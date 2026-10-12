@@ -1,0 +1,130 @@
+{
+  "title": "Elige el mundo visual de Cerquita",
+  "question": "The roll assigned Cuadro de Mercado. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Cuadro de Mercado",
+      "kicker": "THE ROLL",
+      "lineage": "Naïf canvases stacked at Mercado Modelo and on Calle El Conde",
+      "thesis": "Each dog is shown like a market painting: one canvas at a time, in a painted frame, and you only take a few home.",
+      "palette": ["#E3F1F4", "#1D2340", "#1E8A4F", "#E2477A", "#F5A524", "#2F55D4"],
+      "materials": ["flat gouache color fields, no gradients", "hand-painted frame bands", "layered flat leaf silhouettes (plantain, palm, almendro)"],
+      "viewport": "One dog photo in a painted frame band filling about 70% of the screen. Leaves tuck behind the frame edges, the name and km are painted on the frame's lower band, the radius chip sits at the top, and two skip and save capsules sit within thumb reach.",
+      "risk": "Leaves can tip into souvenir kitsch if overused. Market naïf is partly Haitian in origin, so it stays a shared Caribbean grammar of painted color with Dominican subjects.",
+      "raised": [
+        {"from": "Warm consumer app surface", "raise": "One action color, used only on things you can tap. The frame colors never compete with the save button, which also fits the color study's finding about salience."},
+        {"from": "Boarding pass & gate board", "raise": "The dog's facts (age, size, energy, km) are a strip of labeled segments with tabular figures, not loose tags."},
+        {"from": "Split-flap concourse", "raise": "Moving the radius slider updates the dog count and distances in place, digit by digit, so you see what the change does."},
+        {"from": "Vertical media feed", "raise": "The next dog is already loaded one gesture away, and photos fill their frame at any aspect ratio."}
+      ]
+    },
+    {
+      "id": "model-pick",
+      "label": "Ruta de Guagua",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Hand-painted guagua and concho route placards, and the stripes on their bodywork",
+      "thesis": "Distance is the route: each dog appears as a painted windshield placard announcing its name and how far it is.",
+      "palette": ["#FFFFFF", "#151515", "#FFC72C", "#D7263D", "#00897B"],
+      "materials": ["sign-painter lettering", "carrocería speed stripes", "enamel paint on metal"],
+      "viewport": "A dog photo under a windshield-style placard reading 'LUNA · a 6 km · Los Mina'. The radius is a route stripe with stops, and actions sit on a bottom bumper bar.",
+      "risk": "The transit metaphor may make adoption feel like logistics. It's very recognizable locally but could read loud for a careful decision."
+    },
+    {
+      "id": "challenger-zoo-map",
+      "label": "Guide Map Lobes",
+      "verdict": "competitive",
+      "lineage": "Opening-day zoo and garden guide map",
+      "thesis": "Your radius is a swelling lobe of flat color, with shelters pinned along its coast and each dog cropped into its own lobe.",
+      "palette": ["#F5F1E4", "#8ED462", "#2C2E2A", "#F5E211", "#FF705D", "#2BA0FF"],
+      "materials": ["flat unmodulated color", "SVG coastlines", "capsule controls"],
+      "viewport": "A green lobe of 'your area' swells across the screen and the current dog's photo is cropped into it. A yellow capsule shows the km, and the controls are coral and blue capsules.",
+      "case": "Fuses well and wins on product clarity, since the radius becomes the map. It loses on audience identification: it's a generic park map with nothing Dominican.",
+      "risk": "Lobe crops can cut dogs awkwardly, and morphing SVG coastlines is costly on low-end phones.",
+      "hero": "https://impeccable.style/worlds/cards/aww2-zoo-gardens-guide-map-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/aww2-zoo-gardens-guide-map.webp"
+    },
+    {
+      "id": "challenger-warm-consumer",
+      "label": "Warm Consumer App",
+      "verdict": "declined",
+      "lineage": "Soft-cornered consumer apps",
+      "thesis": "Soft cards and one bright action color.",
+      "palette": ["#FFF6EE", "#FFFFFF", "#2A2420", "#FF5A3C"],
+      "materials": ["soft radii", "white cards"],
+      "viewport": "A stacked card column with a bottom bar.",
+      "case": "Clear, but nobody recognizes it as theirs; it's indistinguishable from every pet app.",
+      "kept": "The action color appears only where something can be tapped.",
+      "risk": "Generic.",
+      "hero": "https://impeccable.style/worlds/cards/digital-design-canon-warm-consumer-app-surface-hero.webp"
+    },
+    {
+      "id": "challenger-boarding-pass",
+      "label": "Boarding Pass & Gate Board",
+      "verdict": "declined",
+      "lineage": "Airline travel documents",
+      "thesis": "A segmented pass and a live board.",
+      "palette": ["#F4F4F2", "#111111", "#FF4D00"],
+      "materials": ["segmented panels", "mono figures"],
+      "viewport": "The dog as a pass, with a board of nearby dogs.",
+      "case": "Ranking by departure doesn't fit adoption, and the feel is cold and transactional.",
+      "kept": "Facts shown as labeled segments with tabular figures.",
+      "risk": "Cold.",
+      "hero": "https://impeccable.style/worlds/cards/vernacular-ephemera-boarding-pass-and-gate-board-hero.webp"
+    },
+    {
+      "id": "challenger-vertical-feed",
+      "label": "Vertical Media Feed",
+      "verdict": "declined",
+      "lineage": "Short-video feeds",
+      "thesis": "One item fills the screen and the next is one flick away.",
+      "palette": ["#000000", "#FFFFFF"],
+      "materials": ["full-bleed media", "bottom scrim"],
+      "viewport": "A full-screen dog with an action rail.",
+      "case": "It is built for consumption, which contradicts 'consider, don't consume', and a black frame works against dark-coated dogs.",
+      "kept": "Preloaded next item and photos that fit any aspect.",
+      "risk": "Reflexive swiping.",
+      "hero": "https://impeccable.style/worlds/cards/pop-culture-shelf-vertical-video-feed-surface-hero.webp"
+    },
+    {
+      "id": "challenger-timetable",
+      "label": "Timetable Slide Rack",
+      "verdict": "declined",
+      "lineage": "1971 pocket airline timetable",
+      "thesis": "One type size, raked glass slides.",
+      "palette": ["#D9A521", "#2B2B2B", "#F2ECDD", "#C8321E", "#1E5B3A"],
+      "materials": ["tinted acetate", "lit goldenrod bed"],
+      "viewport": "A raked rack of dog slides.",
+      "case": "A raked lateral rack fights touch browsing and readability on a phone.",
+      "kept": "Rank carried by weight and case, not a ladder of sizes.",
+      "risk": "Unreadable on small screens.",
+      "hero": "https://impeccable.style/worlds/cards/rw-timetable-slide-rack-hero.webp"
+    },
+    {
+      "id": "challenger-split-flap",
+      "label": "Split-Flap Concourse",
+      "verdict": "declined",
+      "lineage": "Rail departure boards",
+      "thesis": "Rows that flip character by character.",
+      "palette": ["#111111", "#FFFFFF", "#FFB000", "#B3261E"],
+      "materials": ["matte flaps", "brushed steel"],
+      "viewport": "A board of nearby dogs.",
+      "case": "Dark and mechanical; it treats dogs as departures.",
+      "kept": "Numbers that change animate in place, digit by digit.",
+      "risk": "Dark and impersonal.",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-split-flap-concourse-hero.webp"
+    }
+  ],
+  "reroll": {"registers": ["safer", "bolder"]},
+  "buildPath": {"value": "code", "toggle": false},
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A photo-first pet adoption app with swipe cards, done at full craft.",
+    "palette": ["#FFFFFF", "#1F2937", "#FF5A5F"],
+    "materials": ["rounded photo cards", "heart and X buttons", "bottom tab bar"],
+    "viewport": "A stack of rounded photo cards, a heart and an X below, and tabs at the bottom.",
+    "risk": "It reads as 'Tinder for dogs', which is exactly what the product refuses to be."
+  },
+  "steer": true
+}

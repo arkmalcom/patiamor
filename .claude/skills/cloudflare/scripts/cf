@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Wrangler wrapper for Patiamor.
+#  - Loads CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID from the project .env without echoing them.
+#  - Runs the project's pinned wrangler (api/node_modules) or falls back to wrangler@4 via npx.
+#  - Refuses anything that touches production, deletes, secrets, or restores unless CF_APPROVED=1,
+#    which is set only after the owner approved that exact command in the conversation.
+#
+# Usage: .claude/skills/cloudflare/scripts/cf <wrangler args...>
+#        CF_APPROVED=1 .claude/skills/cloudflare/scripts/cf deploy      # after explicit approval
+#        .claude/skills/cloudflare/scripts/cf --check <wrangler args...> # classify only, run nothing
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+API_DIR="$ROOT/api"
+
+check_only=0
+if [[ "${1:-}" == "--check" ]]; then check_only=1; shift; fi
+[[ $# -gt 0 ]] || { echo "usage: cf [--check] <wrangler args...>" >&2; exit 2; }
+
+args=("$@")
+joined=" ${args[*]} "
+lower="$(printf '%s' "$joined" | tr '[:upper:]' '[:lower:]')"
+
+has() { [[ "$lower" == *" $1 "* ]]; }
+env_name=""
+for ((i = 0; i < ${#args[@]}; i++)); do
+  case "${args[$i]}" in
+    --env|-e) env_name="${args[$((i + 1))]:-}" ;;
+    --env=*) env_name="${args[$i]#--env=}" ;;
+  esac
+done
+
+# Commands that act on Cloudflare (not local) and therefore have a target environment.
+remote=0
+case "${args[0]}" in
+  deploy|rollback|triggers) remote=1 ;;
+  versions) [[ "${args[1]:-}" =~ ^(deploy|upload|secret)$ ]] && remote=1 ;;
+  secret) remote=1 ;;
+  d1) has "--remote" && remote=1 ;;
+esac
+# No --env means the top-level config, which is production.
+has "--dry-run" && remote=0  # dry runs change nothing
+targets_prod=0
+if [[ "$env_name" == "production" ]] || { [[ $remote -eq 1 ]] && [[ -z "$env_name" ]]; }; then targets_prod=1; fi
+
+reason=""
+writes_sql() { [[ "$lower" =~ (insert|update|delete|drop|alter|create|replace|truncate)[[:space:]] ]]; }
+
+if [[ "${args[0]}" == "login" ]]; then
+  reason="wrangler login grants account-wide OAuth access; this project uses the scoped token in .env"
+elif has "delete" || [[ "${args[0]}" == "delete" ]]; then
+  reason="deletes always need the owner's approval"
+elif [[ "${args[0]}" == "secret" ]] || [[ "${args[0]} ${args[1]:-}" == "versions secret" ]]; then
+  reason="setting or removing secrets always needs the owner's approval"
+elif [[ "${args[0]} ${args[1]:-}" == "d1 create" && "${args[2]:-}" != *-staging ]]; then
+  reason="creating a production D1 database needs the owner's approval"
+elif [[ "$lower" == *" time-travel restore "* ]]; then
+  reason="restoring a D1 database rewinds data; needs the owner's approval"
+elif [[ $targets_prod -eq 1 ]]; then
+  if [[ "${args[0]}" == "d1" && "${args[1]:-}" == "execute" ]] && ! has "--file" && ! writes_sql; then
+    reason=""  # read-only query against production is allowed
+  elif [[ "${args[0]}" == "d1" && "${args[1]:-}" =~ ^(list|info|export)$ ]]; then
+    reason=""
+  elif [[ "${args[0]} ${args[1]:-}" == "d1 migrations" && "${args[2]:-}" == "list" ]]; then
+    reason=""
+  else
+    reason="this changes PRODUCTION (no --env staging given)"
+  fi
+elif [[ "$env_name" == "staging" && "${args[0]}" == "d1" && "${args[1]:-}" == "execute" ]] && writes_sql; then
+  if [[ "$lower" =~ (delete|drop|truncate)[[:space:]] ]]; then reason="destructive SQL (DELETE/DROP/TRUNCATE) needs approval even on staging"; fi
+fi
+
+if [[ -n "$reason" && "${CF_APPROVED:-}" != "1" ]]; then
+  echo "BLOCKED: $reason." >&2
+  echo "Ask the owner, showing the exact command and its effect. Rerun with CF_APPROVED=1 only after a yes." >&2
+  exit 3
+fi
+if [[ $check_only -eq 1 ]]; then
+  if [[ -n "$reason" ]]; then echo "ALLOWED (approved): $reason"; else echo "ALLOWED"; fi
+  exit 0
+fi
+
+if [[ -f "$ROOT/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT/.env"
+  set +a
+fi
+if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+  echo "note: CLOUDFLARE_API_TOKEN is not set; remote commands will fail. See .claude/skills/cloudflare/references/setup.md (the owner creates the token)." >&2
+fi
+
+if [[ -x "$API_DIR/node_modules/.bin/wrangler" ]]; then
+  cd "$API_DIR"
+  exec "$API_DIR/node_modules/.bin/wrangler" "${args[@]}"
+fi
+[[ -d "$API_DIR" ]] && cd "$API_DIR"
+exec npx -y wrangler@4 "${args[@]}"

@@ -1,0 +1,566 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-12T22:01:04+00:00",
+  "title": "Design System: Patiamor",
+  "extensions": {
+    "colorMeta": {
+      "sky": {
+        "role": "neutral",
+        "displayName": "Naïf Sky",
+        "canonical": "#e3f1f4",
+        "tonalRamp": [
+          "oklch(15% 0.015 212.0)",
+          "oklch(26% 0.015 212.0)",
+          "oklch(38% 0.015 212.0)",
+          "oklch(50% 0.015 212.0)",
+          "oklch(62% 0.015 212.0)",
+          "oklch(74% 0.015 212.0)",
+          "oklch(85% 0.015 212.0)",
+          "oklch(95% 0.015 212.0)"
+        ]
+      },
+      "sky-tint": {
+        "role": "neutral",
+        "displayName": "Sky Tint",
+        "canonical": "#eef7f9",
+        "tonalRamp": [
+          "oklch(15% 0.01 212.5)",
+          "oklch(26% 0.01 212.5)",
+          "oklch(38% 0.01 212.5)",
+          "oklch(50% 0.01 212.5)",
+          "oklch(62% 0.01 212.5)",
+          "oklch(74% 0.01 212.5)",
+          "oklch(85% 0.01 212.5)",
+          "oklch(95% 0.01 212.5)"
+        ]
+      },
+      "hill-far": {
+        "role": "neutral",
+        "displayName": "Far Hill",
+        "canonical": "#d2eacf",
+        "tonalRamp": [
+          "oklch(15% 0.044 142.1)",
+          "oklch(26% 0.044 142.1)",
+          "oklch(38% 0.044 142.1)",
+          "oklch(50% 0.044 142.1)",
+          "oklch(62% 0.044 142.1)",
+          "oklch(74% 0.044 142.1)",
+          "oklch(85% 0.044 142.1)",
+          "oklch(95% 0.044 142.1)"
+        ]
+      },
+      "hill-near": {
+        "role": "neutral",
+        "displayName": "Near Hill",
+        "canonical": "#bfe0bf",
+        "tonalRamp": [
+          "oklch(15% 0.057 145.1)",
+          "oklch(26% 0.057 145.1)",
+          "oklch(38% 0.057 145.1)",
+          "oklch(50% 0.057 145.1)",
+          "oklch(62% 0.057 145.1)",
+          "oklch(74% 0.057 145.1)",
+          "oklch(85% 0.057 145.1)",
+          "oklch(95% 0.057 145.1)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0.0 89.9)",
+          "oklch(26% 0.0 89.9)",
+          "oklch(38% 0.0 89.9)",
+          "oklch(50% 0.0 89.9)",
+          "oklch(62% 0.0 89.9)",
+          "oklch(74% 0.0 89.9)",
+          "oklch(85% 0.0 89.9)",
+          "oklch(95% 0.0 89.9)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Night-Blue Ink",
+        "canonical": "#1d2340",
+        "tonalRamp": [
+          "oklch(15% 0.055 273.3)",
+          "oklch(26% 0.055 273.3)",
+          "oklch(38% 0.055 273.3)",
+          "oklch(50% 0.055 273.3)",
+          "oklch(62% 0.055 273.3)",
+          "oklch(74% 0.055 273.3)",
+          "oklch(85% 0.055 273.3)",
+          "oklch(95% 0.055 273.3)"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Soft Ink",
+        "canonical": "#4a5275",
+        "tonalRamp": [
+          "oklch(15% 0.058 273.9)",
+          "oklch(26% 0.058 273.9)",
+          "oklch(38% 0.058 273.9)",
+          "oklch(50% 0.058 273.9)",
+          "oklch(62% 0.058 273.9)",
+          "oklch(74% 0.058 273.9)",
+          "oklch(85% 0.058 273.9)",
+          "oklch(95% 0.058 273.9)"
+        ]
+      },
+      "hibiscus": {
+        "role": "primary",
+        "displayName": "Hibiscus",
+        "canonical": "#c8285f",
+        "tonalRamp": [
+          "oklch(15% 0.196 6.7)",
+          "oklch(26% 0.196 6.7)",
+          "oklch(38% 0.196 6.7)",
+          "oklch(50% 0.196 6.7)",
+          "oklch(62% 0.196 6.7)",
+          "oklch(74% 0.196 6.7)",
+          "oklch(85% 0.196 6.7)",
+          "oklch(95% 0.196 6.7)"
+        ]
+      },
+      "hibiscus-press": {
+        "role": "primary",
+        "displayName": "Hibiscus Press",
+        "canonical": "#a81f4f",
+        "tonalRamp": [
+          "oklch(15% 0.173 6.4)",
+          "oklch(26% 0.173 6.4)",
+          "oklch(38% 0.173 6.4)",
+          "oklch(50% 0.173 6.4)",
+          "oklch(62% 0.173 6.4)",
+          "oklch(74% 0.173 6.4)",
+          "oklch(85% 0.173 6.4)",
+          "oklch(95% 0.173 6.4)"
+        ]
+      },
+      "hoja": {
+        "role": "secondary",
+        "displayName": "Hoja (Leaf Green)",
+        "canonical": "#1e7f49",
+        "tonalRamp": [
+          "oklch(15% 0.122 153.7)",
+          "oklch(26% 0.122 153.7)",
+          "oklch(38% 0.122 153.7)",
+          "oklch(50% 0.122 153.7)",
+          "oklch(62% 0.122 153.7)",
+          "oklch(74% 0.122 153.7)",
+          "oklch(85% 0.122 153.7)",
+          "oklch(95% 0.122 153.7)"
+        ]
+      },
+      "hoja-deep": {
+        "role": "secondary",
+        "displayName": "Hoja Deep",
+        "canonical": "#145c35",
+        "tonalRamp": [
+          "oklch(15% 0.095 154.5)",
+          "oklch(26% 0.095 154.5)",
+          "oklch(38% 0.095 154.5)",
+          "oklch(50% 0.095 154.5)",
+          "oklch(62% 0.095 154.5)",
+          "oklch(74% 0.095 154.5)",
+          "oklch(85% 0.095 154.5)",
+          "oklch(95% 0.095 154.5)"
+        ]
+      },
+      "mango": {
+        "role": "secondary",
+        "displayName": "Mango",
+        "canonical": "#f2a21b",
+        "tonalRamp": [
+          "oklch(15% 0.159 72.5)",
+          "oklch(26% 0.159 72.5)",
+          "oklch(38% 0.159 72.5)",
+          "oklch(50% 0.159 72.5)",
+          "oklch(62% 0.159 72.5)",
+          "oklch(74% 0.159 72.5)",
+          "oklch(85% 0.159 72.5)",
+          "oklch(95% 0.159 72.5)"
+        ]
+      },
+      "mango-tint": {
+        "role": "neutral",
+        "displayName": "Mango Tint",
+        "canonical": "#fdf0d3",
+        "tonalRamp": [
+          "oklch(15% 0.04 86.7)",
+          "oklch(26% 0.04 86.7)",
+          "oklch(38% 0.04 86.7)",
+          "oklch(50% 0.04 86.7)",
+          "oklch(62% 0.04 86.7)",
+          "oklch(74% 0.04 86.7)",
+          "oklch(85% 0.04 86.7)",
+          "oklch(95% 0.04 86.7)"
+        ]
+      },
+      "anil": {
+        "role": "secondary",
+        "displayName": "Añil (Ultramarine)",
+        "canonical": "#2d4fc9",
+        "tonalRamp": [
+          "oklch(15% 0.193 266.8)",
+          "oklch(26% 0.193 266.8)",
+          "oklch(38% 0.193 266.8)",
+          "oklch(50% 0.193 266.8)",
+          "oklch(62% 0.193 266.8)",
+          "oklch(74% 0.193 266.8)",
+          "oklch(85% 0.193 266.8)",
+          "oklch(95% 0.193 266.8)"
+        ]
+      },
+      "turquesa": {
+        "role": "secondary",
+        "displayName": "Turquesa",
+        "canonical": "#3fc1c0",
+        "tonalRamp": [
+          "oklch(15% 0.11 194.3)",
+          "oklch(26% 0.11 194.3)",
+          "oklch(38% 0.11 194.3)",
+          "oklch(50% 0.11 194.3)",
+          "oklch(62% 0.11 194.3)",
+          "oklch(74% 0.11 194.3)",
+          "oklch(85% 0.11 194.3)",
+          "oklch(95% 0.11 194.3)"
+        ]
+      },
+      "ink-lift": {
+        "role": "neutral",
+        "displayName": "Ink Lift",
+        "canonical": "#2b335a"
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Hairline Rule",
+        "canonical": "rgba(29, 35, 64, 0.12)"
+      },
+      "rule-strong": {
+        "role": "neutral",
+        "displayName": "Strong Rule",
+        "canonical": "rgba(29, 35, 64, 0.28)"
+      },
+      "disabled-fill": {
+        "role": "neutral",
+        "displayName": "Disabled Fill",
+        "canonical": "#d5d8e2"
+      },
+      "toast-link": {
+        "role": "neutral",
+        "displayName": "Toast Link Gold",
+        "canonical": "#ffd27a"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Canvas Name",
+        "purpose": "The dog's name painted on the canvas band."
+      },
+      "headline": {
+        "displayName": "Page Title",
+        "purpose": "Page titles (Mi lista, Cuenta)."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Sheet titles, profile section titles, slot dog names, radius value."
+      },
+      "title-sm": {
+        "displayName": "Title Small",
+        "purpose": "Sub-panel titles and drag stamps."
+      },
+      "numeral": {
+        "displayName": "Rolling Numeral",
+        "purpose": "The digit-roll dog count under the radar."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default UI text."
+      },
+      "body-long": {
+        "displayName": "Story",
+        "purpose": "The dog's story and list lede; 52-62ch measure."
+      },
+      "ui-strong": {
+        "displayName": "Button Label",
+        "purpose": "Button labels."
+      },
+      "label": {
+        "displayName": "Field Label",
+        "purpose": "Uppercase field labels only: facts strip dt and chip-group legends."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Sample-data notes, dates, deck position."
+      }
+    },
+    "shadows": [
+      {
+        "name": "canvas-lean",
+        "value": "drop-shadow(0 18px 18px rgba(29,35,64,.28)) drop-shadow(0 3px 4px rgba(29,35,64,.22))",
+        "purpose": "filter on the top canvas; follows the hand-cut frame edge."
+      },
+      {
+        "name": "canvas",
+        "value": "0 26px 40px -26px rgba(29,35,64,.6), 0 4px 10px -6px rgba(29,35,64,.3)",
+        "purpose": "Empty-deck frame."
+      },
+      {
+        "name": "soft",
+        "value": "0 10px 24px -18px rgba(29,35,64,.45)",
+        "purpose": "Paper cards, side panels, stamps, floating icon button, active top-nav pill."
+      },
+      {
+        "name": "sheet-rise",
+        "value": "0 -20px 40px -20px rgba(29,35,64,.4)",
+        "purpose": "Bottom sheet / dialog, over a 50% ink scrim."
+      },
+      {
+        "name": "toast",
+        "value": "0 16px 30px -18px rgba(29,35,64,.8)",
+        "purpose": "Ink toast."
+      },
+      {
+        "name": "bar",
+        "value": "0 -12px 24px -20px rgba(29,35,64,.5)",
+        "purpose": "Fixed profile action bar."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Ease-out-expo; every state change, settle, roll and view transition."
+      },
+      {
+        "name": "ease-exit",
+        "value": "cubic-bezier(0.4, 0, 1, 1)",
+        "purpose": "Card thrown off-screen on skip (320ms)."
+      },
+      {
+        "name": "duration-state",
+        "value": "140-180ms",
+        "purpose": "Hover/press colors, borders, press scale."
+      },
+      {
+        "name": "duration-settle",
+        "value": "260ms",
+        "purpose": "Card considering lift, save lift-off, root view transition."
+      },
+      {
+        "name": "duration-move",
+        "value": "360-460ms",
+        "purpose": "Toast in (360), spring-back (420), photo view transition (440), radar disk (460)."
+      },
+      {
+        "name": "duration-roll",
+        "value": "560ms",
+        "purpose": "Digit-roll count."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0ms",
+        "purpose": "All transitions and animations collapse; view transitions disabled."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "place-chip",
+        "value": "420px"
+      },
+      {
+        "name": "tablet",
+        "value": "720px"
+      },
+      {
+        "name": "desktop",
+        "value": "1100px"
+      },
+      {
+        "name": "short-phone",
+        "value": "(max-height: 640px) and (max-width: 719px)"
+      }
+    ],
+    "framePairs": [
+      {
+        "name": "hoja",
+        "frame": "#1e7f49",
+        "inner": "#f2a21b",
+        "ink": "#ffffff"
+      },
+      {
+        "name": "mango",
+        "frame": "#f2a21b",
+        "inner": "#2d4fc9",
+        "ink": "#1d2340"
+      },
+      {
+        "name": "anil",
+        "frame": "#2d4fc9",
+        "inner": "#3fc1c0",
+        "ink": "#ffffff"
+      },
+      {
+        "name": "turquesa",
+        "frame": "#3fc1c0",
+        "inner": "#1e7f49",
+        "ink": "#1d2340"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button (Guardar)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single hibiscus action in a view; save, widen radius, apply, submit reflection.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5\"/></svg><span>Guardar</span></button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:0 22px;border-radius:999px;border:2px solid transparent;font-family:var(--font-ui, 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif);font-weight:800;font-size:1rem;line-height:1.1;cursor:pointer;white-space:nowrap;transition:background-color 160ms,border-color 160ms,color 160ms,transform 180ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));background:var(--hibiscus, #c8285f);color:#fff;} .ds-btn-primary:hover{background:var(--hibiscus-press, #a81f4f);} .ds-btn-primary:active{transform:scale(0.97);} .ds-btn-primary:focus-visible{outline:3px solid var(--anil, #2d4fc9);outline-offset:3px;} .ds-btn-primary:disabled{background:#d5d8e2;color:var(--ink-2, #4a5275);cursor:not-allowed;transform:none;}"
+    },
+    {
+      "name": "Outline Button (Ahora no)",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Paper pill with an ink border; skip (\"not now\") and secondary choices.",
+      "html": "<button class=\"ds-btn-outline\" type=\"button\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 6v6l4 2\"/></svg><span>Ahora no</span></button>",
+      "css": ".ds-btn-outline{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:0 22px;border-radius:999px;border:2px solid transparent;font-family:var(--font-ui, 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif);font-weight:800;font-size:1rem;line-height:1.1;cursor:pointer;white-space:nowrap;transition:background-color 160ms,border-color 160ms,color 160ms,transform 180ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));background:var(--paper, #fff);color:var(--ink, #1d2340);border-color:var(--ink, #1d2340);} .ds-btn-outline:hover{background:var(--sky-tint, #eef7f9);} .ds-btn-outline:active{transform:scale(0.97);} .ds-btn-outline:focus-visible{outline:3px solid var(--anil, #2d4fc9);outline-offset:3px;}"
+    },
+    {
+      "name": "Ghost Button (Ver perfil)",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Underlined ink text; tertiary actions. Underline turns mango on hover.",
+      "html": "<button class=\"ds-btn-ghost\" type=\"button\">Ver perfil</button>",
+      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:0 22px;border-radius:999px;border:2px solid transparent;font-family:var(--font-ui, 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif);font-weight:800;font-size:1rem;line-height:1.1;cursor:pointer;white-space:nowrap;transition:background-color 160ms,border-color 160ms,color 160ms,transform 180ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));padding:0 12px;background:transparent;color:var(--ink, #1d2340);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:0.25em;} .ds-btn-ghost:hover{text-decoration-color:var(--mango, #f2a21b);} .ds-btn-ghost:active{transform:scale(0.97);} .ds-btn-ghost:focus-visible{outline:3px solid var(--anil, #2d4fc9);outline-offset:3px;}"
+    },
+    {
+      "name": "Ink Button",
+      "kind": "button",
+      "refersTo": "button-ink",
+      "description": "Ink pill for outbound mailto CTAs (multi-adoption, shelter contact).",
+      "html": "<a class=\"ds-btn-ink\" href=\"#\">Escríbenos</a>",
+      "css": ".ds-btn-ink{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:0 22px;border-radius:999px;border:2px solid transparent;font-family:var(--font-ui, 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif);font-weight:800;font-size:1rem;line-height:1.1;cursor:pointer;white-space:nowrap;transition:background-color 160ms,border-color 160ms,color 160ms,transform 180ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));text-decoration:none;background:var(--ink, #1d2340);color:#fff;} .ds-btn-ink:hover{background:#2b335a;} .ds-btn-ink:active{transform:scale(0.97);} .ds-btn-ink:focus-visible{outline:3px solid var(--anil, #2d4fc9);outline-offset:3px;}"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Paper pill toggle; selected fills ink and shows a leading check.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip\" type=\"button\" aria-pressed=\"false\">Pequeño</button><button class=\"ds-chip\" type=\"button\" aria-pressed=\"true\"><span class=\"ds-chip-check\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg></span>Mediano</button></div>",
+      "css": ".ds-chips{display:flex;flex-wrap:wrap;gap:8px;} .ds-chip{display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:0 16px;border-radius:999px;border:1.5px solid var(--rule-strong, rgba(29,35,64,.28));background:var(--paper, #fff);color:var(--ink, #1d2340);font-family:var(--font-ui, 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif);font-weight:700;font-size:0.95rem;cursor:pointer;transition:background-color 140ms,color 140ms,border-color 140ms,transform 160ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));} .ds-chip:hover{border-color:var(--ink, #1d2340);} .ds-chip:active{transform:scale(0.96);} .ds-chip:focus-visible{outline:3px solid var(--anil, #2d4fc9);outline-offset:3px;} .ds-chip[aria-pressed='true']{background:var(--ink, #1d2340);color:#fff;border-color:var(--ink, #1d2340);padding-left:12px;}"
+    },
+    {
+      "name": "Radius Chip",
+      "kind": "chip",
+      "refersTo": "radius-chip",
+      "description": "Top-bar pill showing place and km; opens the radius sheet.",
+      "html": "<button class=\"ds-radius-chip\" type=\"button\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/></svg><span>Gazcue · 25 km</span></button>",
+      "css": ".ds-radius-chip{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px 0 12px;border-radius:999px;border:1.5px solid var(--rule-strong, rgba(29,35,64,.28));background:var(--paper, #fff);color:var(--ink, #1d2340);font-family:var(--font-ui, 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif);font-weight:700;font-size:0.95rem;font-variant-numeric:tabular-nums;cursor:pointer;transition:border-color 160ms,transform 160ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));} .ds-radius-chip:hover{border-color:var(--ink, #1d2340);} .ds-radius-chip:active{transform:scale(0.97);} .ds-radius-chip:focus-visible{outline:3px solid var(--anil, #2d4fc9);outline-offset:3px;}"
+    },
+    {
+      "name": "Segmented Answer",
+      "kind": "input",
+      "refersTo": "segmented-option",
+      "description": "Two-option reflection answer; checked fills ink.",
+      "html": "<div class=\"ds-seg\"><label><input type=\"radio\" name=\"ds-q\" checked><span>Sí, tengo patio</span></label><label><input type=\"radio\" name=\"ds-q\"><span>Apartamento</span></label></div>",
+      "css": ".ds-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-family:var(--font-ui, 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif);} .ds-seg label{position:relative;} .ds-seg input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer;} .ds-seg span{display:flex;align-items:center;justify-content:center;text-align:center;min-height:48px;padding:6px 12px;border:1.5px solid var(--rule-strong, rgba(29,35,64,.28));border-radius:12px;font-weight:700;color:var(--ink, #1d2340);transition:background-color 140ms,color 140ms,border-color 140ms;} .ds-seg label:hover span{border-color:var(--ink, #1d2340);} .ds-seg input:checked+span{background:var(--ink, #1d2340);color:#fff;border-color:var(--ink, #1d2340);} .ds-seg input:focus-visible+span{outline:3px solid var(--anil, #2d4fc9);outline-offset:3px;}"
+    },
+    {
+      "name": "Tab Bar",
+      "kind": "nav",
+      "refersTo": "tabbar",
+      "description": "Mobile bottom nav; active tab goes ink 800 with a mango bar from the top edge; Mi lista shows slot pips.",
+      "html": "<nav class=\"ds-tabbar\"><a href=\"#\" aria-current=\"page\"><span class=\"ds-tab-ico\">●</span>Explorar</a><a href=\"#\"><span class=\"ds-pips\"><i></i><i></i><i></i><b>0/3</b></span>Mi lista</a><a href=\"#\"><span class=\"ds-tab-ico\">○</span>Cuenta</a></nav>",
+      "css": ".ds-tabbar{display:grid;grid-template-columns:repeat(3,1fr);background:var(--paper, #fff);border-top:1px solid var(--rule, rgba(29,35,64,.12));font-family:var(--font-ui, 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif);} .ds-tabbar a{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:64px;color:var(--ink-2, #4a5275);text-decoration:none;font-size:0.8rem;font-weight:600;} .ds-tabbar a:hover{color:var(--ink, #1d2340);} .ds-tabbar a:focus-visible{outline:3px solid var(--anil, #2d4fc9);outline-offset:3px;} .ds-tabbar a[aria-current='page']{color:var(--ink, #1d2340);font-weight:800;} .ds-tabbar a[aria-current='page']::before{content:'';position:absolute;top:0;left:50%;translate:-50% 0;width:32px;height:4px;border-radius:0 0 4px 4px;background:var(--mango, #f2a21b);} .ds-tab-ico{height:24px;line-height:24px;} .ds-pips{display:inline-flex;align-items:center;gap:4px;height:24px;} .ds-pips i{width:9px;height:19px;border-radius:2px;border:1.5px dashed currentColor;opacity:.55;} .ds-pips b{font-size:0.78em;font-weight:800;font-variant-numeric:tabular-nums;margin-left:2px;}"
+    },
+    {
+      "name": "Market Canvas",
+      "kind": "card",
+      "refersTo": "facts-strip",
+      "description": "Signature dog card: painted two-tone frame band, white photo mat with inner fillet, Shrikhand name on the band, segmented facts strip. Production adds the hand-cut SVG edge mask and stroke overlay.",
+      "html": "<div class=\"ds-canvas\"><div class=\"ds-canvas-pic\"></div><div class=\"ds-canvas-band\"><span class=\"ds-canvas-name\">Canela</span><span class=\"ds-canvas-where\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/></svg><b>a 0.6 km</b>&nbsp;· Gazcue</span></div><dl class=\"ds-facts\"><div><dt>Edad</dt><dd>4 años</dd></div><div><dt>Tamaño</dt><dd>Mediano</dd></div><div><dt>Energía</dt><dd>Media</dd></div><div><dt>Sexo</dt><dd>Hembra</dd></div></dl></div>",
+      "css": ".ds-canvas{width:320px;display:grid;padding:12px;background:var(--hoja, #1e7f49);color:#fff;font-family:var(--font-ui, 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif);filter:drop-shadow(0 18px 18px rgba(29,35,64,.28)) drop-shadow(0 3px 4px rgba(29,35,64,.22));} .ds-canvas-pic{height:300px;margin:4px;border-radius:3px;background:var(--sky, #e3f1f4);box-shadow:0 0 0 4px var(--mango, #f2a21b);} .ds-canvas-band{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:2px 12px;padding:14px 6px 12px;} .ds-canvas-name{font-family:var(--font-display, 'Shrikhand', serif);font-size:2.4rem;line-height:1;letter-spacing:-0.01em;} .ds-canvas-where{display:inline-flex;align-items:center;gap:4px;font-size:0.98rem;font-variant-numeric:tabular-nums;} .ds-canvas-where b{font-weight:800;} .ds-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0;background:var(--paper, #fff);color:var(--ink, #1d2340);border-radius:4px;} .ds-facts>div{padding:8px 10px 9px;min-width:0;} .ds-facts>div+div{border-left:1px solid var(--rule, rgba(29,35,64,.12));} .ds-facts dt{font-size:0.68rem;font-weight:800;letter-spacing:0.09em;text-transform:uppercase;color:var(--ink-2, #4a5275);} .ds-facts dd{margin:0;font-weight:700;font-size:0.9rem;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}"
+    },
+    {
+      "name": "Slot Card",
+      "kind": "card",
+      "refersTo": "slot-card",
+      "description": "A Mi lista slot: paper card with a mini frame and Shrikhand name; empty slot is dashed and transparent.",
+      "html": "<ul class=\"ds-slots\"><li class=\"ds-slot\"><span class=\"ds-mini\"><span></span></span><span class=\"ds-slot-text\"><span class=\"ds-slot-name\">Canela</span><span class=\"ds-slot-date\">Guardada hoy</span></span></li><li class=\"ds-slot ds-slot--empty\"><span class=\"ds-slot-blank\"></span><span class=\"ds-slot-empty\">Espacio libre</span></li></ul>",
+      "css": ".ds-slots{list-style:none;margin:0;padding:0;display:grid;gap:14px;font-family:var(--font-ui, 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif);color:var(--ink, #1d2340);} .ds-slot{display:flex;gap:16px;align-items:center;padding:16px;background:var(--paper, #fff);border-radius:16px;box-shadow:0 10px 24px -18px rgba(29,35,64,.45);} .ds-slot--empty{background:transparent;box-shadow:none;border:2px dashed var(--rule-strong, rgba(29,35,64,.28));} .ds-mini{display:inline-block;padding:5px;background:var(--anil, #2d4fc9);border-radius:5px;box-shadow:0 8px 14px -10px rgba(29,35,64,.6);} .ds-mini span{display:block;width:66px;height:80px;border-radius:2px;background:var(--sky, #e3f1f4);box-shadow:0 0 0 2px var(--turquesa, #3fc1c0);} .ds-slot-blank{flex:none;width:76px;height:90px;border:2px dashed var(--rule-strong, rgba(29,35,64,.28));border-radius:5px;} .ds-slot-text{display:grid;gap:6px;} .ds-slot-name{font-family:var(--font-display, 'Shrikhand', serif);font-size:1.6rem;line-height:1.05;} .ds-slot-date{font-size:0.9rem;color:var(--ink-2, #4a5275);} .ds-slot-empty{font-weight:800;font-size:1.05rem;color:var(--ink-2, #4a5275);}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Cuadro de Mercado",
+    "overview": "Every dog is a naïf market painting of the kind sold on the street in El Conde and at the Mercado Modelo. The build shows one framed canvas at a time on a pale painted sky, set above two flat green hills. The frame is a two-tone gouache band whose edge is slightly wobbly, as if cut by hand, with faint brush strokes. Flat leaf silhouettes tuck in behind its edges. The dog's name is painted on the lower band in a heavy brush script, and the dog's facts sit beneath it in a white strip divided into cells. Everything around the canvas (the top bar, the thumb row, the sheets) stays quiet. It uses paper-white, night-blue ink and pill shapes, so the painting carries the color and the interface stays out of the way.\n\nDensity is low and deliberate. The stated aim is one painting, looked at carefully, with only a few taken home. Color works by strict division of labor. The frame paints (leaf green, mango, ultramarine, turquoise) belong to the dogs and the painted world. A single hibiscus pink belongs to the act of pressing. Ink belongs to text and to the selected state. The fills are flat: no smooth gradients, no glass, no blur. Depth comes from soft, cool, ink-tinted drop shadows under paper objects and under the canvas, which reads like a painting leaning off a wall.\n\nThe world explicitly rejects the dating-app stack: rounded photo cards with a red X and a green heart. Skipping is \"Ahora no\" (outline, a clock icon, on the left); saving is \"Guardar\" (hibiscus, a heart icon, on the right), and a save opens a reflection sheet rather than committing at once.",
+    "keyCharacteristics": [
+      "One framed canvas per view; the photo fills about two thirds of the phone viewport.",
+      "Two-tone painted frame bands chosen per dog from a four-paint set, with a hand-cut edge mask and stroke texture.",
+      "Hibiscus is the only action color, and only on pressable things.",
+      "Shrikhand for dog names, titles and big numbers; Atkinson Hyperlegible Next for everything else.",
+      "Flat gouache fields: sky ground, two painted hills, leaf silhouettes with one fill and a midrib.",
+      "Paper-white controls with pill shapes and ink outlines; ink fill marks the selected state.",
+      "Tabular figures wherever a number is read: km, counts, facts, slot pips."
+    ],
+    "rules": [
+      {
+        "name": "The One Pink Rule",
+        "body": "Hibiscus marks only things that act when pressed or dragged: the primary button, the save stamp on the draggable card, and the caret in a field. It never colors a heading, an illustration, a frame, a badge or a status. The color study found that the button-color effect comes from isolation, not hue (docs/color-study.md §1, \"Red buttons convert better\" is a Myth; the von Restorff effect is Strong). The pink works because it is the only one on screen.",
+        "section": "colors"
+      },
+      {
+        "name": "The Paint Belongs To The Dog Rule",
+        "body": "Each dog carries one frame paint pair (`data-frame`). That pair repeats wherever the dog appears: the canvas, the mini frame, its radar dot and its filled slot pip. A paint never becomes a UI state color.",
+        "section": "colors"
+      },
+      {
+        "name": "The Light Ground Rule",
+        "body": "Photos sit only on light grounds: the sky page, a white mat inside the frame, and mid-tone frame paints. Nothing near black ever goes behind a photo. This is cheap insurance for dark-coated dogs (docs/color-study.md, implication 3).",
+        "section": "colors"
+      },
+      {
+        "name": "The Never Color Alone Rule",
+        "body": "Skip and save are told apart by label, icon (clock or heart), position (left or right), fill (outline or hibiscus) and gesture direction. They are never told apart by red against green, and never by color alone (docs/color-study.md §4; WCAG 1.4.1).",
+        "section": "colors"
+      },
+      {
+        "name": "The Painted Title Rule",
+        "body": "Shrikhand is always set at weight 400 and only at title sizes (1.3rem and up). It never sets body copy, button labels or field labels.",
+        "section": "typography"
+      },
+      {
+        "name": "The Counted Figures Rule",
+        "body": "Every number a person compares (km, counts, ages, slot tallies, ring labels) uses `font-variant-numeric: tabular-nums`.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Paint Rule",
+        "body": "Painted fields (sky, hills, leaves, frame bands) are flat single fills. They take no gradients, no shading, and no shadows of their own. Only objects (the canvas and paper surfaces) cast shadows.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep hibiscus ({colors.hibiscus}) for the single primary action in a view. Pair it with an outline or ghost alternative, so it stays the only pink on screen.",
+      "Do give every new dog surface the dog's own frame pair via `data-frame` (hoja, mango, anil or turquesa), and repeat that paint in its pip, mini frame and radar dot.",
+      "Do put dog photos on sky, paper or a frame paint, with a white mat and an inner fillet.",
+      "Do set dog names, page titles and big counts in Shrikhand 400. Set everything else in Atkinson Hyperlegible Next, with tabular figures for numbers.",
+      "Do keep a visible, labeled button with an icon for every swipe gesture, with skip on the left and save on the right.",
+      "Do use the ease-out-expo curve (cubic-bezier(0.16, 1, 0.3, 1)) for state changes at 140–260ms and for larger moves at 420–560ms, and drop every duration to 0ms under reduced motion.",
+      "Do show selection with an ink fill plus a check or label change, never with a color shift alone.",
+      "Do mark sample data visibly (the DEMO tag and sample notes in caption style)."
+    ],
+    "donts": [
+      "Don't use a red X or green heart, a red/green pair, or any color-only distinction between skip and save.",
+      "Don't put hibiscus on headings, frames, illustrations, badges, statuses or decoration.",
+      "Don't place a photo on near-black or dark ink grounds.",
+      "Don't use smooth gradients, glass, backdrop blur or shading on painted fields; fills are flat (the slider's fill is a hard stop, not a blend).",
+      "Don't use hard offset shadows; shadows are soft, ink-tinted and negative-spread.",
+      "Don't add frame paints beyond the four in the set, or use a frame paint as a UI state color.",
+      "Don't set Shrikhand below 1.3rem or above weight 400, or use it for buttons, labels or body copy.",
+      "Don't shrink touch targets below 42px or primary buttons below 46px."
+    ]
+  }
+}

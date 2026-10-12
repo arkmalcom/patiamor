@@ -1,0 +1,30 @@
+# Dependencies & builds
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+
+# Cloudflare / secrets
+.wrangler/
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+backups/
+
+# Impeccable: keep design.json, surfaces/ and decision/ (durable design context); ignore scratch
+.impeccable/review/
+.impeccable/questions/
+.impeccable/config.local.json
+
+# Claude Code: keep skills/ (shared project skill); ignore personal settings and eval scratch
+.claude/settings.local.json
+.claude/skills/*-workspace/
+
+# Editors & OS
+.DS_Store
+*.log
+.vscode/*
+!.vscode/extensions.json
+.idea/
