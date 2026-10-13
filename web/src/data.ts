@@ -40,6 +40,8 @@ export interface PetSummary {
   health: { vaccinated: boolean; sterilized: boolean; dewormed: boolean };
   litterId: string | null;
   status: string;
+  /** Whether an adoption request can be sent: open, busy (several already), paused, or reserved ("en proceso"). */
+  requests: 'open' | 'busy' | 'paused' | 'reserved';
   place: Place;
   lister: Lister;
   photo: { url: string | null; focus: string };

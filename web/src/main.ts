@@ -6,9 +6,10 @@ import { Compass, MapPin, SlidersHorizontal, User } from 'lucide';
 import { landscape } from './art';
 import { $, $$, html, icon, mount, transition } from './dom';
 import { t } from './i18n';
-import { activeFilterCount, loadPets, setLocation, setUser, state, subscribe, update } from './store';
+import { activeFilterCount, loadPets, setLocation, setUser, state, subscribe, takePendingRequest, update } from './store';
 import { applyFooter, bindRadiusPanel, radiusPanel } from './ui/radius';
-import { mountPips, pips, resumePendingSave } from './ui/save';
+import { resumePendingRequest } from './ui/request';
+import { mountPips, pips } from './ui/save';
 import { closeSheet, initSheet, openSheet, sheetEl } from './ui/sheet';
 import { initToast, toast } from './ui/toast';
 import { api, ApiError } from './api';
@@ -170,7 +171,7 @@ const signedIn = linkToken
 signedIn
   .then((user) => {
     setUser(user);
-    void resumePendingSave();
+    void resumePendingRequest(takePendingRequest());
   })
   .catch(() => {
     /* API unreachable (e.g. static preview): stay signed out */

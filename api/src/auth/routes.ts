@@ -3,7 +3,7 @@ import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { AppContext } from '../env';
 import { isoIn, nowIso, randomToken, sha256, sixDigitCode, timingSafeEqual } from './crypto';
-import { EmailQuotaError, sendSignInEmail } from './email';
+import { EmailQuotaError, hasEmailBudget, sendSignInEmail } from './email';
 import { endSession, startSession } from './session';
 import { isEmail, normalizeEmail, userForEmail, userForGoogle } from './users';
 
@@ -12,8 +12,6 @@ const MAX_ATTEMPTS = 5;
 const MAX_CODES_PER_EMAIL_HOUR = 5;
 const MAX_CODES_PER_IP_HOUR = 20;
 const RESEND_COOLDOWN_MS = 45 * 1000;
-/** Resend's free tier: 100 emails a day for the whole account. Stop just short and say so kindly. */
-const DAILY_EMAIL_CAP = 100;
 
 type C = Context<AppContext>;
 
@@ -47,12 +45,9 @@ auth.post('/email/start', async (c) => {
   if ((recent?.n ?? 0) >= MAX_CODES_PER_EMAIL_HOUR || (byIp?.n ?? 0) >= MAX_CODES_PER_IP_HOUR) {
     return c.json({ error: 'too_many' }, 429);
   }
-  const today = await db
-    .prepare('SELECT count(*) AS n FROM email_codes WHERE created_at > ?')
-    .bind(isoIn(-24 * 60 * 60 * 1000))
-    .first<{ n: number }>();
-  if ((today?.n ?? 0) >= DAILY_EMAIL_CAP) {
-    console.error(`sign-in email cap reached: ${today?.n} codes in the last 24h`);
+  // Resend's free tier is 100 emails a day for the whole account; stop just short and say so kindly.
+  if (!(await hasEmailBudget(db, 'signin'))) {
+    console.error('daily email cap reached: sign-in code refused');
     return c.json({ error: 'email_quota' }, 503);
   }
 

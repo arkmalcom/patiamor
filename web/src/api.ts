@@ -1,11 +1,13 @@
 // Thin client for the Patiamor Worker API (same origin in every environment).
 import type { PetDetail, PetSummary, LatLng, Place } from './data';
-import type { Answers, SavedItem } from './store';
+import type { AdoptionRequest, ContactPref, MyRequest, RequestForm } from './store';
 
 export interface Me {
   id: string;
   email: string;
   name: string | null;
+  phone?: string | null;
+  contactPref?: ContactPref | null;
   isAdmin: boolean;
   shelters?: { id: string; name: string; role: 'owner' | 'maintainer' }[];
 }
@@ -49,9 +51,11 @@ export const api = {
   searchPlaces: (q: string) => call<{ places: Place[] }>(`/api/places?q=${encodeURIComponent(q)}`).then((r) => r.places),
   nearestPlace: (at: LatLng) => call<{ place: Place }>(`/api/places/nearest?${point(at)}`).then((r) => r.place),
   whereami: () => call<{ place: Place; source: 'ip' | 'default' }>('/api/whereami'),
-  shortlist: () => call<{ items: SavedItem[] }>('/api/shortlist').then((r) => r.items),
-  save: (petId: string, answers: Answers) => call<{ ok: true }>('/api/shortlist', 'POST', { petId, answers }),
-  unsave: (petId: string) => call<{ ok: true }>(`/api/shortlist/${encodeURIComponent(petId)}`, 'DELETE', {}),
+  myRequests: () => call<{ items: MyRequest[]; alerts: string[] }>('/api/requests'),
+  requestAdoption: (form: RequestForm) => call<{ request: AdoptionRequest }>('/api/requests', 'POST', form).then((r) => r.request),
+  withdrawRequest: (id: string, reason: string | null) => call<{ ok: true }>(`/api/requests/${encodeURIComponent(id)}/withdraw`, 'POST', { reason }),
+  alertOn: (petId: string) => call<{ ok: true }>(`/api/alerts/${encodeURIComponent(petId)}`, 'PUT', {}),
+  alertOff: (petId: string) => call<{ ok: true }>(`/api/alerts/${encodeURIComponent(petId)}`, 'DELETE', {}),
 };
 
 function point({ lat, lng }: LatLng) {

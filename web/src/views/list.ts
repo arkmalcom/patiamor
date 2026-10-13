@@ -1,10 +1,15 @@
-import { Compass, Footprints } from 'lucide';
-import { $$, html, icon, mount, type Raw } from '../dom';
-import { formatDate, t, away } from '../i18n';
-import { MAX_SLOTS, placePet, state, type Answer, type SavedItem } from '../store';
-import { listerLabel, miniFrame, photo } from '../ui/canvas';
+import { Compass, Eye, Undo2 } from 'lucide';
 import { frameFor } from '../data';
-import { pips, removeFromList } from '../ui/save';
+import { $$, html, icon, mount, type Raw } from '../dom';
+import { away, t } from '../i18n';
+import { activeRequests, isOpen, MAX_SLOTS, petCache, placePet, state, update, type Answer, type MyRequest } from '../store';
+import { listerLabel, miniFrame, photo } from '../ui/canvas';
+import { listerName, openWithdraw, requestStatus, statusKey } from '../ui/request';
+import { pips } from '../ui/save';
+import { toast } from '../ui/toast';
+
+// Mi lista: three slots, each an adoption request in progress, plus the ones that ended recently and,
+// in a second view, the pets passed on this session ("Dejaste pasar"), shown as a list.
 
 interface ListDeps {
   openProfile: (id: string) => void;
@@ -14,34 +19,27 @@ interface ListDeps {
 const answerTag = (label: string, a: Answer) =>
   html`<li class="answer answer--${a}"><span>${label}</span><strong>${a === 'si' ? t('reflect.yes') : t('reflect.unsure')}</strong></li>`;
 
-function filled(s: SavedItem, compact: boolean): Raw {
+function filled(s: MyRequest, compact: boolean): Raw {
   const { pet } = s;
   const p = placePet(pet);
-  const who = pet.lister.type === 'shelter' ? pet.lister.name : t('lister.privateWho');
-  const gone = pet.status !== 'available';
   return html`
     <li class="slot slot--filled">
       <button class="slot__open" type="button" data-open="${pet.id}" aria-label="${t('deck.profile')}: ${pet.name}">${miniFrame(pet, compact ? 'sm' : 'md')}</button>
       <div class="slot__text">
         <h2 class="slot__name">${pet.name}</h2>
         <p class="muted">${away(p.km)} · ${listerLabel(pet)}</p>
-        ${gone ? html`<p class="slot__gone">${t('list.unavailable')}</p>` : ''}
         ${compact
-          ? ''
+          ? html`<p class="slot__status">${t(`request.status.${statusKey(s) as 'sent'}`, { lister: listerName(pet), name: pet.name })}</p>`
           : html`
-              <p class="slot__date">${t('list.savedOn', { date: formatDate(s.savedAt.slice(0, 10)) })}</p>
+              ${requestStatus(s)}
               <ul class="answers" aria-label="${t('list.answers')}">
                 ${answerTag(t('list.answer.space'), s.answers.space)}
                 ${answerTag(t('list.answer.time'), s.answers.time)}
                 ${answerTag(t('list.answer.cost'), s.answers.cost)}
               </ul>
-              <div class="next-step">
-                ${icon(Footprints, 18)}
-                <p><strong>${t('list.next')}:</strong> ${t('list.nextBody', { shelter: who })}</p>
-              </div>
               <div class="slot__actions">
                 <button class="button button--outline button--small" type="button" data-open="${pet.id}">${t('deck.profile')}</button>
-                <button class="button button--ghost button--small" type="button" data-release="${pet.id}">${t('full.release')}</button>
+                <button class="button button--ghost button--small" type="button" data-withdraw="${s.request.id}">${t('request.withdraw')}</button>
               </div>`}
       </div>
     </li>`;
@@ -57,20 +55,74 @@ const empty = (compact: boolean) => html`
   </li>`;
 
 export function slots(compact = false): Raw {
-  return html`<ol class="slots ${compact ? 'slots--compact' : ''}">${Array.from({ length: MAX_SLOTS }, (_, i) =>
-    state.saved[i] ? filled(state.saved[i], compact) : empty(compact),
-  )}</ol>`;
+  const open = activeRequests();
+  return html`<ol class="slots ${compact ? 'slots--compact' : ''}">${Array.from({ length: MAX_SLOTS }, (_, i) => (open[i] ? filled(open[i], compact) : empty(compact)))}</ol>`;
+}
+
+/** Requests that ended in the last 30 days: how things turned out, never a mystery. */
+function ended(): Raw {
+  const done = state.requests.filter((r) => !isOpen(r.request)).reverse();
+  if (!done.length) return html``;
+  return html`
+    <section class="ended" aria-labelledby="ended-title">
+      <h2 class="section-title" id="ended-title">${t('list.ended')}</h2>
+      <ul class="ended__list">
+        ${done.map(
+          (s) => html`<li class="ended__item">
+            <button class="slot__open" type="button" data-open="${s.pet.id}" aria-label="${t('deck.profile')}: ${s.pet.name}">${miniFrame(s.pet, 'sm')}</button>
+            <div class="ended__text"><strong>${s.pet.name}</strong>${requestStatus(s)}</div>
+          </li>`,
+        )}
+      </ul>
+    </section>`;
+}
+
+/** "Dejaste pasar": this session's skipped pets. They return to Explorar next visit, and leave this list then. */
+function passed(): Raw {
+  const pets = state.skipped.map((id) => petCache.get(id)).filter((p) => !!p);
+  if (!pets.length) return html`<p class="passed__empty">${t('list.passedEmpty')}</p>`;
+  return html`
+    <p class="muted">${t('list.passedNote')}</p>
+    <ul class="passed">
+      ${pets.map((pet) => {
+        const p = placePet(pet);
+        return html`<li class="passed__item">
+          <button class="slot__open" type="button" data-open="${pet.id}" aria-label="${t('deck.profile')}: ${pet.name}">${miniFrame(pet, 'sm')}</button>
+          <div class="passed__text">
+            <strong class="passed__name">${pet.name}</strong>
+            <span class="muted">${away(p.km)} · ${listerLabel(pet)}</span>
+          </div>
+          <div class="passed__actions">
+            <button class="button button--outline button--small" type="button" data-open="${pet.id}">${icon(Eye, 16)}${t('deck.profile')}</button>
+            <button class="button button--ghost button--small" type="button" data-unskip="${pet.id}">${icon(Undo2, 16)}${t('list.showAgain')}</button>
+          </div>
+        </li>`;
+      })}
+    </ul>`;
 }
 
 export function bindSlots(root: HTMLElement, deps: ListDeps) {
   $$<HTMLButtonElement>('[data-open]', root).forEach((b) => b.addEventListener('click', () => deps.openProfile(b.dataset.open!)));
-  $$<HTMLButtonElement>('[data-release]', root).forEach((b) => b.addEventListener('click', () => removeFromList(b.dataset.release!)));
+  $$<HTMLButtonElement>('[data-withdraw]', root).forEach((b) =>
+    b.addEventListener('click', () => {
+      const item = state.requests.find((x) => x.request.id === b.dataset.withdraw);
+      if (item) openWithdraw(item);
+    }),
+  );
+  $$<HTMLButtonElement>('[data-unskip]', root).forEach((b) =>
+    b.addEventListener('click', () => {
+      const id = b.dataset.unskip!;
+      update((s) => (s.skipped = s.skipped.filter((x) => x !== id)));
+      toast(t('list.shownAgain', { name: petCache.get(id)?.name ?? '' }));
+    }),
+  );
 }
 
 /** "Tu casa": one painted facade with three windows, open with a pet looking out or shut while empty. */
 function casa(): Raw {
+  const open = activeRequests();
   const windows = Array.from({ length: MAX_SLOTS }, (_, i) => {
-    const s = state.saved[i];
+    const s = open[i];
     return s
       ? html`<span class="casa__window is-open" data-frame="${frameFor(s.pet.id)}"><span class="casa__shutter"></span><span class="casa__pane">${photo(s.pet)}</span><span class="casa__shutter"></span></span>`
       : html`<span class="casa__window" data-frame="anil"><span class="casa__pane"><span class="casa__shut"></span><span class="casa__shut"></span></span></span>`;
@@ -79,18 +131,28 @@ function casa(): Raw {
 }
 
 export function renderList(root: HTMLElement, deps: ListDeps) {
+  const showPassed = location.hash.startsWith('#/lista/pasados');
+  const open = activeRequests();
   mount(
     root,
     html`
       <section class="list-view" aria-labelledby="list-title">
         <header class="list-view__head">
           <h1 class="page-title" id="list-title" tabindex="-1" data-focus>${t('list.title')}</h1>
-          <span class="list-view__count">${pips()}<span>${t('list.slots', { n: state.saved.length })}</span></span>
+          <span class="list-view__count">${pips()}<span>${t('list.slots', { n: open.length })}</span></span>
         </header>
-        ${casa()}
-        <p class="list-view__lede">${t('list.body')}</p>
-        ${!state.signedIn && !state.saved.length ? html`<p class="sample-note">${t('list.signedOut')}</p>` : ''}
-        ${slots()}
+        <nav class="list-tabs" aria-label="${t('list.title')}">
+          <a class="list-tabs__tab" href="#/lista" aria-current="${showPassed ? 'false' : 'page'}">${t('list.tab.requests')}</a>
+          <a class="list-tabs__tab" href="#/lista/pasados" aria-current="${showPassed ? 'page' : 'false'}">${t('list.tab.passed')}${state.skipped.length ? html` <span class="list-tabs__count">${state.skipped.length}</span>` : ''}</a>
+        </nav>
+        ${showPassed
+          ? passed()
+          : html`
+              ${casa()}
+              <p class="list-view__lede">${t('list.body')}</p>
+              ${!state.signedIn && !open.length ? html`<p class="sample-note">${t('list.signedOut')}</p>` : ''}
+              ${slots()}
+              ${ended()}`}
         <button class="button button--outline" type="button" data-explore>${icon(Compass, 20)}${t('list.explore')}</button>
       </section>`,
   );

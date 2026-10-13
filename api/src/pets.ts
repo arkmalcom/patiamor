@@ -2,11 +2,18 @@ import { Hono } from 'hono';
 import { cachedJson } from './cache';
 import type { AppContext } from './env';
 
-// Who may see a pet publicly. One definition, used by search, profiles, siblings and shortlist saves:
+// Who may see a pet publicly. One definition, used by search, profiles, siblings and adoption requests:
 // available; from a verified shelter or a private lister; and at least 8 weeks old (anti puppy-mill rule).
-export const VISIBLE = `d.status = 'available'
-  AND (d.shelter_id IS NULL OR s.verified_at IS NOT NULL)
+const PUBLIC = `(d.shelter_id IS NULL OR s.verified_at IS NOT NULL)
   AND (d.birth_date IS NULL OR d.birth_date <= date('now', '-56 days'))`;
+export const VISIBLE = `d.status = 'available' AND ${PUBLIC}`;
+/** Browsing shows available pets; a profile (and saving) also works for one "en proceso" with a family. */
+export const VIEWABLE = `d.status IN ('available', 'reserved') AND ${PUBLIC}`;
+
+/** Requests pause on their own at this many open ones, so a viral pet can't flood a small rescue. */
+export const REQUEST_CAP = 10;
+/** From this many, adopters see a gentle "ya tiene varias solicitudes" (never an exact count). */
+const BUSY_AT = 3;
 
 // The pet list is cached per area square, not per visitor: the visitor's point snaps to a square of
 // CELL degrees (~55 km), and everyone in that square shares one cached copy. The list holds every
@@ -27,6 +34,7 @@ const KM_SQL = `6371 * acos(min(1, cos(radians(?1)) * cos(radians(p.lat)) * cos(
 
 export const SUMMARY_COLUMNS = `d.id, d.species, d.name, d.sex, d.birth_date, d.birth_date_estimated, d.size, d.energy,
   d.good_with_kids, d.good_with_dogs, d.good_with_cats, d.vaccinated, d.sterilized, d.dewormed, d.litter_id, d.status,
+  d.open_requests, d.requests_paused,
   p.id AS place_id, p.name AS place_name, p.municipality, p.province, p.lat, p.lng,
   s.id AS shelter_id, s.name AS shelter_name,
   (SELECT json_object('key', ph.r2_key, 'focus', ph.focus) FROM pet_photos ph WHERE ph.pet_id = d.id ORDER BY ph.position LIMIT 1) AS cover`;
@@ -40,7 +48,7 @@ type Bool = 0 | 1 | null;
 export interface SummaryRow {
   id: string; species: string; name: string; sex: string; birth_date: string | null; birth_date_estimated: number; size: string; energy: string;
   good_with_kids: Bool; good_with_dogs: Bool; good_with_cats: Bool; vaccinated: number; sterilized: number; dewormed: number;
-  litter_id: string | null; status: string;
+  litter_id: string | null; status: string; open_requests: number; requests_paused: number;
   place_id: string; place_name: string; municipality: string; province: string; lat: number; lng: number;
   shelter_id: string | null; shelter_name: string | null; cover: string | null;
 }
@@ -62,6 +70,15 @@ export function summary(r: SummaryRow) {
     health: { vaccinated: r.vaccinated === 1, sterilized: r.sterilized === 1, dewormed: r.dewormed === 1 },
     litterId: r.litter_id,
     status: r.status,
+    // Whether a new adoption request can be sent, and how gently to warn that there are others.
+    requests:
+      r.status === 'reserved'
+        ? ('reserved' as const)
+        : r.requests_paused || r.open_requests >= REQUEST_CAP
+          ? ('paused' as const)
+          : r.open_requests >= BUSY_AT
+            ? ('busy' as const)
+            : ('open' as const),
     place: { id: r.place_id, name: r.place_name, municipality: r.municipality, province: r.province, lat: r.lat, lng: r.lng },
     // Verified shelters show their name; everyone else is "Particular" (never a person's name).
     lister: r.shelter_id ? { type: 'shelter' as const, id: r.shelter_id, name: r.shelter_name } : { type: 'private' as const },
@@ -119,7 +136,7 @@ async function profile(db: D1Database, id: string): Promise<{ body: unknown; sta
               d.story, d.needs, d.adoption_fee_dop, d.in_care_since, s.visit_hours, s.description AS shelter_description,
               sp.name AS shelter_place, sp.municipality AS shelter_municipality
          ${FROM} LEFT JOIN places sp ON sp.id = s.place_id
-        WHERE d.id = ? AND ${VISIBLE}`,
+        WHERE d.id = ? AND ${VIEWABLE}`,
     )
     .bind(id)
     .first<SummaryRow & { story: string; needs: string; adoption_fee_dop: number | null; in_care_since: string | null; visit_hours: string | null; shelter_description: string | null; shelter_place: string | null; shelter_municipality: string | null }>();
@@ -128,7 +145,7 @@ async function profile(db: D1Database, id: string): Promise<{ body: unknown; sta
   const [{ results: photos }, { results: siblings }] = await Promise.all([
     db.prepare('SELECT r2_key, focus FROM pet_photos WHERE pet_id = ? ORDER BY position').bind(id).all<{ r2_key: string; focus: string }>(),
     row.litter_id
-      ? db.prepare(`SELECT ${SUMMARY_COLUMNS} ${FROM} WHERE d.litter_id = ? AND d.id != ? AND ${VISIBLE} ORDER BY d.name`).bind(row.litter_id, id).all<SummaryRow>()
+      ? db.prepare(`SELECT ${SUMMARY_COLUMNS} ${FROM} WHERE d.litter_id = ? AND d.id != ? AND ${VIEWABLE} ORDER BY d.name`).bind(row.litter_id, id).all<SummaryRow>()
       : Promise.resolve({ results: [] as SummaryRow[] }),
   ]);
   const base = summary(row);

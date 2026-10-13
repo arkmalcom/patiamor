@@ -6,7 +6,7 @@ import { currentUser } from './auth/session';
 import { pets, readPoint } from './pets';
 import type { AppContext, Env } from './env';
 import { inDR, nearestPlace, PLACES_ATTRIBUTION, placeById, searchPlaces } from './places';
-import { shortlist } from './shortlist';
+import { alerts, requests } from './requests';
 
 export type { Env } from './env';
 
@@ -44,7 +44,8 @@ app.get('/api/health', async (c) => {
 
 app.route('/api/auth', auth);
 app.route('/api/pets', pets);
-app.route('/api/shortlist', shortlist);
+app.route('/api/requests', requests);
+app.route('/api/alerts', alerts);
 
 // ---------- Places (in-memory; no D1 reads) ----------
 
@@ -86,7 +87,8 @@ app.get('/api/me', async (c) => {
   )
     .bind(user.id)
     .all<{ id: string; name: string; role: 'owner' | 'maintainer' }>();
-  return c.json({ user: { ...publicUser(user), shelters } });
+  const contact = await c.env.DB.prepare('SELECT phone, contact_pref FROM users WHERE id = ?').bind(user.id).first<{ phone: string | null; contact_pref: string | null }>();
+  return c.json({ user: { ...publicUser(user), phone: contact?.phone ?? null, contactPref: contact?.contact_pref ?? null, shelters } });
 });
 
 app.patch('/api/me', async (c) => {

@@ -1,11 +1,11 @@
-import { ArrowLeft, Check, CircleHelp, Clock, Heart, House, User, X } from 'lucide';
+import { ArrowLeft, Check, CircleHelp, Clock, Heart, HeartHandshake, House, Send, User, X } from 'lucide';
 import { api, ApiError } from '../api';
 import { companionKey, frameFor, type Companion, type PetDetail, type PetSummary } from '../data';
-import { $, $$, html, icon, mount, type Raw } from '../dom';
+import { $, $$, html, icon, mount, reducedMotion, type Raw } from '../dom';
 import { formatDate, t, away } from '../i18n';
-import { cachePets, petCache, isSaved, placePet, update } from '../store';
+import { activeRequestFor, cachePets, petCache, placePet, state, update } from '../store';
+import { alertButton, bindAlerts, cautions, listerName, startRequest } from '../ui/request';
 import { age, canvas, companionLabel, photo } from '../ui/canvas';
-import { removeFromList, startSave } from '../ui/save';
 import { toast } from '../ui/toast';
 
 interface ProfileDeps {
@@ -117,6 +117,26 @@ function body(pet: PetDetail, km: number): Raw {
       <h2 class="section-title">${t('profile.lister')}</h2>
       ${lister(pet, km)}
       <p class="sample-note">${t('app.sampleNote')}</p>
+    </section>
+    ${canStart(pet) ? ready(pet) : ''}`;
+}
+
+/** Whether this pet can take a new request from this person right now. */
+const canStart = (pet: PetSummary) => pet.status === 'available' && pet.requests !== 'paused' && !activeRequestFor(pet.id);
+
+/** The end of the profile, and the only place to commit: what to keep in mind, then "Sí, quiero empezar el proceso". */
+function ready(pet: PetDetail): Raw {
+  const notes = cautions(pet);
+  return html`
+    <section class="profile__section ready" id="ready" tabindex="-1" aria-labelledby="ready-title">
+      <h2 class="section-title" id="ready-title">${t('profile.ready.title')}</h2>
+      <p>${t('profile.ready.body', { lister: listerName(pet), name: pet.name })}</p>
+      ${notes.length
+        ? html`<div class="mind"><h3 class="mind__title">${t('reflect.mind')}</h3><ul class="mind__list">${notes.map((n) => html`<li>${n}</li>`)}</ul></div>`
+        : ''}
+      ${pet.adoptionFeeDop !== null ? html`<p class="ready__fee">${t('profile.ready.fee', { fee: `RD$${pet.adoptionFeeDop.toLocaleString('es-DO')}` })}</p>` : ''}
+      <button class="button button--primary ready__go" type="button" data-start>${icon(HeartHandshake, 20)}${t('profile.ready.go')}</button>
+      <p class="muted ready__note">${t('profile.ready.note')}</p>
     </section>`;
 }
 
@@ -139,7 +159,18 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
 
   const p = placePet(cached);
   const pet = cached;
-  const saved = isSaved(pet.id);
+  const active = activeRequestFor(pet.id);
+  const waiting = pet.status === 'reserved' || pet.requests === 'paused';
+  // The bar follows the adoption path: "Quiero adoptar" leads to the end of the profile, where the
+  // commitment lives; once sent, it points to Mi lista.
+  const bar = active
+    ? html`<span class="saved-tag">${icon(Send, 18)}${t('request.status.sent')}</span>
+        <a class="button button--outline" href="#/lista">${t('request.inList')}</a>`
+    : waiting
+      ? html`<span class="wait-tag">${icon(HeartHandshake, 18)}${pet.status === 'reserved' ? t('request.reservedShort') : t('request.pausedShort')}</span>
+          ${state.signedIn ? alertButton(pet) : ''}`
+      : html`<button class="button button--outline" type="button" data-skip>${icon(Clock, 20)}${t('deck.skip')}</button>
+          ${canStart(pet) ? html`<button class="button button--primary" type="button" data-to-ready ${isDetail(pet) ? '' : 'disabled'}>${icon(Heart, 20)}${t('deck.save')}</button>` : ''}`;
   mount(
     root,
     html`
@@ -151,19 +182,18 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
         <div class="profile__body">
           ${isDetail(pet) ? body(pet, p.km) : html`<p class="loading-note" role="status">${t('profile.loading')}</p>`}
         </div>
-        <div class="profile__bar">
-          ${saved
-            ? html`<span class="saved-tag">${icon(Check, 18)}${t('profile.saved')}</span>
-                <button class="button button--outline" type="button" data-remove>${t('profile.remove')}</button>`
-            : html`<button class="button button--outline" type="button" data-skip>${icon(Clock, 20)}${t('deck.skip')}</button>
-                <button class="button button--primary" type="button" data-save>${icon(Heart, 20)}${t('profile.save')}</button>`}
-        </div>
+        <div class="profile__bar">${bar}</div>
       </article>`,
   );
 
   $('[data-back]', root).addEventListener('click', deps.back);
-  root.querySelector('[data-save]')?.addEventListener('click', () => startSave(pet.id));
-  root.querySelector('[data-remove]')?.addEventListener('click', () => removeFromList(pet.id));
+  root.querySelector('[data-to-ready]')?.addEventListener('click', () => {
+    const end = root.querySelector<HTMLElement>('#ready');
+    end?.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'center' });
+    end?.focus({ preventScroll: true });
+  });
+  root.querySelector('[data-start]')?.addEventListener('click', () => startRequest(pet.id));
+  bindAlerts(root);
   root.querySelector('[data-skip]')?.addEventListener('click', () => {
     update((s) => s.skipped.push(pet.id));
     toast(t('deck.skipped', { name: pet.name }));

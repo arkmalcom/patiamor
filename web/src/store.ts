@@ -8,11 +8,38 @@ export interface Answers {
   time: Answer;
   cost: Answer;
 }
-/** A pet in "Mi lista", as returned by the server. */
-export interface SavedItem {
+/** One of Mi lista's slots (or a recently ended one): an adoption request, with the pet and the reflection answers. */
+export interface MyRequest {
   pet: PetSummary;
   answers: Answers;
-  savedAt: string;
+  request: AdoptionRequest;
+}
+
+export type RequestStatus = 'sent' | 'seen' | 'contacted' | 'visit' | 'adopted' | 'closed' | 'withdrawn';
+export interface AdoptionRequest {
+  id: string;
+  status: RequestStatus;
+  createdAt: string;
+  updatedAt?: string;
+}
+export const isOpen = (r: AdoptionRequest | null | undefined) => !!r && ['sent', 'seen', 'contacted', 'visit'].includes(r.status);
+
+export type ContactPref = 'whatsapp' | 'llamada' | 'correo';
+
+/** What "Sí, quiero empezar el proceso" sends: reflection, contact, consent; the rest is optional. */
+export interface RequestForm {
+  petId: string;
+  answers: Answers;
+  name: string;
+  phone: string;
+  pref: ContactPref;
+  home?: 'casa_patio' | 'casa' | 'apartamento';
+  otherPets: ('perros' | 'gatos' | 'otros')[];
+  kids?: 'no' | 'menores' | 'mayores';
+  experience?: 'si' | 'primera';
+  visit?: 'semana' | 'fin' | 'cualquiera';
+  message: string;
+  consent: boolean;
 }
 
 export interface Filters {
@@ -39,7 +66,10 @@ export interface State {
   /** Mirrors the server session (from /api/me); never persisted locally. */
   signedIn: boolean;
   user: Me | null;
-  saved: SavedItem[];
+  /** Mi lista: open requests (the 3 slots) and ones that ended in the last 30 days. */
+  requests: MyRequest[];
+  /** Pets the person asked to hear about when they're available again. */
+  alerts: string[];
   /** Pets set aside this session. They come back next session. */
   skipped: string[];
 }
@@ -82,7 +112,8 @@ export const state: State = {
   petsStatus: 'idle',
   signedIn: false,
   user: null,
-  saved: [],
+  requests: [],
+  alerts: [],
   skipped: sessionState.skipped,
 };
 
@@ -173,9 +204,9 @@ export function inReach(radiusKm = state.radiusKm, filters = state.filters): Pla
   return placed.filter((p) => p.km <= radiusKm && matchesFilters(p.pet, filters)).sort((a, b) => a.km - b.km);
 }
 
-/** The browse queue: in reach, not skipped this session, not already on the list. */
+/** The browse queue: in reach, not skipped this session, not already asked about. */
 export function queue(): Placed[] {
-  const listed = new Set(state.saved.map((s) => s.pet.id));
+  const listed = new Set(activeRequests().map((s) => s.pet.id));
   return inReach().filter((p) => !state.skipped.includes(p.pet.id) && !listed.has(p.pet.id));
 }
 
@@ -202,49 +233,54 @@ export function setUser(user: Me | null) {
   update((s) => {
     s.user = user;
     s.signedIn = !!user;
-    if (!user) s.saved = [];
+    if (!user) (s.requests = []), (s.alerts = []);
   });
-  if (user) void loadSaved().catch(() => {});
+  if (user) void loadRequests().catch(() => {});
 }
 
-export async function loadSaved() {
-  const items = await api.shortlist();
+export async function loadRequests() {
+  const { items, alerts } = await api.myRequests();
   cachePets(items.map((i) => i.pet));
-  update((s) => (s.saved = items));
+  update((s) => ((s.requests = items), (s.alerts = alerts)));
 }
 
-export async function savePet(petId: string, answers: Answers) {
-  await api.save(petId, answers);
-  await loadSaved();
+/** The slots: requests still in progress, oldest first. */
+export const activeRequests = () => state.requests.filter((r) => isOpen(r.request));
+/** This pet's request in progress, if any. */
+export const activeRequestFor = (petId: string) => activeRequests().find((r) => r.pet.id === petId) ?? null;
+
+export async function sendRequest(form: RequestForm) {
+  await api.requestAdoption(form);
+  // The account now remembers how to reach them; keep the next form's prefill in step.
+  update((s) => s.user && ((s.user.name = form.name), (s.user.phone = form.phone || s.user.phone), (s.user.contactPref = form.pref)));
+  await loadRequests();
 }
 
-export async function removeSaved(petId: string) {
-  await api.unsave(petId);
-  await loadSaved();
+export async function withdrawRequest(id: string, reason: string | null) {
+  await api.withdrawRequest(id, reason);
+  await loadRequests();
 }
 
-export function isSaved(petId: string) {
-  return state.saved.some((s) => s.pet.id === petId);
+export async function toggleAlert(petId: string) {
+  const on = state.alerts.includes(petId);
+  await (on ? api.alertOff(petId) : api.alertOn(petId));
+  update((s) => (s.alerts = on ? s.alerts.filter((id) => id !== petId) : [...s.alerts, petId]));
 }
 
-/** A save interrupted by a sign-in redirect; completed when the user comes back signed in. */
-export interface PendingSave {
-  petId: string;
-  answers: Answers;
-}
-const PENDING_KEY = 'patiamor-pending-save';
-export function stashPendingSave(p: PendingSave) {
+/** A request started before signing in (Google and the email link leave the page); reopened on return. */
+const PENDING_KEY = 'patiamor-pending-request';
+export function stashPendingRequest(petId: string) {
   try {
-    session?.setItem(PENDING_KEY, JSON.stringify(p));
+    session?.setItem(PENDING_KEY, petId);
   } catch {
     /* ignore */
   }
 }
-export function takePendingSave(): PendingSave | null {
+export function takePendingRequest(): string | null {
   try {
-    const raw = session?.getItem(PENDING_KEY);
+    const id = session?.getItem(PENDING_KEY) ?? null;
     session?.removeItem(PENDING_KEY);
-    return raw ? (JSON.parse(raw) as PendingSave) : null;
+    return id;
   } catch {
     return null;
   }

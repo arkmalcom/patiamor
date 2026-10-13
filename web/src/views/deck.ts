@@ -4,7 +4,6 @@ import { animals, away, t } from '../i18n';
 import { activeFilterCount, emptyFilters, loadPets, nextRadius, queue, state, update } from '../store';
 import { canvas } from '../ui/canvas';
 import { bindSpeciesSwitch, speciesSwitch } from '../ui/species';
-import { startSave } from '../ui/save';
 import { toast } from '../ui/toast';
 
 interface DeckDeps {
@@ -89,7 +88,6 @@ export function renderDeck(root: HTMLElement, deps: DeckDeps) {
         <p class="sr-only" id="deck-keys">${t('deck.keyboard')}</p>
         <div class="deck__actions">
           <button class="button button--outline deck__skip" type="button" data-skip title="${t('deck.skipHint')}">${icon(Clock, 20)}<span>${t('deck.skip')}</span></button>
-          <button class="button button--ghost deck__profile" type="button" data-profile>${t('deck.profile')}</button>
           <button class="button button--primary deck__save" type="button" data-save>${icon(Heart, 20)}<span>${t('deck.save')}</span></button>
         </div>
         <p class="deck__position">${t('deck.position', { n: 1, total })}</p>
@@ -125,17 +123,11 @@ export function renderDeck(root: HTMLElement, deps: DeckDeps) {
     card.animate([{ transform: `translate(${fromX}px, ${fromY}px) rotate(${fromX * 0.05}deg)` }, { transform: 'none' }], { duration: 420, easing: EASE_OUT });
   };
 
-  const save = () => {
-    card.classList.add('is-considering');
-    startSave(top.pet.id, (saved) => {
-      card.classList.remove('is-considering');
-      if (!saved) return;
-      // Re-render happens through the store; let the card rise toward "Mi lista" first.
-      if (!reducedMotion()) card.animate([{ transform: 'none' }, { transform: 'translateY(-24px) scale(.92)', opacity: 0 }], { duration: 260, easing: EASE_OUT, fill: 'forwards' });
-    });
-  };
+  // "Quiero adoptar" never commits on the spot: it opens the full profile, which ends with the one place
+  // to start the process. The photo morphs from the card into the profile.
+  const save = () => deps.openProfile(top.pet.id);
 
-  // Drag physics. A drag left sets the pet aside; a drag right opens the reflection, never an instant save.
+  // Drag physics. A drag left sets the pet aside; a drag right opens the full profile, never an instant request.
   let startX = 0;
   let startY = 0;
   let dx = 0;
@@ -197,6 +189,5 @@ export function renderDeck(root: HTMLElement, deps: DeckDeps) {
 
   $('[data-skip]', root).addEventListener('click', () => skip());
   $('[data-save]', root).addEventListener('click', save);
-  $('[data-profile]', root).addEventListener('click', () => deps.openProfile(top.pet.id));
 }
 
