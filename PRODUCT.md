@@ -20,6 +20,7 @@ Mobile-first. The mobile app will wrap this same Vite frontend (Capacitor or PWA
 
 - **Adopters (regular users):** people in the Dominican Republic looking for a dog to adopt near them. They browse freely without an account; signing in is required to save dogs to their list and to act.
 - **Shelter owners / maintainers:** upload dog profiles, edit them, and mark dogs as adopted, through a restricted admin view scoped to their own shelter.
+- **Private listers:** individuals outside any shelter rehoming dogs (e.g. a family whose dog had a litter). They manage only their own listings through a simpler "Mis publicaciones" view.
 - **Admins (platform owner):** full access across shelters and users.
 
 ## Product Purpose
@@ -44,7 +45,18 @@ Card-by-card browsing of real local dogs within the distance the adopter is will
 - Filters (e.g. size, age, sex, energy, good with kids/other pets): exact set to be confirmed with shelter data model.
 - **Shortlist ("Mi lista")**: 3 visible slots. Saving a dog first asks a short reflection (2–3 questions about space, time, budget, the dog's needs). When the list is full, adding a 4th offers two paths: replace an existing slot, or, for people truly able to take in many animals (e.g. a farm), a CTA to contact the platform (built-in contact email), which then connects them directly with shelters.
 - **Skipping** means "not now": skipped dogs come back in a later session (fairer to hard-to-place dogs).
-- Role-based access: admin / shelter / adopter.
+- Role-based access: admins (platform-wide); shelter owners and maintainers (their shelter's dogs); any signed-in user can adopt, and can list dogs as a private lister.
+- **Listings** always belong to a person (`listed_by`) and optionally to a shelter. Location is a general area (sector/barrio) picked from a curated list, never a street address.
+- **Private listing review:** a private lister's first listing waits for admin approval; once approved they post freely. Every listing has a report button.
+- **Fees:** only shelters may show an optional adoption fee (in DOP, labeled as covering vaccines/sterilization). Private listers can't ask for money, so the platform never becomes a puppy marketplace.
+- **Litters:** puppies are grouped as siblings ("Sus hermanos"); each puppy is still its own card and is adopted individually.
+- **Who's listing:** dogs from a shelter show the shelter's name, but only once an admin has verified the shelter. Until then the shelter's dogs go through review like a private lister's. Dogs from private listers show "Particular" plus the area, never the person's full name.
+- **Anti puppy-mill / anti-resale safeguards (adopted 2026-10-12):**
+  1. Money language in a listing ("vendo", "precio", "RD$", "negociable", "depósito", "reservar", phone numbers in the text) automatically sends it back to review.
+  2. Three reports automatically hide a listing pending admin review.
+  3. No puppy can be listed before 8 weeks of age.
+  4. A plain-Spanish rules page (no sales, no breeding services/"monta", no deposits or transport fees) is shown the first time someone lists.
+  - Considered and **not adopted for now**: litter limits plus a mother-sterilization question; no breed field and flagging trendy-breed puppies; recording the adopter to catch resale, plus account bans; duplicate-photo detection. Revisit if abuse appears.
 - **Open decisions:** what happens after shortlisting (contact the shelter via WhatsApp, an adoption request form, or scheduling a visit); the platform contact email (placeholder: hola@patiamor.com) for the multi-adoption CTA.
 
 ## Brand Commitments

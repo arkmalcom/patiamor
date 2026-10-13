@@ -11,6 +11,7 @@ coverage/
 !.env.example
 .dev.vars
 .dev.vars.*
+!.dev.vars.example
 backups/
 
 # Impeccable: keep design.json, surfaces/ and decision/ (durable design context); ignore scratch

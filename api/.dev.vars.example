@@ -1,0 +1,8 @@
+# Copy to api/.dev.vars (gitignored) for local `wrangler dev`.
+ENVIRONMENT=development
+APP_ORIGIN=http://localhost:8788
+# Leave empty locally to print sign-in codes in the wrangler console instead of emailing them.
+RESEND_API_KEY=
+# From Google Cloud Console → APIs & Services → Credentials (OAuth client, type "Web application").
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=

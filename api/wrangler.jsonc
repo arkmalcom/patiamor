@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // Top level = PRODUCTION. Staging is always `--env staging`.
+  "name": "patiamor",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "vars": { "ENVIRONMENT": "production", "APP_ORIGIN": "https://patiamor.com", "EMAIL_FROM": "Patiamor <hola@patiamor.com>" },
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    // database_id is filled in once the production database is created (with the owner's approval).
+    { "binding": "DB", "database_name": "patiamor-db", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }
+  ],
+  "env": {
+    "staging": {
+      // Bindings and routes are NOT inherited by environments; repeat them here.
+      "d1_databases": [
+        { "binding": "DB", "database_name": "patiamor-db-staging", "database_id": "60ec559a-2dbd-4b9e-87bf-de58a0793cb4", "migrations_dir": "migrations" }
+      ],
+      "vars": { "ENVIRONMENT": "staging", "APP_ORIGIN": "", "EMAIL_FROM": "Patiamor <hola@patiamor.com>" },
+      "routes": [],
+      "workers_dev": true
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import { ageGroup, dogs, shelterById, userLocation, type LatLng, type AgeGroup, type Companion, type Dog, type Energy, type Sex, type Size } from './data';
+import type { Me } from './api';
 import { bearing, distanceKm } from './geo';
 
 export type Answer = 'si' | 'pensando';
@@ -24,7 +25,9 @@ export interface Filters {
 export interface State {
   radiusKm: number;
   filters: Filters;
+  /** Mirrors the server session (from /api/me); never persisted locally. */
   signedIn: boolean;
+  user: Me | null;
   list: SavedDog[];
   /** Dogs set aside this session. They come back next session. */
   skipped: string[];
@@ -56,10 +59,10 @@ function write(storage: Storage | undefined, key: string, value: unknown) {
 const local = typeof localStorage === 'undefined' ? undefined : localStorage;
 const session = typeof sessionStorage === 'undefined' ? undefined : sessionStorage;
 
-const persisted = read(local, 'patiamor', { radiusKm: 25, filters: emptyFilters(), signedIn: false, list: [] as SavedDog[] });
+const persisted = read(local, 'patiamor', { radiusKm: 25, filters: emptyFilters(), list: [] as SavedDog[] });
 const sessionState = read(session, 'patiamor-session', { skipped: [] as string[] });
 
-export const state: State = { ...persisted, filters: { ...emptyFilters(), ...persisted.filters }, ...sessionState };
+export const state: State = { ...persisted, filters: { ...emptyFilters(), ...persisted.filters }, ...sessionState, signedIn: false, user: null };
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -70,7 +73,7 @@ export function subscribe(fn: Listener) {
 
 export function update(mutator: (s: State) => void) {
   mutator(state);
-  write(local, 'patiamor', { radiusKm: state.radiusKm, filters: state.filters, signedIn: state.signedIn, list: state.list });
+  write(local, 'patiamor', { radiusKm: state.radiusKm, filters: state.filters, list: state.list });
   write(session, 'patiamor-session', { skipped: state.skipped });
   listeners.forEach((fn) => fn());
 }
@@ -124,6 +127,29 @@ export function queue(): Placed[] {
 
 export function activeFilterCount(f = state.filters): number {
   return f.size.length + f.age.length + f.sex.length + f.energy.length + f.goodWith.length;
+}
+
+export function setUser(user: Me | null) {
+  update((s) => ((s.user = user), (s.signedIn = !!user)));
+}
+
+/** A save interrupted by a Google redirect; completed when the user comes back signed in. */
+const PENDING_KEY = 'patiamor-pending-save';
+export function stashPendingSave(p: SavedDog) {
+  try {
+    session?.setItem(PENDING_KEY, JSON.stringify(p));
+  } catch {
+    /* ignore */
+  }
+}
+export function takePendingSave(): SavedDog | null {
+  try {
+    const raw = session?.getItem(PENDING_KEY);
+    session?.removeItem(PENDING_KEY);
+    return raw ? (JSON.parse(raw) as SavedDog) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function isSaved(dogId: string) {

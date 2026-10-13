@@ -2,7 +2,8 @@ import { Heart, Mail } from 'lucide';
 import { CONTACT_EMAIL, dogById, shelterById, type Dog } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatKm, t } from '../i18n';
-import { isSaved, MAX_SLOTS, placedById, state, update, type Answer, type Answers } from '../store';
+import { isSaved, MAX_SLOTS, placedById, stashPendingSave, state, takePendingSave, update, type Answer, type Answers, type SavedDog } from '../store';
+import { renderAuth } from './auth';
 import { miniFrame } from './canvas';
 import { closeSheet, openSheet } from './sheet';
 import { toast } from './toast';
@@ -90,30 +91,35 @@ function openReflect(dogId: string, done: Done) {
       toast(`${dog.name} · ${t('profile.saved')} (${state.list.length} de ${MAX_SLOTS})`);
     };
     if (state.signedIn) commit();
-    else showAuth(dog, commit, () => done(saved));
+    else showAuth(dog, { dogId, savedAt: new Date().toISOString(), answers }, commit, () => done(saved));
   });
 }
 
-function showAuth(dog: Dog, onSignedIn: () => void, onClose: () => void) {
+function showAuth(dog: Dog, pending: SavedDog, onSignedIn: () => void, onClose: () => void) {
   const dialog = openSheet(
     t('auth.title', { name: dog.name }),
-    html`
-      <div class="auth">
-        <p class="muted">${t('auth.body')}</p>
-        <div class="auth__buttons">
-          <button class="button button--outline button--block" type="button" data-auth>${t('auth.google')}</button>
-          <button class="button button--outline button--block" type="button" data-auth>${t('auth.email')}</button>
-        </div>
-        <p class="sample-note">${t('auth.demo')}</p>
-      </div>`,
+    html`<p class="muted auth__intro">${t('auth.body')}</p><div data-auth></div>`,
     { onClose },
   );
-  $$('[data-auth]', dialog).forEach((b) =>
-    b.addEventListener('click', () => {
-      update((s) => (s.signedIn = true));
+  renderAuth($('[data-auth]', dialog), {
+    next: location.hash || '#/',
+    // Google and the email link leave this page; the save finishes when the user returns signed in.
+    beforeRedirect: () => stashPendingSave(pending),
+    onSignedIn: () => {
+      takePendingSave();
       onSignedIn();
-    }),
-  );
+    },
+  });
+}
+
+/** Finishes a save that was interrupted by a sign-in redirect. */
+export function resumePendingSave() {
+  const pending = takePendingSave();
+  if (!pending || !state.signedIn || isSaved(pending.dogId) || state.list.length >= MAX_SLOTS) return;
+  const dog = dogById.get(pending.dogId);
+  if (!dog) return;
+  update((s) => s.list.push(pending));
+  toast(`${dog.name} · ${t('profile.saved')} (${state.list.length} de ${MAX_SLOTS})`);
 }
 
 function openFull(dogId: string, done: Done) {

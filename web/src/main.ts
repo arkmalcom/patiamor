@@ -6,11 +6,13 @@ import { Compass, MapPin, SlidersHorizontal, User } from 'lucide';
 import { landscape } from './art';
 import { $, $$, html, icon, mount, transition } from './dom';
 import { t } from './i18n';
-import { activeFilterCount, here, state, subscribe } from './store';
+import { activeFilterCount, here, setUser, state, subscribe } from './store';
 import { applyFooter, bindRadiusPanel, radiusPanel } from './ui/radius';
-import { mountPips, pips } from './ui/save';
+import { mountPips, pips, resumePendingSave } from './ui/save';
 import { closeSheet, initSheet, openSheet, sheetEl } from './ui/sheet';
-import { initToast } from './ui/toast';
+import { initToast, toast } from './ui/toast';
+import { api } from './api';
+import { errorText } from './ui/auth';
 import { renderAccount } from './views/account';
 import { renderDeck } from './views/deck';
 import { bindSlots, renderList, slots } from './views/list';
@@ -19,7 +21,7 @@ import { renderProfile } from './views/profile';
 type Route = { name: 'deck' } | { name: 'profile'; id: string } | { name: 'list' } | { name: 'account' };
 
 function parse(hash: string): Route {
-  const [, a, b] = hash.replace(/^#/, '').split('/');
+  const [, a, b] = hash.replace(/^#/, '').split('?')[0].split('/');
   if (a === 'perro' && b) return { name: 'profile', id: decodeURIComponent(b) };
   if (a === 'lista') return { name: 'list' };
   if (a === 'cuenta') return { name: 'account' };
@@ -131,6 +133,22 @@ window.addEventListener('hashchange', () => {
 
 subscribe(() => {
   render(current);
+
+// Sign-in state lives on the server; errors from a sign-in redirect arrive as ?error=… on the hash.
+const authError = new URLSearchParams(location.hash.split('?')[1] ?? '').get('error');
+if (authError) {
+  toast(errorText(authError));
+  history.replaceState(null, '', location.pathname + location.hash.split('?')[0]);
+}
+api
+  .me()
+  .then((user) => {
+    setUser(user);
+    resumePendingSave();
+  })
+  .catch(() => {
+    /* API unreachable (e.g. static preview): stay signed out */
+  });
   inline.refresh();
 });
 

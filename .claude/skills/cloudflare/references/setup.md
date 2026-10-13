@@ -24,8 +24,12 @@ In the Cloudflare dashboard, go to **My Profile → API Tokens → Create Token 
 Create `.env` at the repo root (it's gitignored):
 
 ```
-CLOUDFLARE_API_TOKEN=<token>
-CLOUDFLARE_ACCOUNT_ID=<account id from the dashboard sidebar>
+PATIAMOR_CLOUDFLARE_API_TOKEN=<token>
+PATIAMOR_CLOUDFLARE_ACCOUNT_ID=<account id from the dashboard sidebar>
+# R2 S3-style credentials (only for S3 clients/scripts; the Worker uses an R2 binding)
+PATIAMOR_CLOUDFLARE_ACCESS_KEY_ID=
+PATIAMOR_CLOUDFLARE_SECRET_ACCESS_KEY=
+PATIAMOR_CLOUDFLARE_S3_API_ENDPOINT=
 ```
 
 Verify with `.claude/skills/cloudflare/scripts/cf whoami`.
@@ -93,6 +97,8 @@ export default app;
 
 ## 3. Create the databases
 
+Status (2026-10-12): `patiamor-db-staging` exists (ENAM region), is migrated and seeded, and its ID is in `wrangler.jsonc`. `patiamor-db` (production) has **not** been created; that needs the owner's approval. Until it exists, `deploy-prod.yml` fails at the migration step, which is harmless.
+
 ```bash
 cf d1 create patiamor-db-staging                 # free: staging
 CF_APPROVED=1 cf d1 create patiamor-db           # production: ask first
@@ -106,6 +112,21 @@ Copy each `database_id` into `wrangler.jsonc`. IDs aren't secrets and are commit
 2. `cf deploy --env staging`, then smoke-test the workers.dev URL.
 3. Production with approval, once `patiamor.com` is registered and in the token's zone list. The `custom_domain` route creates the DNS record automatically on deploy, which counts as a DNS change, so mention it when asking.
 
-## 5. Mobile app (later)
+## 5. GitHub Actions secrets (owner)
+
+This setup relies on GitHub environments, which a repo on GitHub Free only gets while it's public.
+
+- **Repository secret** (Settings → Secrets and variables → Actions): `CLOUDFLARE_ACCOUNT_ID`.
+- **Environment `staging`** (Settings → Environments):
+  - deployment branches limited to `main`;
+  - secrets: `CLOUDFLARE_API_TOKEN` (a dedicated staging CI token) and `STAGING_ADMIN_EMAILS` (comma-separated).
+- **Environment `production`:**
+  - deployment branches limited to `prod`;
+  - required reviewer: the owner;
+  - secret: `CLOUDFLARE_API_TOKEN` (a dedicated production CI token).
+
+Each CI token has the same permissions as the local token in step 1. Cloudflare can't scope a token to a single Worker or database, so the separation is about revoking each independently and gating access, not true isolation.
+
+## 6. Mobile app (later)
 
 The Capacitor-wrapped app calls `https://patiamor.com/api`. Its origin (`capacitor://localhost`, or `https://localhost` on Android) needs a CORS allowance on `/api/*`. Use Hono's `cors()` with an explicit allowlist, never `*` on authenticated routes.

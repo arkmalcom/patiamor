@@ -1,0 +1,55 @@
+# Checks every pull request into main (staging) or prod. Needs no secrets: nothing is deployed.
+name: CI
+
+on:
+  pull_request:
+    branches: [main, prod]
+
+concurrency:
+  group: ci-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            api/package-lock.json
+
+      - name: Install
+        run: |
+          npm ci --prefix web
+          npm ci --prefix api
+
+      - name: Build web (type-checks first)
+        run: npm run build --prefix web
+
+      - name: Type-check API
+        run: npm run typecheck --prefix api
+
+      - name: Bundle the Worker for the target environment (dry run)
+        working-directory: api
+        run: |
+          if [ "${{ github.base_ref }}" = "prod" ]; then
+            npx wrangler deploy --dry-run --outdir dist
+          else
+            npx wrangler deploy --dry-run --env staging --outdir dist
+          fi
+
+      - name: Migrations are append-only
+        # Editing a migration that already ran on staging/prod means it silently never runs again there.
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          changed=$(git diff --name-status "origin/${{ github.base_ref }}" -- api/migrations | grep -v '^A' || true)
+          if [ -n "$changed" ]; then
+            echo "::error::Existing migrations were modified or deleted. Add a new migration instead:"
+            echo "$changed"
+            exit 1
+          fi

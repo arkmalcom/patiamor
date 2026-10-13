@@ -639,8 +639,38 @@ html.sheet-open { overflow: hidden; }
 
 .unsure-note { background: var(--mango-tint); border-radius: 14px; padding: 12px 16px; margin-top: 10px; }
 
-.auth { display: grid; gap: 16px; }
-.auth__buttons { display: grid; gap: 10px; }
+.auth { display: grid; gap: 14px; }
+.auth__intro { margin-bottom: 16px; }
+.auth__title { font-family: var(--font-display); font-weight: 400; font-size: 1.35rem; line-height: 1.15; }
+.auth__form { display: grid; gap: 12px; }
+.auth__or {
+  display: flex; align-items: center; gap: 12px;
+  color: var(--ink-2); font-size: 0.9rem; font-weight: 700;
+}
+.auth__or::before, .auth__or::after { content: ''; flex: 1; border-top: 1px solid var(--rule); }
+.auth__links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.text-button:disabled { color: var(--ink-2); text-decoration: none; cursor: default; }
+
+.field { display: grid; gap: 6px; }
+.field__label { font-weight: 800; font-size: 0.95rem; }
+.field__input {
+  width: 100%; min-height: 52px; padding: 0 16px;
+  border: 1.5px solid var(--rule-strong); border-radius: 12px;
+  background: var(--paper); color: var(--ink);
+  font: inherit; font-size: 1.05rem;
+  transition: border-color 140ms;
+}
+.field__input::placeholder { color: var(--ink-2); opacity: 0.75; }
+.field__input:hover { border-color: var(--ink-2); }
+.field__input:focus-visible { outline: 3px solid var(--anil); outline-offset: 2px; border-color: var(--ink); }
+.field__input--code {
+  font-size: 1.6rem; font-weight: 800; letter-spacing: 0.4em; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.field__error { color: var(--hibiscus-press); font-weight: 700; font-size: 0.95rem; }
+.field__error[hidden] { display: none; }
+.account__hello { font-family: var(--font-display); font-size: 1.5rem; line-height: 1.1; }
+.account__auth { width: 100%; max-width: 420px; }
 
 .mini-frame {
   display: inline-block; flex: none;
@@ -784,7 +814,6 @@ html[data-route='profile'] .tabbar { display: none; }
 /* ---------- Account ---------- */
 
 .account__block { display: grid; gap: 14px; justify-items: start; }
-.account__block .auth__buttons { width: 100%; max-width: 420px; }
 .account__row { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-block: 1px solid var(--rule); }
 .account__shelter {
   display: flex; gap: 16px; align-items: flex-start;
