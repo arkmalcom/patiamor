@@ -1357,19 +1357,22 @@ html[data-route='profile'] .tabbar { display: none; }
 .listing-preview__card { width: min(100%, 380px); height: 560px; pointer-events: none; }
 .listing-preview__card .canvas { height: 100%; }
 .listing-preview__note { text-align: center; font-size: 0.92rem; }
-/* The form's actions ride along at the bottom while scrolling: one centred pair of equal buttons, the
-   main one on the right; the save state and any error sit just above them. */
+/* The form's actions ride along at the bottom while scrolling: just the buttons (a centred pair of equal
+   width, the main one on the right), each lifted by its own shadow. No bar behind them: the empty space
+   around them lets taps through to the form. The save state and any error float above as their own pills. */
 .listing-form__actions {
-  position: sticky; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 10px); z-index: 4;
-  display: grid; gap: 10px; justify-items: center; text-align: center;
-  padding: 12px; background: var(--paper); border-radius: 16px;
-  box-shadow: 0 -2px 0 var(--rule), 0 14px 30px -14px rgba(29, 35, 64, 0.45);
+  position: sticky; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px); z-index: 4;
+  display: grid; gap: 8px; justify-items: center; text-align: center;
+  pointer-events: none;
 }
-.listing-form__actions > p { max-width: 60ch; }
+.listing-form__actions > * { pointer-events: auto; }
+.listing-form__actions > p { max-width: min(100%, 60ch); padding: 8px 14px; border-radius: 14px; background: var(--paper); box-shadow: var(--shadow-soft); }
 .listing-form__actions > p:empty { display: none; }
-.listing-form__actions .form-error { margin-top: 0; width: 100%; }
-.listing-form__buttons { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; width: min(100%, 560px); }
-.listing-form__buttons:has(> :only-child) { width: min(100%, 320px); }
+.listing-form__actions .form-error { margin-top: 0; background: var(--mango-tint); }
+.listing-form__buttons .button { box-shadow: 0 12px 24px -10px rgba(29, 35, 64, 0.55); }
+.listing-form__buttons { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; width: min(100%, 520px); pointer-events: none; }
+.listing-form__buttons > * { pointer-events: auto; }
+.listing-form__buttons:has(> :only-child) { width: min(100%, 300px); }
 .listing-form__buttons .button { padding-inline: 12px; }
 
 @media (min-width: 1000px) {
@@ -1646,7 +1649,7 @@ html[data-route='profile'] .toast-region { bottom: calc(96px + env(safe-area-ins
 /* Landscape phones and small tablets: slimmer bars, and the switch and buttons sit beside the card. */
 @media (max-height: 620px) and (orientation: landscape) and (max-width: 1099px) {
   :root { --topbar-h: 48px; --tabbar-h: 48px; }
-  .listing-form__actions { padding: 8px; gap: 6px; }
+  .listing-form__actions { gap: 6px; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 8px); }
   .listing-form__buttons .button { min-height: 44px; }
   .topbar { padding-block: calc(env(safe-area-inset-top) + 4px) 4px; }
   .wordmark { font-size: 1.45rem; }
