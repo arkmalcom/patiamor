@@ -77,7 +77,7 @@ function siblings(pet: PetDetail): Raw {
         ${pet.siblings.map(
           (s) => html`<li>
             <button class="sibling" type="button" data-sibling="${s.id}">
-              <span class="mini-frame mini-frame--sm" data-frame="${frameFor(s.id)}">${photo(s)}</span>
+              <span class="mini-frame mini-frame--sm" data-frame="${frameFor(s.id)}">${photo(s, 'lazy', true)}</span>
               <span><strong>${s.name}</strong><span class="muted">${t(`sex.${s.sex}`)} · ${age(s)}</span></span>
             </button>
           </li>`,

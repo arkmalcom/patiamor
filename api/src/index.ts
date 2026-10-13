@@ -8,6 +8,7 @@ import type { AppContext, Env } from './env';
 import { inDR, nearestPlace, PLACES_ATTRIBUTION, placeById, searchPlaces } from './places';
 import { admin } from './admin';
 import { listings } from './listings';
+import { photoRoutes, servePhoto } from './photos';
 import { portal } from './portal';
 import { alerts, requests, requestsRestricted } from './requests';
 
@@ -34,7 +35,7 @@ app.use('/api/*', async (c, next) => {
 });
 
 // Public reads are the same for everyone, so they skip the session lookup (a D1 read per request).
-const PUBLIC_READ = /^\/api\/(pets|places|whereami|health)(\/|$)/;
+const PUBLIC_READ = /^\/api\/(pets|photos|places|whereami|health)(\/|$)/;
 app.use('/api/*', async (c, next) => {
   c.set('user', c.req.method === 'GET' && PUBLIC_READ.test(c.req.path) ? null : await currentUser(c));
   await next();
@@ -51,6 +52,8 @@ app.route('/api/requests', requests);
 app.route('/api/alerts', alerts);
 app.route('/api/portal', portal);
 app.route('/api/portal', listings);
+app.route('/api/portal', photoRoutes);
+app.get('/api/photos/:key', servePhoto);
 app.route('/api/admin', admin);
 
 // ---------- Places (in-memory; no D1 reads) ----------

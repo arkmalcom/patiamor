@@ -1,5 +1,7 @@
 export type Env = {
   DB: D1Database;
+  /** Pet photos (R2). Keys are chosen by the Worker, never by the client: pets/<petId>/<content hash>[-t].<ext>. */
+  PHOTOS: R2Bucket;
   ASSETS: Fetcher;
   /** 'production' | 'staging' | 'development'. Set in wrangler.jsonc vars; .dev.vars overrides locally. */
   ENVIRONMENT: string;

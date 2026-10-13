@@ -20,6 +20,8 @@ Both exist so a slip can't take down production or lose real shelters' data.
 | `main` | staging | `patiamor-staging` | `patiamor-db-staging` (seeded with sample data) | https://patiamor-staging.patiamor-api.workers.dev |
 | `prod` | production | `patiamor` | `patiamor-db` (real data only) | https://patiamor.com |
 
+Pet photos live in R2, bound as `PHOTOS`. Staging uses `patiamor-photos-staging`, created 2026-10-13. Production uses `patiamor-photos`, which doesn't exist yet: creating it is a production resource, so ask first, and do it before the first production deploy. Both CI tokens have R2 read/write. Upload safeguards are documented in `api/src/photos.ts`.
+
 Work happens on feature branches, which open PRs into `main`. GitHub Actions (`.github/workflows/`) do the deploys:
 - **`ci.yml`** runs on every PR into `main` or `prod`. It builds, type-checks, dry-runs the Worker bundle, and refuses edits to existing migrations. It needs no secrets.
 - **`deploy-staging.yml`** runs on every push to `main`. It applies migrations, re-applies `api/seeds/staging.sql` (idempotent), deploys `--env staging`, and smoke-tests.

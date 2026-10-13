@@ -37,7 +37,7 @@ export const SUMMARY_COLUMNS = `d.id, d.species, d.name, d.sex, d.birth_date, d.
   d.open_requests, d.requests_paused,
   p.id AS place_id, p.name AS place_name, p.municipality, p.province, p.lat, p.lng,
   s.id AS shelter_id, s.name AS shelter_name,
-  (SELECT json_object('key', ph.r2_key, 'focus', ph.focus) FROM pet_photos ph WHERE ph.pet_id = d.id ORDER BY ph.position LIMIT 1) AS cover`;
+  (SELECT json_object('key', ph.r2_key, 'thumb', ph.thumb_key, 'focus', ph.focus) FROM pet_photos ph WHERE ph.pet_id = d.id ORDER BY ph.position LIMIT 1) AS cover`;
 // One lookup for the cover photo, not one per column: D1 bills every row read, and this runs per pet.
 
 // A shelter's animals are at the shelter: its place wins over whatever place the listing carries.
@@ -56,7 +56,7 @@ export interface SummaryRow {
 const bool = (v: Bool) => (v === null ? null : v === 1);
 
 export function summary(r: SummaryRow) {
-  const cover = r.cover ? (JSON.parse(r.cover) as { key: string; focus: string }) : null;
+  const cover = r.cover ? (JSON.parse(r.cover) as { key: string; thumb: string | null; focus: string }) : null;
   return {
     id: r.id,
     species: r.species,
@@ -82,7 +82,8 @@ export function summary(r: SummaryRow) {
     place: { id: r.place_id, name: r.place_name, municipality: r.municipality, province: r.province, lat: r.lat, lng: r.lng },
     // Verified shelters show their name; everyone else is "Particular" (never a person's name).
     lister: r.shelter_id ? { type: 'shelter' as const, id: r.shelter_id, name: r.shelter_name } : { type: 'private' as const },
-    photo: { url: photoUrl(cover?.key ?? null), focus: cover?.focus ?? '50% 40%' },
+    // The thumbnail (about 480 px) is for small frames; sample photos have none, so lists fall back to the full one.
+    photo: { url: photoUrl(cover?.key ?? null), thumb: photoUrl(cover?.thumb ?? null), focus: cover?.focus ?? '50% 40%' },
   };
 }
 

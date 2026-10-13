@@ -104,11 +104,19 @@ export interface PetForm {
   inCareSince: string | null;
 }
 
+export interface ListingPhoto {
+  id: string;
+  url: string;
+  thumb: string | null;
+  focus: string;
+}
+
 export interface Listing extends PetForm {
   id: string;
   status: PetStatus;
   openRequests: number;
   updatedAt: string;
+  photos: ListingPhoto[];
 }
 
 export type ListingSummary = PetSummary & { status: PetStatus; openRequests: number; updatedAt: string };
@@ -169,6 +177,11 @@ export const api = {
   listing: (petId: string) => call<{ shelter: ListingShelter; pet: Listing }>(`/api/portal/pets/${encodeURIComponent(petId)}`),
   savePet: (petId: string, form: PetForm, publish: boolean) =>
     call<{ pet: { id: string; status: PetStatus } }>(`/api/portal/pets/${encodeURIComponent(petId)}`, 'PUT', { ...form, publish }).then((r) => r.pet),
+  uploadPhoto: (petId: string, body: { image: string; thumb: string; focus: string }) =>
+    call<{ photo: ListingPhoto }>(`/api/portal/pets/${encodeURIComponent(petId)}/photos`, 'POST', body).then((r) => r.photo),
+  arrangePhotos: (petId: string, photos: { id: string; focus: string }[]) => call<{ ok: true }>(`/api/portal/pets/${encodeURIComponent(petId)}/photos`, 'PUT', { photos }),
+  deletePhoto: (petId: string, photoId: string) =>
+    call<{ ok: true }>(`/api/portal/pets/${encodeURIComponent(petId)}/photos/${encodeURIComponent(photoId)}`, 'DELETE', {}),
   adminShelters: (status: ShelterStatus) => call<{ shelters: AdminShelter[] }>(`/api/admin/shelters?status=${status}`).then((r) => r.shelters),
   adminDecision: (id: string, action: 'verify' | 'reject' | 'suspend', reason?: string) =>
     call<{ shelter: { id: string; status: ShelterStatus } }>(`/api/admin/shelters/${encodeURIComponent(id)}/decision`, 'POST', { action, reason }),

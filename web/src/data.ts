@@ -44,7 +44,8 @@ export interface PetSummary {
   requests: 'open' | 'busy' | 'paused' | 'reserved';
   place: Place;
   lister: Lister;
-  photo: { url: string | null; focus: string };
+  /** `thumb` (about 480 px) is for small frames; sample photos have none. */
+  photo: { url: string | null; thumb?: string | null; focus: string };
   km?: number;
 }
 

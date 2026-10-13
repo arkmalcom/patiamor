@@ -17,12 +17,15 @@
     // database_id is filled in once the production database is created (with the owner's approval).
     { "binding": "DB", "database_name": "patiamor-db", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }
   ],
+  // Pet photos (PAT-9). The production bucket is created with the owner's approval when production is set up.
+  "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "patiamor-photos" }],
   "env": {
     "staging": {
       // Bindings and routes are NOT inherited by environments; repeat them here.
       "d1_databases": [
         { "binding": "DB", "database_name": "patiamor-db-staging", "database_id": "60ec559a-2dbd-4b9e-87bf-de58a0793cb4", "migrations_dir": "migrations" }
       ],
+      "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "patiamor-photos-staging" }],
       "vars": { "ENVIRONMENT": "staging", "APP_ORIGIN": "", "EMAIL_FROM": "Patiamor <hola@patiamor.com>" },
       "routes": [],
       "workers_dev": true

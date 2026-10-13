@@ -2,14 +2,15 @@ import { Hono, type Context } from 'hono';
 import { nowIso } from './auth/crypto';
 import { forgetCatalogVersion } from './cache';
 import type { AppContext } from './env';
-import { PET_JOINS, SUMMARY_COLUMNS, summary, type SummaryRow } from './pets';
+import { PET_JOINS, photoUrl, SUMMARY_COLUMNS, summary, type SummaryRow } from './pets';
 import { placeById } from './places';
 import { roleIn } from './portal';
 
 // Shelter listings (PAT-8): members (owners and maintainers) create and edit their shelter's animals.
 // Any shelter that isn't suspended can prepare drafts; only a verified one can publish, and a published
 // animal goes live at once (the catalogue triggers clear cached pages). A shelter's animals are at the
-// shelter, so listings never ask for an area. Private listers (and their first-listing review) come later.
+// shelter, so listings never ask for an area. Photos are managed in photos.ts. Private listers (and their
+// first-listing review) come later.
 
 type C = Context<AppContext>;
 
@@ -68,10 +69,11 @@ function readPet(b: Record<string, unknown>) {
 }
 
 /** What a listing needs before adopters can see it; null when it's ready. */
-function publishProblem(shelterStatus: string, pet: { birthDate: string; story: string }) {
+function publishProblem(shelterStatus: string, pet: { birthDate: string; story: string }, photos: number) {
   if (shelterStatus !== 'verified') return 'shelter_not_verified';
   if (pet.birthDate > daysAgo(MIN_AGE_DAYS)) return 'too_young';
   if (pet.story.length < MIN_STORY) return 'story_required';
+  if (photos < 1) return 'photo_required';
   return null;
 }
 
@@ -119,7 +121,8 @@ listings.post('/shelters/:id/pets', async (c) => {
   const { pet, error } = readPet(body);
   if (error) return c.json({ error }, 400);
   const publish = body.publish === true;
-  const problem = publish ? publishProblem(w.shelter.status, pet) : null;
+  // A new listing has no photos yet (they're added to its id), so it always starts as a draft in practice.
+  const problem = publish ? publishProblem(w.shelter.status, pet, 0) : null;
   if (problem) return c.json({ error: problem }, 409);
 
   const id = crypto.randomUUID();
@@ -162,6 +165,9 @@ listings.get('/pets/:id', async (c) => {
   if (!found) return c.json({ error: 'not_found' }, 404);
   const { row: r } = found;
   const s = await c.env.DB.prepare('SELECT id, name, status, place_id FROM shelters WHERE id = ?').bind(r.shelter_id).first<{ id: string; name: string; status: string; place_id: string }>();
+  const { results: photos } = await c.env.DB.prepare('SELECT id, r2_key, thumb_key, focus FROM pet_photos WHERE pet_id = ? ORDER BY position')
+    .bind(r.id)
+    .all<{ id: string; r2_key: string; thumb_key: string | null; focus: string }>();
   return c.json({
     shelter: { id: s!.id, name: s!.name, status: s!.status, place: placeById(s!.place_id) ?? null, role: found.role },
     pet: {
@@ -182,6 +188,7 @@ listings.get('/pets/:id', async (c) => {
       status: r.status,
       openRequests: r.open_requests,
       updatedAt: r.updated_at,
+      photos: photos.map((p) => ({ id: p.id, url: photoUrl(p.r2_key), thumb: photoUrl(p.thumb_key), focus: p.focus })),
     },
   });
 });
@@ -200,7 +207,8 @@ listings.put('/pets/:id', async (c) => {
   const current = found.row.status;
   const status = current === 'draft' && body.publish === true ? 'available' : current;
   if (status !== 'draft' && status !== 'withdrawn') {
-    const problem = publishProblem(w.shelter.status, pet);
+    const photos = await c.env.DB.prepare('SELECT count(*) AS n FROM pet_photos WHERE pet_id = ?').bind(found.row.id).first<{ n: number }>();
+    const problem = publishProblem(w.shelter.status, pet, photos?.n ?? 0);
     if (problem) return c.json({ error: problem }, 409);
   }
   const now = nowIso();

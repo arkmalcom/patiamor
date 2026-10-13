@@ -124,7 +124,7 @@ function casa(): Raw {
   const windows = Array.from({ length: MAX_SLOTS }, (_, i) => {
     const s = open[i];
     return s
-      ? html`<span class="casa__window is-open" data-frame="${frameFor(s.pet.id)}"><span class="casa__shutter"></span><span class="casa__pane">${photo(s.pet)}</span><span class="casa__shutter"></span></span>`
+      ? html`<span class="casa__window is-open" data-frame="${frameFor(s.pet.id)}"><span class="casa__shutter"></span><span class="casa__pane">${photo(s.pet, 'lazy', true)}</span><span class="casa__shutter"></span></span>`
       : html`<span class="casa__window" data-frame="anil"><span class="casa__pane"><span class="casa__shut"></span><span class="casa__shut"></span></span></span>`;
   });
   return html`<div class="casa" aria-hidden="true"><span class="casa__cornice"></span><span class="casa__wall"><span class="casa__windows">${windows}</span><span class="casa__door"></span></span></div>`;

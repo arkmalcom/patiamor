@@ -1272,6 +1272,38 @@ html[data-route='profile'] .tabbar { display: none; }
 .money__unit { position: absolute; left: 16px; top: 50%; translate: 0 -50%; font-weight: 800; color: var(--ink-2); pointer-events: none; }
 .money .field__input { width: 100%; padding-left: 58px; font-variant-numeric: tabular-nums; }
 
+/* Photos: square-ish tiles in the card's proportions, the cover marked; tap one to frame it. */
+.photo-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 12px; }
+.photo-grid:empty { display: none; }
+.photo-tile { position: relative; display: grid; gap: 6px; justify-items: start; min-width: 0; }
+.photo-tile__pick {
+  width: 100%; aspect-ratio: 4 / 5; padding: 0; border: 0; border-radius: 12px; overflow: hidden; cursor: pointer;
+  background: var(--sky-tint); box-shadow: inset 0 0 0 1.5px var(--rule-strong);
+}
+.photo-tile__pick img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-tile.is-selected .photo-tile__pick { outline: 3px solid var(--ink); outline-offset: 2px; }
+.photo-tile__pick:focus-visible { outline: 3px solid var(--anil); outline-offset: 2px; }
+.photo-tile__badge, .photo-tile__action { display: inline-flex; align-items: center; gap: 4px; font-size: 0.82rem; font-weight: 800; }
+.photo-tile__badge { color: var(--hoja-deep); }
+.photo-tile__action { min-height: 32px; padding: 0; border: 0; background: none; color: var(--ink-2); font-family: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 0.2em; }
+.photo-tile__action:hover { color: var(--ink); }
+.photo-tile__remove {
+  position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 32px; height: 32px;
+  border: 0; border-radius: 50%; background: rgba(29, 35, 64, 0.82); color: #fff; cursor: pointer;
+}
+.photo-tile__remove:hover { background: var(--ink); }
+.photo-add { justify-self: start; gap: 8px; position: relative; cursor: pointer; }
+.photo-add[hidden] { display: none; }
+.photo-add:focus-within { outline: 3px solid var(--anil); outline-offset: 3px; }
+.photo-focus { display: grid; gap: 6px; padding-top: 14px; border-top: 1px solid var(--rule); }
+.photo-focus[hidden] { display: none; }
+.photo-focus__frame { position: relative; justify-self: start; max-width: 100%; padding: 0; border: 0; border-radius: 12px; overflow: hidden; background: none; line-height: 0; cursor: crosshair; }
+.photo-focus__frame img { display: block; max-width: 100%; max-height: 360px; }
+.photo-focus__dot {
+  position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; pointer-events: none;
+  border: 3px solid #fff; box-shadow: 0 0 0 2px var(--ink), 0 4px 10px rgba(29, 35, 64, 0.4);
+}
+
 /* The adopter's card, live: below the form on phones, beside it (and following the scroll) on wide screens. */
 .listing-preview { display: grid; gap: 12px; justify-items: center; padding: 20px 0 4px; }
 .listing-preview__card { width: min(100%, 380px); height: 560px; pointer-events: none; }

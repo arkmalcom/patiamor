@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { forgetCatalogVersion } from '../src/cache';
-import { api, signIn } from './helpers';
+import { addPhoto, api, signIn } from './helpers';
 
 // Shelter listings (PAT-8): members create and edit; only verified shelters publish; adopters see it at once.
 
@@ -34,6 +34,12 @@ async function shelter(status: 'pending' | 'verified' | 'suspended' = 'verified'
 const create = (shelterId: string, cookie: string, body: Record<string, unknown>) => api(`/api/portal/shelters/${shelterId}/pets`, { method: 'POST', body, cookie });
 const save = (petId: string, cookie: string, body: Record<string, unknown>) => api(`/api/portal/pets/${petId}`, { method: 'PUT', body, cookie });
 const publicProfile = (petId: string) => (forgetCatalogVersion(), api(`/api/pets/${petId}`));
+/** The app's way to publish: a draft, its photo, then publish. */
+async function publishNew(shelterId: string, cookie: string, over: Record<string, unknown> = {}) {
+  const id = (await create(shelterId, cookie, listing(over))).json.pet.id;
+  await addPhoto(id, cookie);
+  return save(id, cookie, listing({ ...over, publish: true }));
+}
 
 beforeEach(() => forgetCatalogVersion());
 
@@ -70,9 +76,10 @@ describe('creating a listing', () => {
     expect(form.json.pet).toMatchObject({ name: 'Canela', needs: ['Patio'], goodWith: { kids: true, dogs: null, cats: false }, adoptionFeeDop: 1500 });
   });
 
-  it('publishes at once for a verified shelter', async () => {
+  it('publishes for a verified shelter once it has a photo', async () => {
     const s = await shelter();
-    const res = await create(s.id, s.owner.cookie, listing({ publish: true }));
+    expect((await create(s.id, s.owner.cookie, listing({ publish: true }))).json.error).toBe('photo_required');
+    const res = await publishNew(s.id, s.owner.cookie);
     expect(res.json.pet.status).toBe('available');
     const profile = await publicProfile(res.json.pet.id);
     expect(profile.status).toBe(200);
@@ -83,7 +90,7 @@ describe('creating a listing', () => {
     const s = await shelter();
     const maintainer = await signIn();
     await env.DB.prepare("INSERT INTO shelter_members (shelter_id, user_id, role) VALUES (?, ?, 'maintainer')").bind(s.id, maintainer.id).run();
-    expect((await create(s.id, maintainer.cookie, listing({ publish: true }))).status).toBe(201);
+    expect((await publishNew(s.id, maintainer.cookie)).json.pet.status).toBe('available');
   });
 });
 
@@ -104,16 +111,18 @@ describe('publishing rules', () => {
 
   it('keeps a published listing within the rules when it is edited', async () => {
     const s = await shelter();
-    const id = (await create(s.id, s.owner.cookie, listing({ publish: true }))).json.pet.id;
+    const id = (await publishNew(s.id, s.owner.cookie)).json.pet.id;
     expect((await save(id, s.owner.cookie, listing({ story: '' }))).json.error).toBe('story_required');
     const ok = await save(id, s.owner.cookie, listing({ name: 'Canelita' }));
     expect(ok.json.pet.status).toBe('available');
     expect((await publicProfile(id)).json.pet.name).toBe('Canelita');
   });
 
-  it('publishes a draft on save with publish', async () => {
+  it('publishes a draft on save with publish, once it has a photo', async () => {
     const s = await shelter();
     const id = (await create(s.id, s.owner.cookie, listing())).json.pet.id;
+    expect((await save(id, s.owner.cookie, listing({ publish: true }))).json.error).toBe('photo_required');
+    await addPhoto(id, s.owner.cookie);
     expect((await save(id, s.owner.cookie, listing({ publish: true }))).json.pet.status).toBe('available');
     expect((await publicProfile(id)).status).toBe(200);
   });
