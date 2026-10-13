@@ -29,3 +29,6 @@ backups/
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# CI and deploys install with npm (package-lock.json); a pnpm lockfile would drift unchecked.
+pnpm-lock.yaml
