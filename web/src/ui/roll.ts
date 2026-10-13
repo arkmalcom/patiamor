@@ -20,5 +20,6 @@ export function rollTo(el: HTMLElement, value: number) {
     const col = d.firstElementChild as HTMLElement;
     col.style.transitionDelay = reducedMotion() ? '0ms' : `${(digits.length - 1 - i) * 40}ms`;
     col.style.transform = `translateY(${-Number(text[i]) * 10}%)`;
+    d.dataset.d = text[i];
   });
 }

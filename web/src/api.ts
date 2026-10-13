@@ -37,6 +37,7 @@ export const api = {
   setName: (name: string) => call<{ user: Me }>('/api/me', 'PATCH', { name }).then((r) => r.user),
   startEmail: (email: string, next: string) => call<{ ok: true }>('/api/auth/email/start', 'POST', { email, next }),
   verifyEmail: (email: string, code: string) => call<{ user: Me }>('/api/auth/email/verify', 'POST', { email, code }).then((r) => r.user),
+  emailLink: (token: string) => call<{ user: Me }>('/api/auth/email/link', 'POST', { token }).then((r) => r.user),
   logout: () => call<{ ok: true }>('/api/auth/logout', 'POST', {}),
   googleUrl: (next: string) => `/api/auth/google/start?next=${encodeURIComponent(next)}`,
 

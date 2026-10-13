@@ -4,7 +4,7 @@ import { companionKey, frameFor, type Companion, type PetDetail, type PetSummary
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, t, away } from '../i18n';
 import { cachePets, petCache, isSaved, placePet, state, update } from '../store';
-import { age, canvas, photo } from '../ui/canvas';
+import { age, canvas, companionLabel, photo } from '../ui/canvas';
 import { removeFromList, startSave } from '../ui/save';
 import { toast } from '../ui/toast';
 
@@ -100,7 +100,7 @@ function body(pet: PetDetail, km: number): Raw {
     <div class="profile__pair">
       <section class="profile__section">
         <h2 class="section-title">${t('profile.goodWith')}</h2>
-        <dl class="status-list">${companions.map((c) => html`<div><dt>${t(`companion.${c}`)}</dt><dd>${status(pet.goodWith[companionKey[c]])}</dd></div>`)}</dl>
+        <dl class="status-list">${companions.map((c) => html`<div><dt>${companionLabel(c, pet)}</dt><dd>${status(pet.goodWith[companionKey[c]])}</dd></div>`)}</dl>
       </section>
       <section class="profile__section">
         <h2 class="section-title">${t('profile.health')}</h2>

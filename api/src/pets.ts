@@ -21,7 +21,8 @@ const SUMMARY_COLUMNS = `d.id, d.species, d.name, d.sex, d.birth_date, d.birth_d
   (SELECT r2_key FROM pet_photos ph WHERE ph.pet_id = d.id ORDER BY ph.position LIMIT 1) AS photo_key,
   (SELECT focus FROM pet_photos ph WHERE ph.pet_id = d.id ORDER BY ph.position LIMIT 1) AS photo_focus`;
 
-const FROM = `FROM pets d JOIN places p ON p.id = d.place_id LEFT JOIN shelters s ON s.id = d.shelter_id`;
+// A shelter's animals are at the shelter: its place wins over whatever place the listing carries.
+const FROM = `FROM pets d LEFT JOIN shelters s ON s.id = d.shelter_id JOIN places p ON p.id = COALESCE(s.place_id, d.place_id)`;
 
 type Bool = 0 | 1 | null;
 export interface SummaryRow {

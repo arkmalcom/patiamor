@@ -11,7 +11,7 @@ import { applyFooter, bindRadiusPanel, radiusPanel } from './ui/radius';
 import { mountPips, pips, resumePendingSave } from './ui/save';
 import { closeSheet, initSheet, openSheet, sheetEl } from './ui/sheet';
 import { initToast, toast } from './ui/toast';
-import { api } from './api';
+import { api, ApiError } from './api';
 import { errorText } from './ui/auth';
 import { renderAccount } from './views/account';
 import { renderDeck } from './views/deck';
@@ -116,6 +116,15 @@ function render(route = parse(location.hash)) {
   }
 }
 
+// A one-tap link from the sign-in email lands on #/entrar?t=…&next=…. Take the token off the URL before
+// anything renders, then post it; the server only signs in on that POST, never on the link's GET.
+const linkParams = location.hash.startsWith('#/entrar?') ? new URLSearchParams(location.hash.split('?')[1]) : null;
+const linkToken = linkParams?.get('t') ?? null;
+if (linkParams) {
+  const next = linkParams.get('next') ?? '';
+  history.replaceState(null, '', location.pathname + (/^#\/[\w\-/%]*$/.test(next) ? next : '#/'));
+}
+
 let current = parse(location.hash);
 window.addEventListener('hashchange', () => {
   const next = parse(location.hash);
@@ -152,11 +161,15 @@ else
     .then(({ place }) => setLocation(place))
     .catch(() => update((s) => (s.petsStatus = 'error')));
 
-api
-  .me()
+const signedIn = linkToken
+  ? api.emailLink(linkToken).then(
+      (user) => (toast(t('auth.signedIn', { who: user.name ?? user.email })), user),
+      (err) => (toast(errorText(err instanceof ApiError && err.code === 'link' ? 'link' : 'network')), api.me()),
+    )
+  : api.me().then((user) => (user && justSignedIn && toast(t('auth.signedIn', { who: user.name ?? user.email })), user));
+signedIn
   .then((user) => {
     setUser(user);
-    if (user && justSignedIn) toast(t('auth.signedIn', { who: user.name ?? user.email }));
     void resumePendingSave();
   })
   .catch(() => {

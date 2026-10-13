@@ -11,7 +11,9 @@ function render(code: string, link: string) {
     '',
     'El código y el enlace vencen en 15 minutos. Si no pediste entrar, ignora este correo.',
   ].join('\n');
-  const html = `<!doctype html><html lang="es"><body style="margin:0;background:#e3f1f4;font-family:Arial,Helvetica,sans-serif;color:#1d2340">
+  // Light only: Apple Mail and Outlook otherwise recolour the frame and button in dark mode.
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"></head>
+  <body style="margin:0;background:#e3f1f4;font-family:Arial,Helvetica,sans-serif;color:#1d2340">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
     <table role="presentation" width="100%" style="max-width:440px;background:#ffffff;border-radius:16px;border:10px solid #1e7f49" cellpadding="0" cellspacing="0">
       <tr><td style="padding:28px 28px 8px;font-size:26px;font-weight:bold">Patiamor</td></tr>
@@ -23,6 +25,19 @@ function render(code: string, link: string) {
     </table>
   </td></tr></table></body></html>`;
   return { subject, text, html };
+}
+
+/** Resend's free tier allows 100 emails a day (and 3,000 a month) across the whole account. */
+export class EmailQuotaError extends Error {}
+
+/** Resend answers a spent quota with 429 and a `name` of daily_quota_exceeded or monthly_quota_exceeded. */
+export function isQuotaError(status: number, body: string): boolean {
+  if (status !== 429) return false;
+  try {
+    return /quota_exceeded$/.test(String((JSON.parse(body) as { name?: unknown }).name ?? ''));
+  } catch {
+    return false;
+  }
 }
 
 /** Sends the sign-in email through Resend, or logs it outside production when no key is configured. */
@@ -38,5 +53,9 @@ export async function sendSignInEmail(env: Env, to: string, code: string, link: 
     headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ from: env.EMAIL_FROM, to: [to], subject, text, html }),
   });
-  if (!res.ok) throw new Error(`Resend responded ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok) {
+    const body = await res.text();
+    if (isQuotaError(res.status, body)) throw new EmailQuotaError(body.slice(0, 300));
+    throw new Error(`Resend responded ${res.status}: ${body.slice(0, 300)}`);
+  }
 }

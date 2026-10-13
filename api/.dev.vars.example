@@ -1,6 +1,7 @@
 # Copy to api/.dev.vars (gitignored) for local `wrangler dev`.
 ENVIRONMENT=development
-APP_ORIGIN=http://localhost:8788
+# The web app's address: Vite's dev server, which proxies /api to this Worker.
+APP_ORIGIN=http://localhost:5173
 # Leave empty locally to print sign-in codes in the wrangler console instead of emailing them.
 RESEND_API_KEY=
 # From Google Cloud Console → APIs & Services → Credentials (OAuth client, type "Web application").

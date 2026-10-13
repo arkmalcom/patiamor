@@ -1,6 +1,5 @@
-import { House, MapPin, PawPrint, User } from 'lucide';
-import { leaves } from '../art';
-import { ageMonths, frameFor, type PetSummary } from '../data';
+import { Baby, Cat, Check, CircleHelp, Dog, House, MapPin, PawPrint, User, X, type IconNode } from 'lucide';
+import { ageMonths, companionKey, frameFor, type Companion, type PetSummary } from '../data';
 import { html, icon, type Raw } from '../dom';
 import { formatAge, t, away } from '../i18n';
 import type { Placed } from '../store';
@@ -39,23 +38,50 @@ export function photo(pet: PetSummary, loading: 'eager' | 'lazy' = 'lazy'): Raw 
 }
 
 interface CanvasOpts {
-  index?: number;
   heading?: 'h1' | 'h2';
   loading?: 'eager' | 'lazy';
   photoName?: string;
 }
 
-/** A pet presented as a market painting: painted two-tone frame, name on the lower band. */
-export function canvas(p: Placed, { index = 0, heading = 'h2', loading = 'eager', photoName }: CanvasOpts = {}): Raw {
+/** "Otros perros" on a dog's card, "Perros" on a cat's (and the reverse for cats). */
+export function companionLabel(c: Companion, pet: PetSummary): string {
+  if (pet.species === 'gato' && c === 'perros') return t('companion.perros.forCat');
+  if (pet.species === 'gato' && c === 'gatos') return t('companion.gatos.forCat');
+  return t(`companion.${c}`);
+}
+
+const COMPANIONS: [Companion, IconNode][] = [
+  ['ninos', Baby],
+  ['perros', Dog],
+  ['gatos', Cat],
+];
+
+/** Convivencia at a glance: three painted badges, each marked with a shape (check, cross, question), never colour alone. */
+export function compat(pet: PetSummary): Raw {
+  const items = COMPANIONS.map(([c, glyph]) => {
+    const v = pet.goodWith[companionKey[c]];
+    const [cls, mark, word] = v === true ? ['yes', Check, t('compat.yes')] : v === false ? ['no', X, t('compat.no')] : ['unknown', CircleHelp, t('compat.unknown')];
+    return { c, glyph, cls, mark, text: `${companionLabel(c, pet)}: ${word}` };
+  });
+  return html`<ul class="compat" aria-label="${t('compat.label')}: ${items.map((i) => i.text).join(', ')}">${items.map(
+    (i) => html`<li class="compat__badge compat__badge--${i.cls}" title="${i.text}">${icon(i.glyph, 17)}<span class="compat__mark">${icon(i.mark, 11)}</span></li>`,
+  )}</ul>`;
+}
+
+/** A pet's portrait: an arched, hand-painted frame (echoing the street's arched doors), the name on a
+ *  painted sign nailed across it, and convivencia badges at the photo's corner. */
+export function canvas(p: Placed, { heading = 'h2', loading = 'eager', photoName }: CanvasOpts = {}): Raw {
   const { pet } = p;
   const name = heading === 'h1' ? html`<h1 class="canvas__name" id="pet-name" tabindex="-1">${pet.name}</h1>` : html`<h2 class="canvas__name">${pet.name}</h2>`;
   return html`
     <div class="canvas" data-frame="${frameFor(pet.id)}">
-      <div class="canvas__leaves">${leaves(index)}</div>
       <div class="canvas__frame-shadow">
         <div class="canvas__frame">
-          <div class="canvas__picture"${photoName ? html` style="view-transition-name:${photoName}"` : ''}>${photo(pet, loading)}</div>
-          <div class="canvas__band">
+          <div class="canvas__photo">
+            <div class="canvas__picture"${photoName ? html` style="view-transition-name:${photoName}"` : ''}>${photo(pet, loading)}</div>
+            ${compat(pet)}
+          </div>
+          <div class="canvas__band rotulo">
             ${name}
             ${where(p)}
             ${listerLabel(pet)}

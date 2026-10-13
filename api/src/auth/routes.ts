@@ -3,7 +3,7 @@ import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { AppContext } from '../env';
 import { isoIn, nowIso, randomToken, sha256, sixDigitCode, timingSafeEqual } from './crypto';
-import { sendSignInEmail } from './email';
+import { EmailQuotaError, sendSignInEmail } from './email';
 import { endSession, startSession } from './session';
 import { isEmail, normalizeEmail, userForEmail, userForGoogle } from './users';
 
@@ -12,6 +12,8 @@ const MAX_ATTEMPTS = 5;
 const MAX_CODES_PER_EMAIL_HOUR = 5;
 const MAX_CODES_PER_IP_HOUR = 20;
 const RESEND_COOLDOWN_MS = 45 * 1000;
+/** Resend's free tier: 100 emails a day for the whole account. Stop just short and say so kindly. */
+const DAILY_EMAIL_CAP = 100;
 
 type C = Context<AppContext>;
 
@@ -45,6 +47,14 @@ auth.post('/email/start', async (c) => {
   if ((recent?.n ?? 0) >= MAX_CODES_PER_EMAIL_HOUR || (byIp?.n ?? 0) >= MAX_CODES_PER_IP_HOUR) {
     return c.json({ error: 'too_many' }, 429);
   }
+  const today = await db
+    .prepare('SELECT count(*) AS n FROM email_codes WHERE created_at > ?')
+    .bind(isoIn(-24 * 60 * 60 * 1000))
+    .first<{ n: number }>();
+  if ((today?.n ?? 0) >= DAILY_EMAIL_CAP) {
+    console.error(`sign-in email cap reached: ${today?.n} codes in the last 24h`);
+    return c.json({ error: 'email_quota' }, 503);
+  }
 
   const id = crypto.randomUUID();
   const code = sixDigitCode();
@@ -55,10 +65,18 @@ auth.post('/email/start', async (c) => {
     .run();
 
   const next = safeNext(body.next);
-  const link = `${new URL(c.req.url).origin}/api/auth/email/link?t=${linkToken}&next=${encodeURIComponent(next)}`;
+  // The link opens the app, which posts the token back. Mail scanners (Outlook Safe Links and the like)
+  // fetch links before the person taps them; a GET that signed in would burn the token on their visit.
+  const link = `${appOrigin(c)}/#/entrar?t=${linkToken}&next=${encodeURIComponent(next)}`;
   try {
     await sendSignInEmail(c.env, email, code, link);
   } catch (err) {
+    // Nothing was sent, so the code mustn't count toward the cooldown or the hourly limits.
+    await db.prepare('DELETE FROM email_codes WHERE id = ?').bind(id).run();
+    if (err instanceof EmailQuotaError) {
+      console.error('sign-in email quota exceeded at Resend', err.message);
+      return c.json({ error: 'email_quota' }, 503);
+    }
     console.error('sign-in email failed', err);
     return c.json({ error: 'email_failed' }, 502);
   }
@@ -93,19 +111,20 @@ auth.post('/email/verify', async (c) => {
   return c.json({ user: publicUser(user) });
 });
 
-auth.get('/email/link', async (c) => {
-  const token = c.req.query('t') ?? '';
-  const next = safeNext(c.req.query('next'));
+auth.post('/email/link', async (c) => {
+  const body = await c.req.json<{ token?: string }>().catch(() => ({}) as { token?: string });
+  const token = body.token ?? '';
+  if (!token) return c.json({ error: 'link' }, 400);
   const db = c.env.DB;
   const row = await db
     .prepare('SELECT id, email FROM email_codes WHERE link_token_hash = ? AND consumed_at IS NULL AND expires_at > ? AND attempts < ?')
     .bind(await sha256(token), nowIso(), MAX_ATTEMPTS)
     .first<{ id: string; email: string }>();
-  if (!row) return backToApp(c, '#/cuenta?error=link');
+  if (!row) return c.json({ error: 'link' }, 400);
   await db.prepare('UPDATE email_codes SET consumed_at = ? WHERE email = ? AND consumed_at IS NULL').bind(nowIso(), row.email).run();
   const user = await userForEmail(db, row.email);
   await startSession(c, user.id);
-  return backToApp(c, `${next}?signedin=1`);
+  return c.json({ user: publicUser(user) });
 });
 
 // ---------- Google (OAuth 2.0 authorization code + PKCE) ----------

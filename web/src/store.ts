@@ -21,6 +21,8 @@ export interface Filters {
   sex: Sex[];
   energy: Energy[];
   goodWith: Companion[];
+  /** Chosen on the map: one shelter's animals, or the private listings in one neighbourhood. */
+  from: { kind: 'shelter' | 'place'; id: string; name: string } | null;
 }
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -46,7 +48,7 @@ export const MAX_SLOTS = 3;
 export const RADIUS_MIN = 1;
 export const RADIUS_MAX = 150;
 
-const emptyFilters = (): Filters => ({ size: [], age: [], sex: [], energy: [], goodWith: [] });
+export const emptyFilters = (): Filters => ({ size: [], age: [], sex: [], energy: [], goodWith: [], from: null });
 
 function read<T>(storage: Storage | undefined, key: string, fallback: T): T {
   try {
@@ -160,6 +162,8 @@ export function matchesFilters(pet: PetSummary, f: Filters, species: SpeciesFilt
   if (f.sex.length && !f.sex.includes(pet.sex)) return false;
   if (f.energy.length && !f.energy.includes(pet.energy)) return false;
   if (f.goodWith.some((c) => pet.goodWith[companionKey[c]] !== true)) return false;
+  if (f.from?.kind === 'shelter' && !(pet.lister.type === 'shelter' && pet.lister.id === f.from.id)) return false;
+  if (f.from?.kind === 'place' && !(pet.lister.type === 'private' && pet.place.id === f.from.id)) return false;
   return true;
 }
 
@@ -181,7 +185,7 @@ export function speciesCounts(radiusKm = state.radiusKm, filters = state.filters
 }
 
 export function activeFilterCount(f = state.filters): number {
-  return f.size.length + f.age.length + f.sex.length + f.energy.length + f.goodWith.length;
+  return f.size.length + f.age.length + f.sex.length + f.energy.length + f.goodWith.length + (f.from ? 1 : 0);
 }
 
 /** Nearest radius step that would bring at least one more pet into reach. */

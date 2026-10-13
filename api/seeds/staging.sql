@@ -92,7 +92,7 @@ INSERT OR IGNORE INTO pets (id, listed_by, shelter_id, place_id, litter_id, name
 -- Photos: sample images ship with the web app under /perros/ and /gatos/, so keys here point at those static files.
 INSERT OR IGNORE INTO pet_photos (id, pet_id, r2_key, position, focus) VALUES
   ('seed-photo-canela',   'canela',   'static:/perros/canela.jpg',   0, '50% 40%'),
-  ('seed-photo-pinto',    'pinto',    'static:/perros/pinto.jpg',    0, '50% 35%'),
+  ('seed-photo-pinto',    'pinto',    'static:/perros/pinto.jpg',    0, '78% 40%'),
   ('seed-photo-morena',   'morena',   'static:/perros/morena.jpg',   0, '50% 30%'),
   ('seed-photo-bizcocho', 'bizcocho', 'static:/perros/bizcocho.jpg', 0, '50% 30%'),
   ('seed-photo-cacao',    'cacao',    'static:/perros/cacao.jpg',    0, '45% 40%'),
@@ -140,3 +140,6 @@ INSERT OR IGNORE INTO pet_photos (id, pet_id, r2_key, position, focus) VALUES
   ('seed-photo-ceniza',    'ceniza',    'static:/gatos/ceniza.jpg',    0, '50% 40%'),
   ('seed-photo-chinola',   'chinola',   'static:/gatos/chinola.jpg',   0, '50% 40%'),
   ('seed-photo-guayaba',   'guayaba',   'static:/gatos/guayaba.jpg',   0, '50% 35%');
+
+-- Corrections to rows earlier seeds already inserted (INSERT OR IGNORE won't touch them).
+UPDATE pet_photos SET focus = '78% 40%' WHERE id = 'seed-photo-pinto';

@@ -2,7 +2,8 @@ import { Compass, Footprints } from 'lucide';
 import { $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, t, away } from '../i18n';
 import { MAX_SLOTS, placePet, state, type Answer, type SavedItem } from '../store';
-import { listerLabel, miniFrame } from '../ui/canvas';
+import { listerLabel, miniFrame, photo } from '../ui/canvas';
+import { frameFor } from '../data';
 import { pips, removeFromList } from '../ui/save';
 
 interface ListDeps {
@@ -66,6 +67,17 @@ export function bindSlots(root: HTMLElement, deps: ListDeps) {
   $$<HTMLButtonElement>('[data-release]', root).forEach((b) => b.addEventListener('click', () => removeFromList(b.dataset.release!)));
 }
 
+/** "Tu casa": one painted facade with three windows, open with a pet looking out or shut while empty. */
+function casa(): Raw {
+  const windows = Array.from({ length: MAX_SLOTS }, (_, i) => {
+    const s = state.saved[i];
+    return s
+      ? html`<span class="casa__window is-open" data-frame="${frameFor(s.pet.id)}"><span class="casa__shutter"></span><span class="casa__pane">${photo(s.pet)}</span><span class="casa__shutter"></span></span>`
+      : html`<span class="casa__window" data-frame="anil"><span class="casa__pane"><span class="casa__shut"></span><span class="casa__shut"></span></span></span>`;
+  });
+  return html`<div class="casa" aria-hidden="true"><span class="casa__cornice"></span><span class="casa__wall"><span class="casa__windows">${windows}</span><span class="casa__door"></span></span></div>`;
+}
+
 export function renderList(root: HTMLElement, deps: ListDeps) {
   mount(
     root,
@@ -75,6 +87,7 @@ export function renderList(root: HTMLElement, deps: ListDeps) {
           <h1 class="page-title" id="list-title" tabindex="-1" data-focus>${t('list.title')}</h1>
           <span class="list-view__count">${pips()}<span>${t('list.slots', { n: state.saved.length })}</span></span>
         </header>
+        ${casa()}
         <p class="list-view__lede">${t('list.body')}</p>
         ${!state.signedIn && !state.saved.length ? html`<p class="sample-note">${t('list.signedOut')}</p>` : ''}
         ${slots()}

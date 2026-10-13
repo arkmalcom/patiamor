@@ -17,9 +17,9 @@ Memorable moment: the radius "radar". Dogs sit as dots at their real distance an
 
 ## Direction contract
 
-THESIS: Each dog is a market canvas (Mercado Modelo / El Conde naïf painting): one framed painting at a time, carefully looked at, and only a few taken home. Refuses the Tinder stack of rounded photo cards with a red X and a green heart.
+THESIS: Each pet is a portrait in a hand-painted naïf frame set against a painted street of Dominican colonial houses: adoption as coming home. Mi lista is "tu casa", three windows of one house. Refuses the Tinder stack of rounded photo cards with a red X and a green heart. (2026-10-13: leaves replaced by the street and the arched portrait; the bone/ball props, the shutter-window card and a paw plaque were tried and rejected.)
 
-OWN-WORLD: Pale naïf-sky ground (#E3F1F4), night-blue ink (#1D2340). Each dog wears a hand-painted two-tone frame band from a flat gouache set (leaf green, mango, ultramarine, turquoise, flamboyán orange), with flat leaf silhouettes tucked behind frame edges. Hibiscus is the ONLY action color, and only on tappable things. Shrikhand (painted-title display) is used for dog names and headings; Atkinson Hyperlegible Next is used for everything else. Facts sit in a segmented strip with tabular figures. No gradients, no glass.
+OWN-WORLD: Pale naïf-sky ground (#E3F1F4), night-blue ink (#1D2340). Each dog wears a hand-painted two-tone frame band from a flat gouache set (leaf green, mango, ultramarine, turquoise, flamboyán orange), arched on top like the street's doors, the name on a die-cut sticker slapped across it, and convivencia badges (child/dog/cat with check/cross/question) at the photo's corner, over a flat painted street of colonial houses (Zona Colonial parapets, Puerto Plata gingerbread). Hibiscus is the ONLY action color, and only on tappable things. Shrikhand (painted-title display) is used for dog names and headings; Atkinson Hyperlegible Next is used for everything else. Facts sit in a segmented strip with tabular figures. No gradients, no glass.
 
 STORY: The visitor sees one real nearby dog at painting scale, sees exactly how far away it is, and understands that saving means a considered, limited choice.
 
@@ -27,6 +27,6 @@ FIRST VIEWPORT: Top bar with the wordmark and a radius chip ("Gazcue · 15 km"),
 
 FORM: Cuadro de Mercado. Candidate 6 of 7 on the ordered list; seed key 39e6b52b. Raises: action-only color (warm consumer); segmented facts (boarding pass); digit-roll numbers (split-flap); next dog preloaded (vertical feed).
 
-SIGNATURE INTERACTION & MOTION: The canvas swipes with drag physics and tilt; leftward reads "Ahora no", rightward lifts into the reflection sheet rather than saving. Radius radar repaint plus digit roll. Ease-out-expo, 240–420ms, and reduced-motion falls back to crossfades.
+SIGNATURE INTERACTION & MOTION: The portrait swipes with drag physics and tilt; leftward reads "Ahora no", rightward lifts into the reflection sheet rather than saving. Radius radar repaint plus digit roll. Ease-out-expo, 240–420ms; reduced motion falls back to crossfades.
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance

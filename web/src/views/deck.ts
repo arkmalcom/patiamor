@@ -1,7 +1,7 @@
 import { Clock, Heart, SlidersHorizontal } from 'lucide';
 import { $, html, icon, mount, reducedMotion, type Raw } from '../dom';
 import { animals, away, t } from '../i18n';
-import { activeFilterCount, loadPets, nextRadius, queue, state, update } from '../store';
+import { activeFilterCount, emptyFilters, loadPets, nextRadius, queue, state, update } from '../store';
 import { canvas } from '../ui/canvas';
 import { bindSpeciesSwitch, speciesSwitch } from '../ui/species';
 import { startSave } from '../ui/save';
@@ -25,7 +25,7 @@ function emptyState(): Raw {
   const hasSkipped = state.skipped.length > 0;
   return html`
     <div class="deck-empty">
-      <div class="deck-empty__frame" aria-hidden="true"><span></span></div>
+      ${emptyFrame()}
       <h1 class="deck-empty__title" tabindex="-1" data-focus>${t('empty.title')}</h1>
       <p class="muted">${t('empty.body', { km: state.radiusKm, animals: animals(2, state.species) })}</p>
       <div class="deck-empty__actions">
@@ -36,13 +36,17 @@ function emptyState(): Raw {
     </div>`;
 }
 
+/** An empty portrait frame (gently breathing while pets load). */
+const emptyFrame = (loading = false) =>
+  html`<div class="empty-frame${loading ? ' is-loading' : ''}" data-frame="mango" aria-hidden="true"><span class="empty-frame__canvas"></span></div>`;
+
 export function renderDeck(root: HTMLElement, deps: DeckDeps) {
   if (state.petsStatus !== 'ready' && !state.pets.length) {
     const failed = state.petsStatus === 'error';
     mount(
       root,
       html`<section class="deck deck--empty">${speciesSwitch()}<div class="deck-empty">
-        <div class="deck-empty__frame${failed ? '' : ' is-loading'}" aria-hidden="true"><span></span></div>
+        ${emptyFrame(!failed)}
         <h1 class="deck-empty__title" tabindex="-1" data-focus>${failed ? t('deck.error') : t('deck.loading', { animals: animals(2, state.species) })}</h1>
         ${failed ? html`<button class="button button--primary" type="button" data-retry>${t('deck.retry')}</button>` : ''}
       </div></section>`,
@@ -60,13 +64,14 @@ export function renderDeck(root: HTMLElement, deps: DeckDeps) {
       update((s) => (s.radiusKm = km));
     });
     root.querySelector('[data-again]')?.addEventListener('click', () => update((s) => (s.skipped = [])));
-    root.querySelector('[data-filters]')?.addEventListener('click', () => update((s) => (s.filters = { size: [], age: [], sex: [], energy: [], goodWith: [] })));
+    root.querySelector('[data-filters]')?.addEventListener('click', () => update((s) => (s.filters = emptyFilters())));
     return;
   }
 
   const [top, ...rest] = q;
-  const behind = rest.slice(0, 2);
   const total = q.length;
+  // Windows don't stack; the next photos just load ahead so the next window opens instantly.
+  for (const p of rest.slice(0, 2)) if (p.pet.photo.url) new Image().src = p.pet.photo.url;
   mount(
     root,
     html`
@@ -74,13 +79,10 @@ export function renderDeck(root: HTMLElement, deps: DeckDeps) {
         ${speciesSwitch()}
         <h1 class="sr-only" id="deck-title" tabindex="-1" data-focus>${t('nav.explore')}</h1>
         <div class="deck__stack">
-          ${behind
-            .map((p, i) => html`<div class="card card--behind card--behind-${i + 1}" aria-hidden="true" inert>${canvas(p, { index: i + 1, loading: 'eager' })}</div>`)
-            .reverse()}
           <article class="card card--top" tabindex="0" data-card
             aria-label="${top.pet.name}, ${away(top.km)}"
             aria-describedby="deck-keys">
-            ${canvas(top, { index: 0, photoName: 'pet-photo' })}
+            ${canvas(top, { photoName: 'pet-photo' })}
             ${stamps()}
           </article>
         </div>
