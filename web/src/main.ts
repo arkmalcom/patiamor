@@ -57,7 +57,7 @@ mount(
       <nav class="topnav" aria-label="Principal">
         <a href="#/" data-nav="deck">${t('nav.explore')}</a>
         <a href="#/lista" data-nav="list">${t('nav.list')} <span data-pips data-pips-count>${pips(true)}</span></a>
-        <a href="#/cuenta" data-nav="account">${t('nav.account')}</a>
+        <a href="#/cuenta" data-nav="account" data-account-top>${t('nav.account')}</a>
       </nav>
       <div class="topbar__tools">
         <button class="radius-chip" type="button" data-open-radius aria-label="${t('radius.open')}">${icon(MapPin, 18)}<span><span class="radius-chip__place" data-radius-place></span><span data-radius-label></span></span></button>
@@ -74,7 +74,7 @@ mount(
     <nav class="tabbar" aria-label="Principal">
       <a href="#/" data-nav="deck">${icon(Compass, 24)}<span>${t('nav.explore')}</span></a>
       <a href="#/lista" data-nav="list"><span class="tabbar__pips" data-pips data-pips-count>${pips(true)}</span><span>${t('nav.list')}</span></a>
-      <a href="#/cuenta" data-nav="account">${icon(User, 24)}<span>${t('nav.account')}</span></a>
+      <a href="#/cuenta" data-nav="account" data-account-tab>${icon(User, 24)}<span>${t('nav.account')}</span></a>
     </nav>
   `,
 );
@@ -97,6 +97,29 @@ function openRadiusSheet() {
 }
 $$('[data-open-radius]').forEach((b) => b.addEventListener('click', openRadiusSheet));
 
+/** Who's signed in, at a glance: an initial and a first name where "Cuenta" would be. */
+function account() {
+  const user = state.user;
+  const top = $<HTMLAnchorElement>('[data-account-top]');
+  const tab = $<HTMLAnchorElement>('[data-account-tab]');
+  if (!user) {
+    mount(top, html`${t('nav.account')}`);
+    mount(tab, html`${icon(User, 24)}<span>${t('nav.account')}</span>`);
+    top.removeAttribute('aria-label');
+    tab.removeAttribute('aria-label');
+    return;
+  }
+  const first = user.name?.trim().split(/\s+/)[0] || null;
+  const initial = (user.name?.trim() || user.email).charAt(0).toUpperCase();
+  const label = first ?? t('nav.myAccount');
+  const avatar = html`<span class="avatar" aria-hidden="true">${initial}</span>`;
+  mount(top, html`${avatar}<span>${label}</span>`);
+  mount(tab, html`${avatar}<span class="tabbar__name">${label}</span>`);
+  const aria = t('nav.signedInAs', { who: user.name ? `${user.name} (${user.email})` : user.email });
+  top.setAttribute('aria-label', aria);
+  tab.setAttribute('aria-label', aria);
+}
+
 function chrome(route: Route) {
   document.documentElement.dataset.route = route.name;
   // The background's motifs follow the species switch: paws and bones, yarn and fish, or both.
@@ -108,6 +131,7 @@ function chrome(route: Route) {
   badge.hidden = n === 0;
   badge.textContent = String(n);
   $$('[data-pips]').forEach(mountPips);
+  account();
   $$<HTMLAnchorElement>('[data-nav]').forEach((a) => {
     const active = a.dataset.nav === route.name || (route.name === 'profile' && a.dataset.nav === 'deck') || (route.name === 'portal' && a.dataset.nav === 'account');
     if (active) a.setAttribute('aria-current', 'page');

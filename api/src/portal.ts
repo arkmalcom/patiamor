@@ -14,6 +14,7 @@ export type Role = 'owner' | 'maintainer';
 /** Owners can register this many shelters; enough for a real network, too few for a mill of fronts. */
 const MAX_OWNED = 3;
 const REFERENCE_KINDS = ['veterinaria', 'refugio', 'otro'] as const;
+const MAX_REFERENCES = 3;
 
 /** This user's role in the shelter, or null if they aren't a member. */
 export async function roleIn(c: C, shelterId: string): Promise<Role | null> {
@@ -49,7 +50,14 @@ function readApplication(b: Record<string, unknown>) {
   const contactPhone = drPhone(text(b.contactPhone, 30));
   const publicPhone = b.publicPhone ? drPhone(text(b.publicPhone, 30)) : null;
   const email = text(b.email, 120) || null;
-  const ref = (b.reference ?? {}) as Record<string, unknown>;
+  // References: the first is required; up to two more are optional but must be complete if started.
+  const given = Array.isArray(b.references) ? b.references : [b.reference];
+  const refs = given.slice(0, MAX_REFERENCES).map((r) => {
+    const o = (r ?? {}) as Record<string, unknown>;
+    return { name: text(o.name, 80), contact: text(o.contact, 120), kind: o.kind as string };
+  });
+  const completeRef = (r: { name: string; contact: string; kind: string }) => r.name.length >= 2 && r.contact.length >= 5 && REFERENCE_KINDS.includes(r.kind as never);
+  const ref = refs[0] ?? { name: '', contact: '', kind: '' };
   const app = {
     name,
     placeId,
@@ -64,9 +72,10 @@ function readApplication(b: Record<string, unknown>) {
     address: longText(b.address, 300),
     social: links(b.social),
     history: longText(b.history, 2000),
-    referenceName: text(ref.name, 80),
-    referenceContact: text(ref.contact, 120),
+    referenceName: ref.name,
+    referenceContact: ref.contact,
     referenceKind: ref.kind,
+    moreReferences: refs.slice(1),
   };
   let error: string | null = null;
   if (name.length < 3) error = 'invalid_name';
@@ -77,7 +86,8 @@ function readApplication(b: Record<string, unknown>) {
   else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) error = 'invalid_email';
   else if (app.address.length < 8) error = 'invalid_address';
   else if (app.history.length < 40) error = 'history_too_short';
-  else if (app.referenceName.length < 2 || app.referenceContact.length < 5 || !REFERENCE_KINDS.includes(app.referenceKind as never)) error = 'invalid_reference';
+  else if (!completeRef(ref)) error = 'invalid_reference';
+  else if (!app.moreReferences.every(completeRef)) error = 'invalid_more_reference';
   else if (b.rules !== true) error = 'rules_required';
   return { app, error };
 }
@@ -137,10 +147,10 @@ portal.post('/shelters', async (c) => {
       .bind(id, slug, app.name, app.description, app.placeId, app.publicPhone, app.email, app.website, app.visitHours, 'pending'),
     db
       .prepare(
-        `INSERT INTO shelter_applications (shelter_id, contact_name, contact_phone, rnc, address, social, history, reference_name, reference_contact, reference_kind)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO shelter_applications (shelter_id, contact_name, contact_phone, rnc, address, social, history, reference_name, reference_contact, reference_kind, more_references)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(id, app.contactName, app.contactPhone, app.rnc, app.address, JSON.stringify(app.social), app.history, app.referenceName, app.referenceContact, app.referenceKind),
+      .bind(id, app.contactName, app.contactPhone, app.rnc, app.address, JSON.stringify(app.social), app.history, app.referenceName, app.referenceContact, app.referenceKind, JSON.stringify(app.moreReferences)),
     db.prepare("INSERT INTO shelter_members (shelter_id, user_id, role) VALUES (?, ?, 'owner')").bind(id, user.id),
   ]);
   return c.json({ shelter: { id, slug, name: app.name, status: 'pending' } }, 201);
@@ -185,7 +195,7 @@ portal.get('/shelters/:id', async (c) => {
           address: a.address,
           social: JSON.parse(a.social ?? '[]') as string[],
           history: a.history,
-          reference: { name: a.reference_name, contact: a.reference_contact, kind: a.reference_kind },
+          references: [{ name: a.reference_name, contact: a.reference_contact, kind: a.reference_kind }, ...(JSON.parse(a.more_references ?? '[]') as object[])],
           submittedAt: a.submitted_at,
         }
       : null,
@@ -214,10 +224,10 @@ portal.put('/shelters/:id/application', async (c) => {
     db
       .prepare(
         `UPDATE shelter_applications SET contact_name = ?, contact_phone = ?, rnc = ?, address = ?, social = ?, history = ?,
-           reference_name = ?, reference_contact = ?, reference_kind = ?, submitted_at = ?, reviewed_at = NULL, reviewed_by = NULL
+           reference_name = ?, reference_contact = ?, reference_kind = ?, more_references = ?, submitted_at = ?, reviewed_at = NULL, reviewed_by = NULL
          WHERE shelter_id = ?`,
       )
-      .bind(app.contactName, app.contactPhone, app.rnc, app.address, JSON.stringify(app.social), app.history, app.referenceName, app.referenceContact, app.referenceKind, now, id),
+      .bind(app.contactName, app.contactPhone, app.rnc, app.address, JSON.stringify(app.social), app.history, app.referenceName, app.referenceContact, app.referenceKind, JSON.stringify(app.moreReferences), now, id),
   ]);
   return c.json({ shelter: { id, status: 'pending' } });
 });

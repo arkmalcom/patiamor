@@ -69,6 +69,16 @@ describe('registering a shelter', () => {
     expect(mine.json.shelters.map((s: { role: string }) => s.role)).toEqual(['owner', 'owner']);
   });
 
+  it('takes up to three references; extra ones must be complete', async () => {
+    const u = await signIn();
+    const vet = { name: 'Clínica Vet Centro', contact: '809-555-0202', kind: 'veterinaria' };
+    const other = { name: 'Refugio Amigo', contact: '829-555-0303', kind: 'refugio' };
+    expect((await register(u.cookie, { references: [vet, { name: 'Ana', contact: '', kind: 'otro' }] })).json.error).toBe('invalid_more_reference');
+    const id = (await register(u.cookie, { references: [vet, other, { ...other, name: 'Tercera' }, { ...other, name: 'Cuarta' }] })).json.shelter.id;
+    const refs = (await api(`/api/portal/shelters/${id}`, { cookie: u.cookie })).json.application.references;
+    expect(refs.map((r: { name: string }) => r.name)).toEqual(['Clínica Vet Centro', 'Refugio Amigo', 'Tercera']);
+  });
+
   it('caps how many shelters one person can own', async () => {
     const u = await signIn();
     for (let i = 0; i < 3; i++) expect((await register(u.cookie, { name: `Refugio ${i}` })).status).toBe(201);

@@ -16,6 +16,11 @@ export interface Me {
 
 export type ShelterStatus = 'pending' | 'verified' | 'rejected' | 'suspended';
 export type ReferenceKind = 'veterinaria' | 'refugio' | 'otro';
+export interface Reference {
+  name: string;
+  contact: string;
+  kind: ReferenceKind;
+}
 
 /** A shelter as its members see it in the portal. */
 export interface PortalShelter {
@@ -42,7 +47,8 @@ export interface ShelterApplication {
   address: string;
   social: string[];
   history: string;
-  reference: { name: string; contact: string; kind: ReferenceKind };
+  /** The first is required; up to two more. */
+  references: Reference[];
   submittedAt?: string;
 }
 
@@ -61,7 +67,7 @@ export interface ShelterForm {
   address: string;
   social: string[];
   history: string;
-  reference: { name: string; contact: string; kind: ReferenceKind | '' };
+  references: { name: string; contact: string; kind: ReferenceKind | '' }[];
   rules: boolean;
 }
 

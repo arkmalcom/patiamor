@@ -1,5 +1,5 @@
 import { BadgeCheck, CircleAlert, Clock, House, Mail, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, Users } from 'lucide';
-import { api, ApiError, type AdminShelter, type PortalShelter, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
+import { api, ApiError, type AdminShelter, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
 import { CONTACT_EMAIL, type Place } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, t, type Key } from '../i18n';
@@ -41,7 +41,7 @@ function signedOut(root: HTMLElement) {
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('portal.title')}</h1>
         <p class="portal__lede">${t('portal.lede')}</p>
         ${steps()}
-        <div class="portal-card"><p>${t('portal.signIn')}</p><div data-auth></div></div>
+        <div class="portal-card"><p>${t('portal.signIn')}</p><div class="portal-card__auth" data-auth></div></div>
       </section>`,
   );
   renderAuth($('[data-auth]', root), { next: '#/refugio', onSignedIn: (u) => toast(t('auth.signedIn', { who: u.name ?? u.email })) });
@@ -71,6 +71,7 @@ async function home(root: HTMLElement) {
     html`
       <section class="portal" aria-labelledby="portal-title">
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('portal.title')}</h1>
+        <p class="portal__who">${t('portal.who', { who: state.user?.name ? `${state.user.name} · ${state.user.email}` : (state.user?.email ?? '') })}</p>
         ${state.user?.isAdmin
           ? html`<a class="portal-admin-link" href="#/refugio/admin">${icon(ShieldCheck, 20)}<span>${t('portal.admin.link')}</span>${pending ? html`<span class="list-tabs__count">${pending}</span>` : ''}</a>`
           : ''}
@@ -148,7 +149,7 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
             <div class="field">
               <span class="field__label" id="place-label">${t('portal.form.place')}</span>
               <div class="place-pick" data-place-pick>
-                <input class="field__input" type="search" autocomplete="off" placeholder="${t('place.searchPlaceholder')}" aria-labelledby="place-label" aria-describedby="place-chosen" data-place-query />
+                <input class="field__input" type="search" autocomplete="off" placeholder="${t('place.searchPlaceholder')}" aria-labelledby="place-label" aria-describedby="place-chosen" value="${place?.name ?? ''}" data-place-query />
                 <ul class="place-pick__results" role="listbox" aria-labelledby="place-label" data-place-results hidden></ul>
                 <p class="field__hint" id="place-chosen" data-place-chosen>${place ? t('portal.form.placeChosen', { place: `${place.name}, ${place.municipality}` }) : t('portal.form.placeHint')}</p>
               </div>
@@ -171,14 +172,8 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
             <div class="form-subsection">
               <h3 class="form-subsection__title">${t('portal.form.reference')}</h3>
               <p class="muted">${t('portal.form.referenceNote')}</p>
-              ${field('referenceName', 'portal.form.referenceName', { value: a?.reference.name, required: true, max: 80 })}
-              ${field('referenceContact', 'portal.form.referenceContact', { value: a?.reference.contact, required: true, max: 120 })}
-              <fieldset class="question">
-                <legend>${t('portal.form.referenceKind')}</legend>
-                <div class="segmented segmented--wrap">
-                  ${(['veterinaria', 'refugio', 'otro'] as const).map((k) => html`<label><input type="radio" name="referenceKind" value="${k}" ${a?.reference.kind === k ? 'checked' : ''} /><span>${t(`portal.form.kind.${k}`)}</span></label>`)}
-                </div>
-              </fieldset>
+              <div class="references" data-refs></div>
+              <button class="text-button references__add" type="button" data-add-ref>${icon(Plus, 18)}${t('portal.form.addReference')}</button>
             </div>
           </fieldset>
           <label class="consent">
@@ -191,12 +186,68 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
       </section>`,
   );
 
-  // The area: a place search like the adopter's, without coordinates leaving the device.
+  // References: the first is required; up to two more, each with a "Quitar". The list is kept here and
+  // redrawn on add or remove, keeping whatever has been typed.
+  type Ref = { name: string; contact: string; kind: ReferenceKind | '' };
+  let refs: Ref[] = a?.references.length ? a.references.map((r) => ({ ...r })) : [{ name: '', contact: '', kind: '' }];
+  const refsRoot = $('[data-refs]', root);
+  const addRef = $<HTMLButtonElement>('[data-add-ref]', root);
+  const readRefs = () =>
+    (refs = $$<HTMLElement>('[data-ref]', refsRoot).map((el, i) => ({
+      name: $<HTMLInputElement>('input[name^=ref-name]', el).value.trim(),
+      contact: $<HTMLInputElement>('input[name^=ref-contact]', el).value.trim(),
+      kind: (el.querySelector<HTMLInputElement>(`input[name=ref-kind-${i}]:checked`)?.value ?? '') as Ref['kind'],
+    })));
+  const drawRefs = () => {
+    mount(
+      refsRoot,
+      html`${refs.map(
+        (r, i) => html`
+          <div class="reference" data-ref>
+            ${i > 0
+              ? html`<div class="reference__head"><span class="reference__title">${t('portal.form.referenceN', { n: i + 1 })} <span class="muted">(${t('request.optional')})</span></span><button class="text-button" type="button" data-remove-ref="${i}">${t('portal.form.removeReference')}</button></div>`
+              : ''}
+            <label class="field"><span class="field__label">${t('portal.form.referenceName')}</span><input class="field__input" name="ref-name-${i}" maxlength="80" value="${r.name}" /></label>
+            <label class="field"><span class="field__label">${t('portal.form.referenceContact')}</span><input class="field__input" name="ref-contact-${i}" maxlength="120" value="${r.contact}" /></label>
+            <fieldset class="question">
+              <legend>${t('portal.form.referenceKind')}</legend>
+              <div class="segmented segmented--wrap">
+                ${(['veterinaria', 'refugio', 'otro'] as const).map((k) => html`<label><input type="radio" name="ref-kind-${i}" value="${k}" ${r.kind === k ? 'checked' : ''} /><span>${t(`portal.form.kind.${k}`)}</span></label>`)}
+              </div>
+            </fieldset>
+          </div>`,
+      )}`,
+    );
+    addRef.hidden = refs.length >= 3;
+    $$<HTMLButtonElement>('[data-remove-ref]', refsRoot).forEach((b) =>
+      b.addEventListener('click', () => {
+        readRefs();
+        refs.splice(Number(b.dataset.removeRef), 1);
+        drawRefs();
+        addRef.focus();
+      }),
+    );
+  };
+  drawRefs();
+  addRef.addEventListener('click', () => {
+    readRefs();
+    refs.push({ name: '', contact: '', kind: '' });
+    drawRefs();
+    $$<HTMLInputElement>('input[name^=ref-name]', refsRoot).at(-1)?.focus();
+  });
+
+  // The area: a place search like the adopter's, without coordinates leaving the device. Choosing a result
+  // puts its name in the field (the hint below names the municipality, which tells apart places with the
+  // same name); editing the field afterwards clears the choice until another is picked, so the
+  // field never shows a zone that isn't actually selected.
   const query = $<HTMLInputElement>('[data-place-query]', root);
   const results = $<HTMLUListElement>('[data-place-results]', root);
   const chosen = $('[data-place-chosen]', root);
+  const labelOf = (p: Place) => `${p.name}, ${p.municipality}`;
+  const showChoice = () => (chosen.textContent = place ? t('portal.form.placeChosen', { place: labelOf(place) }) : t('portal.form.placeHint'));
   let timer = 0;
   query.addEventListener('input', () => {
+    if (place && query.value !== place.name) (place = null), showChoice();
     clearTimeout(timer);
     const q = query.value.trim();
     if (q.length < 2) return void (results.hidden = true);
@@ -207,12 +258,16 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
       $$<HTMLButtonElement>('[data-place]', results).forEach((b) =>
         b.addEventListener('click', () => {
           place = found[Number(b.dataset.place)];
-          chosen.textContent = t('portal.form.placeChosen', { place: `${place.name}, ${place.municipality}` });
-          query.value = '';
+          query.value = place.name; // the hint below gives the full "Zona elegida: …, municipio"
+          showChoice();
           results.hidden = true;
+          query.focus();
         }),
       );
     }, 200);
+  });
+  query.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !results.hidden) (e.preventDefault(), (results.hidden = true));
   });
 
   const formEl = $<HTMLFormElement>('#shelter-form', root);
@@ -236,7 +291,8 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
       address: v('address'),
       social: v('social').split(/\s+/).filter(Boolean),
       history: v('history'),
-      reference: { name: v('referenceName'), contact: v('referenceContact'), kind: (f.get('referenceKind') as ShelterForm['reference']['kind']) ?? '' },
+      // Extra references left completely blank are dropped, not sent as errors.
+      references: readRefs().filter((r, i) => i === 0 || r.name || r.contact || r.kind),
       rules: f.get('rules') === 'on',
     };
     send.disabled = true;
@@ -248,7 +304,7 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
       location.hash = '/refugio';
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'network';
-      const known = ['invalid_name', 'invalid_place', 'invalid_contact', 'invalid_phone', 'invalid_public_phone', 'invalid_email', 'invalid_address', 'history_too_short', 'invalid_reference', 'rules_required', 'too_many_shelters', 'not_editable'];
+      const known = ['invalid_more_reference', 'invalid_name', 'invalid_place', 'invalid_contact', 'invalid_phone', 'invalid_public_phone', 'invalid_email', 'invalid_address', 'history_too_short', 'invalid_reference', 'rules_required', 'too_many_shelters', 'not_editable'];
       error.textContent = known.includes(code) ? t(`portal.err.${code as 'invalid_name'}`) : t('auth.err.network');
       error.hidden = false;
       error.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -331,7 +387,7 @@ function adminCard(s: AdminShelter): Raw {
               ${row('portal.form.address', a.address)}
               ${row('portal.form.rnc', a.rnc)}
               ${row('portal.form.social', a.social.length ? html`${a.social.map((l) => html`<a href="${l}" target="_blank" rel="noopener noreferrer">${l.replace(/^https?:\/\//, '')}</a><br />`)}` : null)}
-              ${row('portal.form.reference', `${a.reference.name} · ${a.reference.contact} (${t(`portal.form.kind.${a.reference.kind}`)})`)}
+              ${row('portal.form.reference', html`${a.references.map((r) => html`${r.name} · ${r.contact} (${t(`portal.form.kind.${r.kind}`)})<br />`)}`)}
               ${row('portal.admin.sent', a.submittedAt ? formatDate(a.submittedAt.slice(0, 10)) : null)}`
           : html`<div><dt>${t('portal.admin.noApplication')}</dt><dd>—</dd></div>`}
         ${row('portal.form.visitHours', s.visitHours)}

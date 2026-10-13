@@ -232,6 +232,15 @@ html[data-route='deck'] .view { min-height: 0; }
   background: var(--mango);
 }
 .tabbar__pips { height: 24px; display: grid; place-items: center; }
+/* The signed-in person's initial, where "Cuenta" would be: proof at a glance of who's signed in. */
+.avatar {
+  flex: none; display: inline-grid; place-items: center;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--ink); color: var(--paper);
+  font-size: 0.8rem; font-weight: 800; line-height: 1;
+}
+.tabbar__name { max-width: 9ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.portal__who { margin-top: -10px; color: var(--ink-2); font-weight: 700; overflow-wrap: anywhere; }
 
 /* Slot pips: three little frames, filled with each saved pet's frame paint. */
 .pips { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
@@ -1177,6 +1186,13 @@ html[data-route='profile'] .tabbar { display: none; }
 .form-section--private { background: color-mix(in srgb, var(--paper) 88%, var(--casa-anil)); }
 .form-subsection { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--rule); }
 .form-subsection__title { font-weight: 800; font-size: 1.05rem; }
+.references { display: grid; gap: 16px; }
+.reference { display: grid; gap: 12px; }
+.reference + .reference { padding-top: 16px; border-top: 1px dashed var(--rule-strong); }
+.reference__head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.reference__title { font-weight: 800; }
+.references__add { display: inline-flex; align-items: center; gap: 6px; justify-self: start; }
+.references__add[hidden] { display: none; }
 .portal-form__send { justify-self: start; min-width: 220px; }
 .portal-form .consent { margin-top: 0; }
 
@@ -1200,6 +1216,8 @@ html[data-route='profile'] .tabbar { display: none; }
 .portal-decide .field[hidden] { display: none; }
 .portal-decide__actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .account__shelters { display: grid; gap: 2px; font-weight: 700; }
+/* The sign-in fills the card, so its controls share the card's edges instead of stopping halfway. */
+.portal-card__auth { justify-self: stretch; }
 
 /* ---------- List ---------- */
 

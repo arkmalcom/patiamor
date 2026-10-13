@@ -29,7 +29,7 @@ admin.get('/shelters', async (c) => {
   const status = STATUSES.includes(c.req.query('status') as never) ? c.req.query('status')! : 'pending';
   const { results } = await c.env.DB.prepare(
     `SELECT s.id, s.name, s.slug, s.description, s.place_id, s.phone, s.email, s.website, s.visit_hours, s.status, s.status_reason, s.created_at,
-            a.contact_name, a.contact_phone, a.rnc, a.address, a.social, a.history, a.reference_name, a.reference_contact, a.reference_kind, a.submitted_at,
+            a.contact_name, a.contact_phone, a.rnc, a.address, a.social, a.history, a.reference_name, a.reference_contact, a.reference_kind, a.more_references, a.submitted_at,
             (SELECT group_concat(u.email, ', ') FROM shelter_members m JOIN users u ON u.id = m.user_id WHERE m.shelter_id = s.id AND m.role = 'owner') AS owners
        FROM shelters s LEFT JOIN shelter_applications a ON a.shelter_id = s.id
       WHERE s.status = ? ORDER BY coalesce(a.submitted_at, s.created_at)`,
@@ -58,7 +58,7 @@ admin.get('/shelters', async (c) => {
             address: r.address,
             social: JSON.parse(r.social ?? '[]') as string[],
             history: r.history,
-            reference: { name: r.reference_name, contact: r.reference_contact, kind: r.reference_kind },
+            references: [{ name: r.reference_name, contact: r.reference_contact, kind: r.reference_kind }, ...(JSON.parse(r.more_references ?? '[]') as object[])],
             submittedAt: r.submitted_at,
           }
         : null,
