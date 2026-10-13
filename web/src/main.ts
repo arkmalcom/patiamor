@@ -6,7 +6,7 @@ import { Compass, MapPin, SlidersHorizontal, User } from 'lucide';
 import { landscape } from './art';
 import { $, $$, html, icon, mount, transition } from './dom';
 import { t } from './i18n';
-import { activeFilterCount, here, setUser, state, subscribe } from './store';
+import { activeFilterCount, loadPets, setLocation, setUser, state, subscribe, update } from './store';
 import { applyFooter, bindRadiusPanel, radiusPanel } from './ui/radius';
 import { mountPips, pips, resumePendingSave } from './ui/save';
 import { closeSheet, initSheet, openSheet, sheetEl } from './ui/sheet';
@@ -22,14 +22,14 @@ type Route = { name: 'deck' } | { name: 'profile'; id: string } | { name: 'list'
 
 function parse(hash: string): Route {
   const [, a, b] = hash.replace(/^#/, '').split('?')[0].split('/');
-  if (a === 'perro' && b) return { name: 'profile', id: decodeURIComponent(b) };
+  if (a === 'mascota' && b) return { name: 'profile', id: decodeURIComponent(b) };
   if (a === 'lista') return { name: 'list' };
   if (a === 'cuenta') return { name: 'account' };
   return { name: 'deck' };
 }
 
 const go = (path: string) => (location.hash = path);
-const openProfile = (id: string) => go(`/perro/${encodeURIComponent(id)}`);
+const openProfile = (id: string) => go(`/mascota/${encodeURIComponent(id)}`);
 const explore = () => go('/');
 
 const app = $('#app');
@@ -85,7 +85,7 @@ $$('[data-open-radius]').forEach((b) => b.addEventListener('click', openRadiusSh
 
 function chrome(route: Route) {
   document.documentElement.dataset.route = route.name;
-  $('[data-radius-place]').textContent = `${here.label} · `;
+  $('[data-radius-place]').textContent = state.location ? `${state.location.name} · ` : '';
   $('[data-radius-label]').textContent = t('radius.chip', { km: state.radiusKm });
   const n = activeFilterCount();
   const badge = $('[data-filter-badge]');
@@ -108,7 +108,7 @@ function render(route = parse(location.hash)) {
     case 'deck':
       return renderDeck(view, { openProfile });
     case 'profile':
-      return renderProfile(view, route.id, { back: () => (history.length > 1 ? history.back() : explore()) });
+      return renderProfile(view, route.id, { back: () => (history.length > 1 ? history.back() : explore()), openProfile });
     case 'list':
       return renderList(view, { openProfile, explore });
     case 'account':
@@ -133,23 +133,32 @@ window.addEventListener('hashchange', () => {
 
 subscribe(() => {
   render(current);
-
-// Sign-in state lives on the server; errors from a sign-in redirect arrive as ?error=… on the hash.
-const authError = new URLSearchParams(location.hash.split('?')[1] ?? '').get('error');
-if (authError) {
-  toast(errorText(authError));
-  history.replaceState(null, '', location.pathname + location.hash.split('?')[0]);
-}
-api
-  .me()
-  .then((user) => {
-    setUser(user);
-    resumePendingSave();
-  })
-  .catch(() => {
-    /* API unreachable (e.g. static preview): stay signed out */
-  });
   inline.refresh();
 });
 
 render(current);
+
+// Sign-in state lives on the server; errors from a sign-in redirect arrive as ?error=… on the hash.
+const returnParams = new URLSearchParams(location.hash.split('?')[1] ?? '');
+const authError = returnParams.get('error');
+const justSignedIn = returnParams.has('signedin');
+if (authError) toast(errorText(authError));
+if (authError || justSignedIn) history.replaceState(null, '', location.pathname + location.hash.split('?')[0]);
+// Where to measure distances from: the saved area, or Cloudflare's coarse IP location (Gazcue outside the DR).
+if (state.location) void loadPets();
+else
+  api
+    .whereami()
+    .then(({ place }) => setLocation(place))
+    .catch(() => update((s) => (s.petsStatus = 'error')));
+
+api
+  .me()
+  .then((user) => {
+    setUser(user);
+    if (user && justSignedIn) toast(t('auth.signedIn', { who: user.name ?? user.email }));
+    void resumePendingSave();
+  })
+  .catch(() => {
+    /* API unreachable (e.g. static preview): stay signed out */
+  });

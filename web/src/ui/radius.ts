@@ -1,8 +1,11 @@
-import { Check, LocateFixed, MapPin } from 'lucide';
-import { shelterById, type AgeGroup, type Companion, type Energy, type Sex, type Size } from '../data';
-import { $, $$, html, icon, type Raw } from '../dom';
-import { t, type Key } from '../i18n';
-import { here, inDR, inReach, matchesFilters, placed, RADIUS_MAX, RADIUS_MIN, setLocation, state, update, type Filters } from '../store';
+import { Check, LocateFixed, MapPin, Search } from 'lucide';
+import { api } from '../api';
+import { frameFor, type AgeGroup, type Companion, type Energy, type Place, type Sex, type Size } from '../data';
+import { $, $$, html, icon, mount, type Raw } from '../dom';
+import { animals, t, type Key } from '../i18n';
+
+type PlaceKind = 'municipio' | 'distrito_municipal' | 'barrio' | 'paraje';
+import { inReach, matchesFilters, placed, RADIUS_MAX, RADIUS_MIN, setLocation, state, update, type Filters } from '../store';
 import { rollTo } from './roll';
 import { toast } from './toast';
 
@@ -15,28 +18,34 @@ const R = 138;
 const rOf = (km: number) => R * Math.sqrt(Math.min(km, RADIUS_MAX) / RADIUS_MAX);
 const RINGS = [5, 15, 30, 60, 120];
 
-function radar(): Raw {
-  const byShelter = new Map<string, number>();
-  const dots = placed.map((p) => {
-    const n = placed.filter((q) => q.dog.shelterId === p.dog.shelterId).length;
-    const i = byShelter.get(p.dog.shelterId) ?? 0;
-    byShelter.set(p.dog.shelterId, i + 1);
+/** Pets from the same area fan out slightly around its bearing so each stays visible. */
+function dots(): Raw {
+  const perPlace = new Map<string, number>();
+  const counts = new Map<string, number>();
+  for (const p of placed) counts.set(p.pet.place.id, (counts.get(p.pet.place.id) ?? 0) + 1);
+  return html`${placed.map((p) => {
+    const n = counts.get(p.pet.place.id)!;
+    const i = perPlace.get(p.pet.place.id) ?? 0;
+    perPlace.set(p.pet.place.id, i + 1);
     const angle = ((p.bearing + (i - (n - 1) / 2) * 9) * Math.PI) / 180;
     const r = Math.max(rOf(p.km), 16 + i * 4);
-    const x = Math.sin(angle) * r;
-    const y = -Math.cos(angle) * r;
-    return html`<circle class="radar__dot" data-id="${p.dog.id}" data-frame="${p.dog.frame}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6.5"><title>${p.dog.name} · ${shelterById.get(p.dog.shelterId)!.sector}</title></circle>`;
-  });
+    return html`<circle class="radar__dot" data-id="${p.pet.id}" data-frame="${frameFor(p.pet.id)}" cx="${(Math.sin(angle) * r).toFixed(1)}" cy="${(-Math.cos(angle) * r).toFixed(1)}" r="6.5"><title>${p.pet.name} · ${p.pet.place.name}</title></circle>`;
+  })}`;
+}
+
+function radar(): Raw {
   return html`
     <svg class="radar" viewBox="-150 -150 300 300" role="img" aria-labelledby="radar-label">
       <title id="radar-label">${t('sheet.radius.label')}</title>
       <circle class="radar__disk" r="${R}" />
       ${RINGS.map((km) => html`<circle class="radar__ring" r="${rOf(km).toFixed(1)}" /><text class="radar__ring-label" y="${(-rOf(km) - 3).toFixed(1)}">${km}</text>`)}
-      ${dots}
+      <g data-dots>${dots()}</g>
       <circle class="radar__you-halo" r="11" />
       <circle class="radar__you" r="5.5" />
     </svg>`;
 }
+
+const fromLabel = () => (state.location ? t('sheet.radius.from', { place: state.location.name, city: state.location.municipality }) : t('place.unset'));
 
 type Group = keyof Filters;
 const GROUPS: { key: Group; title: Key; values: string[]; label: (v: string) => string }[] = [
@@ -52,19 +61,34 @@ export function radiusPanel(mode: 'sheet' | 'inline'): Raw {
     <div class="radius-panel radius-panel--${mode}">
       ${mode === 'inline' ? html`<h2 class="panel-title">${t('sheet.radius.title')}</h2>` : ''}
       <p class="muted">${t('sheet.radius.body')}</p>
+      <div class="location">
+        <div class="location-row">
+          ${icon(MapPin, 18)}
+          <span data-location>${fromLabel()}</span>
+          <button class="text-button" type="button" data-change aria-expanded="false" aria-controls="place-search-${mode}">${t('place.change')}</button>
+        </div>
+        <div class="place-search" id="place-search-${mode}" hidden data-search>
+          <label class="field">
+            <span class="field__label">${t('place.searchLabel')}</span>
+            <span class="place-search__input">
+              ${icon(Search, 18)}
+              <input class="field__input" type="search" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false"
+                aria-controls="place-results-${mode}" placeholder="${t('place.searchPlaceholder')}" data-query />
+            </span>
+          </label>
+          <ul class="place-results" id="place-results-${mode}" role="listbox" data-results></ul>
+          <button class="text-button" type="button" data-locate>${icon(LocateFixed, 16)}${t('sheet.radius.locate')}</button>
+          <p class="sample-note">${t('place.attribution')}</p>
+        </div>
+      </div>
       <div class="radar-wrap">
-        ${radar()}
-        <p class="radar__count"><span class="roll" data-roll data-label="${t('sheet.radius.count.many')}"></span><span class="radar__count-label" data-count-label></span></p>
+        <div data-radar>${radar()}</div>
+        <p class="radar__count"><span class="roll" data-roll data-label=""></span><span class="radar__count-label" data-count-label></span></p>
       </div>
       <div class="radius-control">
         <label class="radius-control__label" for="radius-${mode}">${t('sheet.radius.label')}</label>
         <output class="radius-control__value" for="radius-${mode}" data-km-out></output>
         <input class="slider" id="radius-${mode}" type="range" min="0" max="100" step="1" data-radius />
-      </div>
-      <div class="location-row">
-        ${icon(MapPin, 18)}
-        <span data-location>${t('sheet.radius.from', { place: here.label, city: here.city })}</span>
-        <button class="text-button" type="button" data-locate>${icon(LocateFixed, 16)}${t('sheet.radius.locate')}</button>
       </div>
 
       <div class="filters">
@@ -103,7 +127,6 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
   const roll = $('[data-roll]', root);
   const countLabel = $('[data-count-label]', root);
   const disk = $('.radar__disk', root) as unknown as SVGCircleElement;
-  const dots = $$<SVGCircleElement>('.radar__dot', root);
   const chips = $$<HTMLButtonElement>('.chip', root);
   const apply = root.closest('dialog')?.querySelector<HTMLButtonElement>('[data-apply]') ?? null;
 
@@ -120,21 +143,31 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
     slider.setAttribute('aria-valuetext', `${km} km`);
     out.textContent = `${km} km`;
     disk.style.transform = `scale(${rOf(km) / R})`;
-    dots.forEach((d) => {
-      const p = placed.find((q) => q.dog.id === d.dataset.id)!;
+    for (const d of $$<SVGCircleElement>('.radar__dot', root)) {
+      const p = placed.find((q) => q.pet.id === d.dataset.id);
+      if (!p) continue;
       d.classList.toggle('is-in', p.km <= km);
-      d.classList.toggle('is-filtered', !matchesFilters(p.dog, draft.filters));
-    });
+      d.classList.toggle('is-filtered', !matchesFilters(p.pet, draft.filters));
+    }
+    const label = t('sheet.radius.count', { animals: animals(n, state.species) });
+    roll.dataset.label = label;
     rollTo(roll, n);
-    countLabel.textContent = n === 1 ? t('sheet.radius.count.one') : t('sheet.radius.count.many');
+    countLabel.textContent = label;
     chips.forEach((c) => {
       const list = draft.filters[c.dataset.group as Group] as string[];
       c.setAttribute('aria-pressed', String(list.includes(c.dataset.value!)));
     });
     if (apply) {
       apply.disabled = n === 0;
-      apply.textContent = n === 0 ? t('sheet.apply.none') : n === 1 ? t('sheet.apply.one') : t('sheet.apply.many', { n });
+      apply.textContent = n === 0 ? t('sheet.apply.none') : t('sheet.apply', { n, animals: animals(n, state.species) });
     }
+  };
+
+  /** New pets or a new origin: redraw the dots, keep the disk and its transition. */
+  const redraw = () => {
+    mount($('[data-dots]', root), dots());
+    $('[data-location]', root).textContent = fromLabel();
+    paint();
   };
 
   let commitTimer = 0;
@@ -156,33 +189,114 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
     }),
   );
 
-  const clear = () => {
+  $('[data-clear]', root).addEventListener('click', () => {
     draft.filters = { size: [], age: [], sex: [], energy: [], goodWith: [] };
     paint();
     commit();
-  };
-  $('[data-clear]', root).addEventListener('click', clear);
+  });
 
   apply?.addEventListener('click', () => {
     update((s) => ((s.radiusKm = draft.radiusKm), (s.filters = structuredClone(draft.filters))));
     onApply?.();
   });
 
+  // ---------- Location: search a sector, or use the device's position (rounded to its nearest place) ----------
+  const search = $('[data-search]', root);
+  const changeBtn = $('[data-change]', root);
+  const query = $<HTMLInputElement>('[data-query]', root);
+  const results = $<HTMLUListElement>('[data-results]', root);
+  let found: Place[] = [];
+  let active = -1;
+
+  const choose = async (place: Place) => {
+    search.hidden = true;
+    changeBtn.setAttribute('aria-expanded', 'false');
+    query.value = '';
+    mount(results, html``);
+    $('[data-location]', root).textContent = fromLabel();
+    await setLocation(place);
+    redraw();
+  };
+
+  const renderResults = () => {
+    query.setAttribute('aria-expanded', String(found.length > 0));
+    mount(
+      results,
+      html`${found.map(
+        (p, i) => html`<li role="option" id="place-opt-${mode}-${i}" class="place-option" aria-selected="${String(i === active)}" data-i="${i}">
+          <strong>${p.name}</strong><span class="muted">${p.kind ? `${t(`kind.${p.kind as PlaceKind}`)} · ` : ''}${p.hint ? `${p.hint} · ` : ''}${p.kind === 'municipio' ? p.province : `${p.municipality}, ${p.province}`}</span>
+        </li>`,
+      )}${query.value.trim().length >= 2 && !found.length ? html`<li class="place-empty">${t('place.noResults')}</li>` : ''}`,
+    );
+    if (active >= 0) query.setAttribute('aria-activedescendant', `place-opt-${mode}-${active}`);
+    else query.removeAttribute('aria-activedescendant');
+  };
+
+  changeBtn.addEventListener('click', () => {
+    search.hidden = !search.hidden;
+    changeBtn.setAttribute('aria-expanded', String(!search.hidden));
+    if (!search.hidden) query.focus();
+  });
+
+  let searchTimer = 0;
+  let searchSeq = 0;
+  query.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    const q = query.value.trim();
+    if (q.length < 2) {
+      found = [];
+      active = -1;
+      return renderResults();
+    }
+    searchTimer = window.setTimeout(async () => {
+      const seq = ++searchSeq;
+      try {
+        const places = await api.searchPlaces(q);
+        if (seq !== searchSeq) return;
+        found = places;
+        active = places.length ? 0 : -1;
+        renderResults();
+      } catch {
+        toast(t('auth.err.network'));
+      }
+    }, 180);
+  });
+  query.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!found.length) return;
+      active = (active + (e.key === 'ArrowDown' ? 1 : -1) + found.length) % found.length;
+      renderResults();
+    } else if (e.key === 'Enter' && active >= 0) {
+      e.preventDefault();
+      void choose(found[active]);
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      search.hidden = true;
+      changeBtn.setAttribute('aria-expanded', 'false');
+      changeBtn.focus();
+    }
+  });
+  results.addEventListener('click', (e) => {
+    const li = (e.target as HTMLElement).closest<HTMLElement>('[data-i]');
+    if (li) void choose(found[Number(li.dataset.i)]);
+  });
+
   $('[data-locate]', root).addEventListener('click', () => {
-    if (!('geolocation' in navigator)) return toast(t('sheet.radius.from', { place: here.label, city: here.city }));
+    if (!('geolocation' in navigator)) return toast(t('geo.error'));
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const point = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        if (!inDR(point)) {
+      async (pos) => {
+        try {
+          // Only a ~1 km rounded point leaves the device; distances are then measured from that area.
+          const place = await api.nearestPlace({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          await choose(place);
+          toast(t('place.located', { place: place.name }));
+        } catch {
           toast(t('geo.outside'));
-          return;
         }
-        setLocation(point, t('geo.here'), t('geo.country'));
-        $('[data-location]', root).textContent = t('sheet.radius.from', { place: here.label, city: here.city });
-        paint();
       },
       () => toast(t('geo.error')),
-      { enableHighAccuracy: false, timeout: 8000 },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 },
     );
   });
 
@@ -193,7 +307,7 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
       draft.radiusKm = state.radiusKm;
       draft.filters = structuredClone(state.filters);
       slider.value = String(toSlider(draft.radiusKm));
-      paint();
+      redraw();
     },
   };
 }

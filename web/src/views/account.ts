@@ -39,7 +39,7 @@ export function renderAccount(root: HTMLElement) {
       </section>`,
   );
   const authRoot = root.querySelector<HTMLElement>('[data-auth]');
-  if (authRoot) renderAuth(authRoot, { next: '#/cuenta', onSignedIn: () => {} });
+  if (authRoot) renderAuth(authRoot, { next: '#/cuenta', onSignedIn: (u) => toast(t('auth.signedIn', { who: u.name ?? u.email })) });
   root.querySelector('[data-signout]')?.addEventListener('click', async () => {
     try {
       await api.logout();

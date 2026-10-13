@@ -1,9 +1,8 @@
 import { Compass, Footprints } from 'lucide';
-import { dogById, shelterById } from '../data';
 import { $$, html, icon, mount, type Raw } from '../dom';
-import { formatDate, formatKm, t } from '../i18n';
-import { MAX_SLOTS, placedById, state, type Answer, type SavedDog } from '../store';
-import { miniFrame } from '../ui/canvas';
+import { formatDate, t, away } from '../i18n';
+import { MAX_SLOTS, placePet, state, type Answer, type SavedItem } from '../store';
+import { listerLabel, miniFrame } from '../ui/canvas';
 import { pips, removeFromList } from '../ui/save';
 
 interface ListDeps {
@@ -14,16 +13,18 @@ interface ListDeps {
 const answerTag = (label: string, a: Answer) =>
   html`<li class="answer answer--${a}"><span>${label}</span><strong>${a === 'si' ? t('reflect.yes') : t('reflect.unsure')}</strong></li>`;
 
-function filled(s: SavedDog, compact: boolean): Raw {
-  const dog = dogById.get(s.dogId)!;
-  const p = placedById.get(s.dogId)!;
-  const shelter = shelterById.get(dog.shelterId)!;
+function filled(s: SavedItem, compact: boolean): Raw {
+  const { pet } = s;
+  const p = placePet(pet);
+  const who = pet.lister.type === 'shelter' ? pet.lister.name : t('lister.privateWho');
+  const gone = pet.status !== 'available';
   return html`
     <li class="slot slot--filled">
-      <button class="slot__open" type="button" data-open="${dog.id}" aria-label="${t('deck.profile')}: ${dog.name}">${miniFrame(dog, compact ? 'sm' : 'md')}</button>
+      <button class="slot__open" type="button" data-open="${pet.id}" aria-label="${t('deck.profile')}: ${pet.name}">${miniFrame(pet, compact ? 'sm' : 'md')}</button>
       <div class="slot__text">
-        <h2 class="slot__name">${dog.name}</h2>
-        <p class="muted">${t('deck.away', { km: formatKm(p.km) })} · ${shelter.name}</p>
+        <h2 class="slot__name">${pet.name}</h2>
+        <p class="muted">${away(p.km)} · ${listerLabel(pet)}</p>
+        ${gone ? html`<p class="slot__gone">${t('list.unavailable')}</p>` : ''}
         ${compact
           ? ''
           : html`
@@ -35,11 +36,11 @@ function filled(s: SavedDog, compact: boolean): Raw {
               </ul>
               <div class="next-step">
                 ${icon(Footprints, 18)}
-                <p><strong>${t('list.next')}:</strong> ${t('list.nextBody', { shelter: shelter.name })}</p>
+                <p><strong>${t('list.next')}:</strong> ${t('list.nextBody', { shelter: who })}</p>
               </div>
               <div class="slot__actions">
-                <button class="button button--outline button--small" type="button" data-open="${dog.id}">${t('deck.profile')}</button>
-                <button class="button button--ghost button--small" type="button" data-release="${dog.id}">${t('full.release')}</button>
+                <button class="button button--outline button--small" type="button" data-open="${pet.id}">${t('deck.profile')}</button>
+                <button class="button button--ghost button--small" type="button" data-release="${pet.id}">${t('full.release')}</button>
               </div>`}
       </div>
     </li>`;
@@ -56,7 +57,7 @@ const empty = (compact: boolean) => html`
 
 export function slots(compact = false): Raw {
   return html`<ol class="slots ${compact ? 'slots--compact' : ''}">${Array.from({ length: MAX_SLOTS }, (_, i) =>
-    state.list[i] ? filled(state.list[i], compact) : empty(compact),
+    state.saved[i] ? filled(state.saved[i], compact) : empty(compact),
   )}</ol>`;
 }
 
@@ -72,10 +73,10 @@ export function renderList(root: HTMLElement, deps: ListDeps) {
       <section class="list-view" aria-labelledby="list-title">
         <header class="list-view__head">
           <h1 class="page-title" id="list-title" tabindex="-1" data-focus>${t('list.title')}</h1>
-          <span class="list-view__count">${pips()}<span>${t('list.slots', { n: state.list.length })}</span></span>
+          <span class="list-view__count">${pips()}<span>${t('list.slots', { n: state.saved.length })}</span></span>
         </header>
         <p class="list-view__lede">${t('list.body')}</p>
-        ${!state.signedIn && !state.list.length ? html`<p class="sample-note">${t('list.signedOut')}</p>` : ''}
+        ${!state.signedIn && !state.saved.length ? html`<p class="sample-note">${t('list.signedOut')}</p>` : ''}
         ${slots()}
         <button class="button button--outline" type="button" data-explore>${icon(Compass, 20)}${t('list.explore')}</button>
       </section>`,

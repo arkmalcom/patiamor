@@ -1,7 +1,10 @@
 import { Hono } from 'hono';
 import { appOrigin, auth, publicUser } from './auth/routes';
 import { currentUser } from './auth/session';
+import { pets, readPoint } from './pets';
 import type { AppContext } from './env';
+import { inDR, nearestPlace, PLACES_ATTRIBUTION, placeById, searchPlaces } from './places';
+import { shortlist } from './shortlist';
 
 export type { Env } from './env';
 
@@ -29,6 +32,40 @@ app.get('/api/health', async (c) => {
 });
 
 app.route('/api/auth', auth);
+app.route('/api/pets', pets);
+app.route('/api/shortlist', shortlist);
+
+// ---------- Places (in-memory; no D1 reads) ----------
+
+const DEFAULT_PLACE = 'gazcue-distrito-nacional';
+
+app.get('/api/places', (c) => {
+  c.header('Cache-Control', 'public, max-age=86400');
+  return c.json({ places: searchPlaces(c.req.query('q') ?? ''), attribution: PLACES_ATTRIBUTION });
+});
+
+app.get('/api/places/nearest', (c) => {
+  const point = readPoint(c.req.query('lat'), c.req.query('lng'));
+  if (!point) return c.json({ error: 'invalid_point' }, 400);
+  if (!inDR(point.lat, point.lng)) return c.json({ error: 'outside_dr' }, 404);
+  return c.json({ place: nearestPlace(point.lat, point.lng) });
+});
+
+app.get('/api/places/:id', (c) => {
+  const place = placeById(c.req.param('id'));
+  return place ? c.json({ place }) : c.json({ error: 'not_found' }, 404);
+});
+
+// A starting point before the user picks a place: Cloudflare's IP-based city location when it's in
+// the DR, otherwise Gazcue. Coarse by nature, and never stored.
+app.get('/api/whereami', (c) => {
+  const cf = c.req.raw.cf as { latitude?: string; longitude?: string } | undefined;
+  const lat = Number(cf?.latitude);
+  const lng = Number(cf?.longitude);
+  const place = Number.isFinite(lat) && Number.isFinite(lng) && inDR(lat, lng) ? nearestPlace(lat, lng) : null;
+  const chosen = place ?? placeById(DEFAULT_PLACE)!;
+  return c.json({ place: chosen, source: place ? 'ip' : 'default' });
+});
 
 app.get('/api/me', async (c) => {
   const user = c.get('user');

@@ -1,10 +1,11 @@
 import { Heart, Mail } from 'lucide';
-import { CONTACT_EMAIL, dogById, shelterById, type Dog } from '../data';
+import { api, ApiError } from '../api';
+import { CONTACT_EMAIL, frameFor, type PetDetail, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
-import { formatKm, t } from '../i18n';
-import { isSaved, MAX_SLOTS, placedById, stashPendingSave, state, takePendingSave, update, type Answer, type Answers, type SavedDog } from '../store';
+import { away, t } from '../i18n';
+import { petCache, isSaved, loadSaved, MAX_SLOTS, placePet, removeSaved, savePet, stashPendingSave, state, takePendingSave, type Answer, type Answers } from '../store';
 import { renderAuth } from './auth';
-import { miniFrame } from './canvas';
+import { listerLabel, miniFrame } from './canvas';
 import { closeSheet, openSheet } from './sheet';
 import { toast } from './toast';
 
@@ -12,20 +13,20 @@ import { toast } from './toast';
 
 type Done = (saved: boolean) => void;
 
-export function startSave(dogId: string, done: Done = () => {}) {
-  if (isSaved(dogId)) return done(true);
-  if (state.list.length >= MAX_SLOTS) return openFull(dogId, done);
-  openReflect(dogId, done);
+export function startSave(petId: string, done: Done = () => {}) {
+  if (isSaved(petId)) return done(true);
+  if (state.saved.length >= MAX_SLOTS) return openFull(petId, done);
+  openReflect(petId, done);
 }
 
-const pronoun = (dog: Dog) => (dog.sex === 'hembra' ? 'la' : 'lo');
+const pronoun = (pet: PetSummary) => (pet.sex === 'hembra' ? 'la' : 'lo');
 
-function cautions(dog: Dog): string[] {
+function cautions(pet: PetSummary): string[] {
   const out: string[] = [];
-  if (dog.goodWith.gatos === false) out.push(t('reflect.notCats'));
-  if (dog.goodWith.perros === false) out.push(t('reflect.notDogs'));
-  if (dog.goodWith.ninos === false) out.push(t('reflect.notKids'));
-  return [...out, ...dog.needs];
+  if (pet.goodWith.cats === false) out.push(t('reflect.notCats'));
+  if (pet.goodWith.dogs === false) out.push(t('reflect.notDogs'));
+  if (pet.goodWith.kids === false) out.push(t('reflect.notKids'));
+  return [...out, ...((pet as PetDetail).needs ?? [])];
 }
 
 function question(name: keyof Answers, text: string): Raw {
@@ -39,28 +40,60 @@ function question(name: keyof Answers, text: string): Raw {
     </fieldset>`;
 }
 
-function openReflect(dogId: string, done: Done) {
-  const dog = dogById.get(dogId)!;
-  const p = placedById.get(dogId)!;
-  const lo = pronoun(dog);
-  const slot = state.list.length + 1;
+/** Dogs need walks; cats need play and company. */
+function timeQuestion(pet: PetSummary, lo: string): string {
+  const cat = pet.species === 'gato';
+  if (pet.energy === 'alta') return cat ? t('reflect.q.time.high.cat', { name: pet.name }) : t('reflect.q.time.high', { name: pet.name, lo });
+  return cat ? t('reflect.q.time.cat', { lo }) : t('reflect.q.time', { lo });
+}
+
+const savedToast = (pet: PetSummary) => toast(`${pet.name} · ${t('profile.saved')} (${state.saved.length} de ${MAX_SLOTS})`);
+
+/** Saves on the server; a full list (e.g. filled on another device) routes to the release/contact sheet. */
+async function commitSave(pet: PetSummary, answers: Answers, done: Done): Promise<boolean> {
+  try {
+    await savePet(pet.id, answers);
+    savedToast(pet);
+    return true;
+  } catch (err) {
+    if (err instanceof ApiError && err.code === 'shortlist_full') {
+      await loadSaved().catch(() => {});
+      openFull(pet.id, done);
+    } else if (err instanceof ApiError && err.code === 'not_found') {
+      toast(t('save.unavailable', { name: pet.name }));
+    } else {
+      toast(t('auth.err.network'));
+    }
+    return false;
+  }
+}
+
+function openReflect(petId: string, done: Done) {
+  const pet = petCache.get(petId);
+  if (!pet) return;
+  const p = placePet(pet);
+  const lo = pronoun(pet);
+  const slot = state.saved.length + 1;
+  const caution = cautions(pet);
   const body = html`
     <form class="reflect" id="reflect-form">
       <div class="reflect__intro">
-        ${miniFrame(dog)}
+        ${miniFrame(pet)}
         <div>
-          <p class="reflect__dog">${dog.name} · ${t('deck.away', { km: formatKm(p.km) })}</p>
+          <p class="reflect__pet">${pet.name} · ${away(p.km)}</p>
           <p class="muted">${t('reflect.body')}</p>
           <p class="reflect__slot">${t('reflect.slot', { n: slot })}</p>
         </div>
       </div>
-      ${question('space', dog.size === 'grande' ? t('reflect.q.space.big', { name: dog.name }) : t('reflect.q.space'))}
-      ${question('time', dog.energy === 'alta' ? t('reflect.q.time.high', { name: dog.name, lo }) : t('reflect.q.time', { lo }))}
+      ${question('space', pet.size === 'grande' && pet.species === 'perro' ? t('reflect.q.space.big', { name: pet.name }) : t('reflect.q.space', { un: t(`animal.${pet.species}.un`) }))}
+      ${question('time', timeQuestion(pet, lo))}
       ${question('cost', t('reflect.q.cost'))}
-      <div class="mind">
-        <h3 class="mind__title">${t('reflect.mind')}</h3>
-        <ul class="mind__list">${cautions(dog).map((c) => html`<li>${c}</li>`)}</ul>
-      </div>
+      ${caution.length
+        ? html`<div class="mind">
+            <h3 class="mind__title">${t('reflect.mind')}</h3>
+            <ul class="mind__list">${caution.map((c) => html`<li>${c}</li>`)}</ul>
+          </div>`
+        : ''}
       <p class="unsure-note" hidden data-unsure>${t('reflect.unsureNote', { lo })}</p>
     </form>`;
   const footer = html`
@@ -68,7 +101,7 @@ function openReflect(dogId: string, done: Done) {
     <button class="button button--primary" type="submit" form="reflect-form" disabled data-save>${icon(Heart, 18)}<span>${t('reflect.answerAll')}</span></button>`;
 
   let saved = false;
-  const dialog = openSheet(t('reflect.title', { name: dog.name }), body, { footer, onClose: () => done(saved) });
+  const dialog = openSheet(t('reflect.title', { name: pet.name }), body, { footer, onClose: () => done(saved) });
   const form = $<HTMLFormElement>('#reflect-form', dialog);
   const saveBtn = $<HTMLButtonElement>('[data-save]', dialog);
   const read = (): Partial<Answers> => Object.fromEntries(new FormData(form)) as Partial<Answers>;
@@ -81,30 +114,26 @@ function openReflect(dogId: string, done: Done) {
     $('[data-unsure]', dialog).hidden = !Object.values(a).includes('pensando' as Answer);
   });
   $('[data-cancel]', dialog).addEventListener('click', () => closeSheet());
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const answers = read() as Answers;
-    const commit = () => {
-      update((s) => s.list.push({ dogId, savedAt: new Date().toISOString(), answers }));
-      saved = true;
-      closeSheet();
-      toast(`${dog.name} · ${t('profile.saved')} (${state.list.length} de ${MAX_SLOTS})`);
+    const commit = async () => {
+      saveBtn.disabled = true;
+      saved = await commitSave(pet, answers, done);
+      if (saved) closeSheet();
+      else saveBtn.disabled = false;
     };
-    if (state.signedIn) commit();
-    else showAuth(dog, { dogId, savedAt: new Date().toISOString(), answers }, commit, () => done(saved));
+    if (state.signedIn) await commit();
+    else showAuth(pet, answers, commit, () => done(saved));
   });
 }
 
-function showAuth(dog: Dog, pending: SavedDog, onSignedIn: () => void, onClose: () => void) {
-  const dialog = openSheet(
-    t('auth.title', { name: dog.name }),
-    html`<p class="muted auth__intro">${t('auth.body')}</p><div data-auth></div>`,
-    { onClose },
-  );
+function showAuth(pet: PetSummary, answers: Answers, onSignedIn: () => void, onClose: () => void) {
+  const dialog = openSheet(t('auth.title', { name: pet.name }), html`<p class="muted auth__intro">${t('auth.body')}</p><div data-auth></div>`, { onClose });
   renderAuth($('[data-auth]', dialog), {
     next: location.hash || '#/',
     // Google and the email link leave this page; the save finishes when the user returns signed in.
-    beforeRedirect: () => stashPendingSave(pending),
+    beforeRedirect: () => stashPendingSave({ petId: pet.id, answers }),
     onSignedIn: () => {
       takePendingSave();
       onSignedIn();
@@ -113,32 +142,31 @@ function showAuth(dog: Dog, pending: SavedDog, onSignedIn: () => void, onClose: 
 }
 
 /** Finishes a save that was interrupted by a sign-in redirect. */
-export function resumePendingSave() {
+export async function resumePendingSave() {
   const pending = takePendingSave();
-  if (!pending || !state.signedIn || isSaved(pending.dogId) || state.list.length >= MAX_SLOTS) return;
-  const dog = dogById.get(pending.dogId);
-  if (!dog) return;
-  update((s) => s.list.push(pending));
-  toast(`${dog.name} · ${t('profile.saved')} (${state.list.length} de ${MAX_SLOTS})`);
+  if (!pending || !state.signedIn) return;
+  await loadSaved().catch(() => {});
+  if (isSaved(pending.petId)) return;
+  const pet = petCache.get(pending.petId) ?? (await api.pet(pending.petId).catch(() => null));
+  if (pet) await commitSave(pet, pending.answers, () => {});
 }
 
-function openFull(dogId: string, done: Done) {
-  const dog = dogById.get(dogId)!;
+function openFull(petId: string, done: Done) {
+  const pet = petCache.get(petId);
+  if (!pet) return;
   const subject = encodeURIComponent(t('full.manySubject'));
-  const mailBody = encodeURIComponent(`Hola, me interesa adoptar a ${dog.name} y a otros perros más.`);
+  const mailBody = encodeURIComponent(`Hola, me interesa adoptar a ${pet.name} y a otros animales más.`);
   const body = html`
     <div class="full">
-      <p class="muted">${t('full.body', { name: dog.name })}</p>
+      <p class="muted">${t('full.body', { name: pet.name })}</p>
       <ul class="full__slots">
-        ${state.list.map((s) => {
-          const d = dogById.get(s.dogId)!;
-          const shelter = shelterById.get(d.shelterId)!;
-          return html`<li class="full__slot">
+        ${state.saved.map(
+          ({ pet: d }) => html`<li class="full__slot">
             ${miniFrame(d, 'sm')}
-            <span class="full__slot-text"><strong>${d.name}</strong><span class="muted">${shelter.name}</span></span>
+            <span class="full__slot-text"><strong>${d.name}</strong><span class="muted">${listerLabel(d)}</span></span>
             <button class="button button--outline button--small" type="button" data-release="${d.id}">${t('full.release')}</button>
-          </li>`;
-        })}
+          </li>`,
+        )}
       </ul>
       <div class="many">
         <h3 class="many__title">${t('full.manyTitle')}</h3>
@@ -149,24 +177,34 @@ function openFull(dogId: string, done: Done) {
   let handedOff = false;
   const dialog = openSheet(t('full.title'), body, { onClose: () => !handedOff && done(false) });
   $$<HTMLButtonElement>('[data-release]', dialog).forEach((b) =>
-    b.addEventListener('click', () => {
-      update((s) => (s.list = s.list.filter((x) => x.dogId !== b.dataset.release)));
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      try {
+        await removeSaved(b.dataset.release!);
+      } catch {
+        b.disabled = false;
+        return toast(t('auth.err.network'));
+      }
       handedOff = true;
-      openReflect(dogId, done);
+      openReflect(petId, done);
     }),
   );
 }
 
-export function removeFromList(dogId: string) {
-  update((s) => (s.list = s.list.filter((x) => x.dogId !== dogId)));
+export async function removeFromList(petId: string) {
+  try {
+    await removeSaved(petId);
+  } catch {
+    toast(t('auth.err.network'));
+  }
 }
 
 /** Re-render helper for any element showing the 3 slot pips. */
 export function pips(withCount = false): Raw {
   return html`<span class="pips" aria-hidden="true">${Array.from({ length: MAX_SLOTS }, (_, i) => {
-    const s = state.list[i];
-    return html`<span class="pip" ${s ? html`data-frame="${dogById.get(s.dogId)!.frame}"` : ''}></span>`;
-  })}${withCount ? html`<span class="pips__count">${state.list.length}/${MAX_SLOTS}</span>` : ''}</span>`;
+    const s = state.saved[i];
+    return html`<span class="pip" ${s ? html`data-frame="${frameFor(s.pet.id)}"` : ''}></span>`;
+  })}${withCount ? html`<span class="pips__count">${state.saved.length}/${MAX_SLOTS}</span>` : ''}</span>`;
 }
 
 export function mountPips(el: Element) {

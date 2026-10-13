@@ -105,7 +105,7 @@ auth.get('/email/link', async (c) => {
   await db.prepare('UPDATE email_codes SET consumed_at = ? WHERE email = ? AND consumed_at IS NULL').bind(nowIso(), row.email).run();
   const user = await userForEmail(db, row.email);
   await startSession(c, user.id);
-  return backToApp(c, next);
+  return backToApp(c, `${next}?signedin=1`);
 });
 
 // ---------- Google (OAuth 2.0 authorization code + PKCE) ----------
@@ -154,7 +154,7 @@ auth.get('/google/callback', async (c) => {
 
   const user = await userForGoogle(c.env.DB, claims.sub, normalizeEmail(claims.email), claims.name ?? null);
   await startSession(c, user.id);
-  return backToApp(c, next);
+  return backToApp(c, `${next}?signedin=1`);
 });
 
 // ---------- Session ----------

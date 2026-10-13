@@ -1,4 +1,6 @@
 // Thin client for the Patiamor Worker API (same origin in every environment).
+import type { PetDetail, PetSummary, LatLng, Place } from './data';
+import type { Answers, SavedItem } from './store';
 
 export interface Me {
   id: string;
@@ -37,4 +39,19 @@ export const api = {
   verifyEmail: (email: string, code: string) => call<{ user: Me }>('/api/auth/email/verify', 'POST', { email, code }).then((r) => r.user),
   logout: () => call<{ ok: true }>('/api/auth/logout', 'POST', {}),
   googleUrl: (next: string) => `/api/auth/google/start?next=${encodeURIComponent(next)}`,
+
+  // Coordinates are rounded to ~1 km before they leave the device.
+  pets: (from: LatLng) => call<{ pets: PetSummary[] }>(`/api/pets?${point(from)}`).then((r) => r.pets),
+  pet: (id: string, from?: LatLng | null) =>
+    call<{ pet: PetDetail }>(`/api/pets/${encodeURIComponent(id)}${from ? `?${point(from)}` : ''}`).then((r) => r.pet),
+  searchPlaces: (q: string) => call<{ places: Place[] }>(`/api/places?q=${encodeURIComponent(q)}`).then((r) => r.places),
+  nearestPlace: (at: LatLng) => call<{ place: Place }>(`/api/places/nearest?${point(at)}`).then((r) => r.place),
+  whereami: () => call<{ place: Place; source: 'ip' | 'default' }>('/api/whereami'),
+  shortlist: () => call<{ items: SavedItem[] }>('/api/shortlist').then((r) => r.items),
+  save: (petId: string, answers: Answers) => call<{ ok: true }>('/api/shortlist', 'POST', { petId, answers }),
+  unsave: (petId: string) => call<{ ok: true }>(`/api/shortlist/${encodeURIComponent(petId)}`, 'DELETE', {}),
 };
+
+function point({ lat, lng }: LatLng) {
+  return `lat=${lat.toFixed(2)}&lng=${lng.toFixed(2)}`;
+}

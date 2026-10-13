@@ -38,7 +38,7 @@ remote=0
 case "${args[0]}" in
   deploy|rollback|triggers) remote=1 ;;
   versions) [[ "${args[1]:-}" =~ ^(deploy|upload|secret)$ ]] && remote=1 ;;
-  secret) remote=1 ;;
+  secret) [[ "${args[1]:-}" != "list" ]] && remote=1 ;;
   d1) has "--remote" && remote=1 ;;
 esac
 # No --env means the top-level config, which is production.
@@ -53,6 +53,8 @@ if [[ "${args[0]}" == "login" ]]; then
   reason="wrangler login grants account-wide OAuth access; this project uses the scoped token in .env"
 elif has "delete" || [[ "${args[0]}" == "delete" ]]; then
   reason="deletes always need the owner's approval"
+elif [[ "${args[0]} ${args[1]:-}" == "secret list" ]]; then
+  reason=""  # listing shows names only, never values
 elif [[ "${args[0]}" == "secret" ]] || [[ "${args[0]} ${args[1]:-}" == "versions secret" ]]; then
   reason="setting or removing secrets always needs the owner's approval"
 elif [[ "${args[0]} ${args[1]:-}" == "d1 create" && "${args[2]:-}" != *-staging ]]; then

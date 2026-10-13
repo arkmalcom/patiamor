@@ -1,6 +1,6 @@
 ---
 name: Patiamor
-description: Nearby shelter dogs, one painted market canvas at a time, with a deliberately small shortlist.
+description: Nearby shelter dogs and cats, one painted market canvas at a time, with a deliberately small shortlist.
 colors:
   sky: "#e3f1f4"
   sky-tint: "#eef7f9"
@@ -356,6 +356,9 @@ The dog card. It has a painted frame band with the hand-cut mask and the stroke 
 
 ### Radius Radar (signature)
 A concentric dashed ring map (5/15/30/60/120 km labels, in ink at 16% with a 2 4 dash). The selected radius is a hill-far disk with a 2.5px hoja stroke, scaling over 460ms. Each dog is a dot at its real bearing and distance: a paper dot at 60% opacity when outside the radius, filled with its frame paint and an ink stroke when inside, and 14% opacity when filtered out. The person's own position is an ink dot with a halo. Under it, the Shrikhand count rolls digit by digit over 560ms.
+
+### Species Switch
+Perros | Ambos | Gatos, at the top of the deck in every state (loading, empty, browsing). It's a radio group shaped like a toggle: a paper pill track (1.5px rule border) with an ink thumb that slides under the chosen option (translate, 340ms ease-out). The selected label turns white over the thumb. "Ambos" sits in the middle as the neutral position, so choosing both reads as naturally as choosing one. Each option carries a small tabular count of animals within the radius, in a sky-tinted pill. Selection uses ink like chips do, never hibiscus, because hibiscus is reserved for actions. Below 480px the Dog/PawPrint/Cat icons drop so the words never truncate.
 
 ### Sheet
 A native `<dialog>`. On phones it is a bottom sheet (top corners 18px, 92dvh max, a 44×5px grabber). At 720px and up it becomes a centered 560px dialog with a 16px corner. It has a Shrikhand title, a close icon button, a scrolling body with contained overscroll, and a footer over a hairline where the primary button takes the remaining width. The scrim is ink at 50%.

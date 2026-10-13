@@ -207,7 +207,7 @@ html[data-route='deck'] .view { min-height: 0; }
 }
 .tabbar__pips { height: 24px; display: grid; place-items: center; }
 
-/* Slot pips: three little frames, filled with each saved dog's frame paint. */
+/* Slot pips: three little frames, filled with each saved pet's frame paint. */
 .pips { display: inline-flex; gap: 4px; vertical-align: middle; }
 .pip {
   width: 10px; height: 14px; border-radius: 2px;
@@ -258,7 +258,7 @@ html[data-route='deck'] .view { min-height: 0; }
   cursor: pointer;
 }
 
-/* ---------- The canvas (a dog as a market painting) ---------- */
+/* ---------- The canvas (a pet as a market painting) ---------- */
 
 .canvas { position: relative; height: 100%; }
 .canvas__frame-shadow { position: relative; z-index: 1; height: 100%; filter: drop-shadow(0 18px 18px rgba(29, 35, 64, 0.28)) drop-shadow(0 3px 4px rgba(29, 35, 64, 0.22)); }
@@ -334,6 +334,22 @@ html[data-route='deck'] .view { min-height: 0; }
   font-variant-numeric: tabular-nums;
 }
 .where strong { font-weight: 800; }
+.lister {
+  flex-basis: 100%;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.9rem; font-weight: 700; opacity: 0.92;
+}
+
+/* A listing without a photo yet: a quiet empty canvas, never a stock image. */
+.no-photo {
+  display: grid; place-content: center; justify-items: center; gap: 8px;
+  width: 100%; height: 100%;
+  background: var(--sky-tint); color: var(--ink-2);
+  font-weight: 700; font-size: 0.95rem; text-align: center;
+}
+.mini-frame .no-photo { width: 66px; height: 80px; font-size: 0; gap: 0; }
+.mini-frame--sm .no-photo { width: 44px; height: 54px; }
+.mini-frame .no-photo .icon { width: 22px; height: 22px; }
 
 .facts {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -363,10 +379,54 @@ html[data-route='deck'] .view { min-height: 0; }
   margin: 0 auto;
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: 14px;
   padding: 10px 20px 10px;
 }
+
+/* Perros | Ambos | Gatos: a three-position switch. The ink thumb slides under the chosen option. */
+.species {
+  position: relative;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0; padding: 4px; min-inline-size: 0;
+  border: 1.5px solid var(--rule-strong); border-radius: 999px;
+  background: var(--paper);
+}
+.species__thumb {
+  position: absolute; top: 4px; bottom: 4px; left: 4px;
+  width: calc((100% - 8px) / 3);
+  border-radius: 999px;
+  background: var(--ink);
+  box-shadow: 0 6px 12px -8px rgba(29, 35, 64, 0.7);
+  transition: translate 340ms var(--ease-out);
+}
+.species[data-value='todos'] .species__thumb { translate: 100% 0; }
+.species[data-value='gato'] .species__thumb { translate: 200% 0; }
+.species__opt {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 40px; padding: 0 6px; min-width: 0;
+  border-radius: 999px;
+  font-weight: 800; font-size: 0.95rem;
+  color: var(--ink);
+  cursor: pointer;
+  transition: color 220ms;
+}
+.species__opt input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.species__opt:has(input:checked) { color: #fff; }
+.species__opt:has(input:focus-visible) { outline: 3px solid var(--anil); outline-offset: 2px; }
+.species__opt .icon { flex: none; }
+.species__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.species__count {
+  flex: none;
+  min-width: 22px; padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--sky);
+  font-size: 0.75rem; font-weight: 800; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.species__opt:has(input:checked) .species__count { background: rgba(255, 255, 255, 0.2); }
+@media (max-width: 479px) { .species__opt .icon { display: none; } }
 
 .deck__stack { position: relative; min-height: 0; margin: 4px 6px 10px; }
 
@@ -419,7 +479,8 @@ html[data-route='deck'] .view { min-height: 0; }
   font-variant-numeric: tabular-nums;
 }
 
-.deck--empty { grid-template-rows: 1fr; place-items: center; text-align: center; }
+.deck--empty { grid-template-rows: auto 1fr; place-items: center; text-align: center; }
+.deck--empty .species { justify-self: stretch; text-align: left; }
 .deck-empty { display: grid; justify-items: center; gap: 14px; max-width: 34ch; }
 .deck-empty__frame {
   width: 150px; height: 180px; padding: 10px;
@@ -433,6 +494,8 @@ html[data-route='deck'] .view { min-height: 0; }
   box-shadow: 0 0 0 4px var(--anil);
   border-radius: 2px;
 }
+.deck-empty__frame.is-loading { animation: frame-breathe 1.6s ease-in-out infinite; }
+@keyframes frame-breathe { 50% { rotate: 2deg; scale: 0.97; } }
 .deck-empty__title { font-family: var(--font-display); font-weight: 400; font-size: 2rem; line-height: 1.1; outline: none; }
 .deck-empty__actions { display: grid; gap: 10px; width: 100%; margin-top: 6px; }
 
@@ -575,6 +638,23 @@ html.sheet-open { overflow: hidden; }
 }
 .slider:focus-visible { outline: 3px solid var(--anil); outline-offset: 4px; }
 
+.location { display: grid; gap: 10px; }
+.place-search { display: grid; gap: 8px; }
+.place-search[hidden] { display: none; }
+.place-search__input { position: relative; display: block; }
+.place-search__input .icon { position: absolute; left: 14px; top: 50%; translate: 0 -50%; color: var(--ink-2); pointer-events: none; }
+.place-search__input .field__input { padding-left: 42px; }
+.place-results { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.place-results:empty { display: none; }
+.place-option {
+  display: grid; gap: 1px;
+  padding: 10px 12px; border-radius: 10px;
+  cursor: pointer;
+}
+.place-option .muted { font-size: 0.88rem; }
+.place-option:hover, .place-option[aria-selected='true'] { background: var(--sky-tint); }
+.place-option[aria-selected='true'] { box-shadow: inset 3px 0 0 var(--anil); }
+.place-empty { padding: 10px 12px; color: var(--ink-2); }
 .location-row {
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
   font-size: 0.95rem;
@@ -612,7 +692,7 @@ html.sheet-open { overflow: hidden; }
 
 .reflect { display: grid; gap: 4px; }
 .reflect__intro { display: flex; gap: 16px; align-items: center; padding-bottom: 14px; }
-.reflect__dog { font-weight: 800; font-variant-numeric: tabular-nums; }
+.reflect__pet { font-weight: 800; font-variant-numeric: tabular-nums; }
 
 .question { position: relative; border: 0; margin: 0; padding: 20px 0 14px; min-width: 0; }
 .question::before { content: ''; position: absolute; top: 0; left: 0; right: 0; border-top: 1px solid var(--rule); }
@@ -641,6 +721,8 @@ html.sheet-open { overflow: hidden; }
 
 .auth { display: grid; gap: 14px; }
 .auth__intro { margin-bottom: 16px; }
+.button--google { gap: 12px; }
+.google-g { flex: none; }
 .auth__title { font-family: var(--font-display); font-weight: 400; font-size: 1.35rem; line-height: 1.15; }
 .auth__form { display: grid; gap: 12px; }
 .auth__or {
@@ -670,7 +752,7 @@ html.sheet-open { overflow: hidden; }
 .field__error { color: var(--hibiscus-press); font-weight: 700; font-size: 0.95rem; }
 .field__error[hidden] { display: none; }
 .account__hello { font-family: var(--font-display); font-size: 1.5rem; line-height: 1.1; }
-.account__auth { width: 100%; max-width: 420px; }
+.account__auth { width: 100%; }
 
 .mini-frame {
   display: inline-block; flex: none;
@@ -743,6 +825,23 @@ html.sheet-open { overflow: hidden; }
   background: var(--anil); color: #fff;
 }
 .shelter__name { font-weight: 800; font-size: 1.1rem; }
+.shelter__mark--private { background: var(--mango); color: var(--ink); }
+
+.siblings { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.sibling {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px 8px 8px;
+  border: 1.5px solid var(--rule-strong); border-radius: 14px;
+  background: var(--paper); text-align: left; cursor: pointer;
+  transition: border-color 140ms;
+}
+.sibling:hover { border-color: var(--ink); }
+.sibling > span:last-child { display: grid; }
+.sibling .muted { font-size: 0.85rem; }
+.fee__amount { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.slot__gone { font-weight: 800; color: var(--hibiscus-press); font-size: 0.92rem; }
+.loading-note { padding: 32px 20px; text-align: center; color: var(--ink-2); font-weight: 700; }
+.profile-missing { max-width: 560px; margin: 0 auto; padding: 32px 20px; display: grid; gap: 14px; justify-items: start; }
 .shelter__meta { font-size: 0.95rem; margin-top: 4px; }
 
 .profile__bar {
@@ -813,6 +912,8 @@ html[data-route='profile'] .tabbar { display: none; }
 
 /* ---------- Account ---------- */
 
+/* One narrow column so the sign-in form and the cards below share a width and read as centered. */
+.account { max-width: 560px; }
 .account__block { display: grid; gap: 14px; justify-items: start; }
 .account__row { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-block: 1px solid var(--rule); }
 .account__shelter {
@@ -854,9 +955,9 @@ html[data-route='profile'] .toast-region { bottom: calc(96px + env(safe-area-ins
 
 /* ---------- View transitions ---------- */
 
-::view-transition-group(dog-photo) { animation-duration: 440ms; animation-timing-function: var(--ease-out); }
-::view-transition-old(dog-photo),
-::view-transition-new(dog-photo) { height: 100%; object-fit: cover; }
+::view-transition-group(pet-photo) { animation-duration: 440ms; animation-timing-function: var(--ease-out); }
+::view-transition-old(pet-photo),
+::view-transition-new(pet-photo) { height: 100%; object-fit: cover; }
 ::view-transition-old(root),
 ::view-transition-new(root) { animation-duration: 260ms; }
 
@@ -911,7 +1012,7 @@ html[data-route='profile'] .toast-region { bottom: calc(96px + env(safe-area-ins
   html[data-route='deck'] .side--list { grid-column: 3; margin-right: 28px; align-self: start; }
   html[data-route='deck'] .filters-button { display: none; }
 
-  .deck { max-width: 500px; padding: 6px 36px 18px; grid-template-rows: auto minmax(0, 1fr) auto; }
+  .deck { max-width: 500px; padding: 6px 36px 18px; grid-template-rows: auto auto minmax(0, 1fr) auto; }
   .deck__position { order: -1; }
 
   .profile {

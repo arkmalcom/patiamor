@@ -23,6 +23,7 @@ INSERT OR IGNORE INTO users (id, email, name, is_admin, lister_approved_at) VALU
   ('seed-vol-santiago',    'refugio.cibao@ejemplo.do',         'Andrés Tavárez',  0, NULL),
   ('seed-private-approved','familia.reyes@ejemplo.do',         'Familia Reyes',   0, '2026-10-01T15:00:00Z'),
   ('seed-private-new',     'nuevo.dueno@ejemplo.do',           'Pedro Almonte',   0, NULL),
+  ('seed-private-gatos',   'rosa.hernandez@ejemplo.do',        'Rosa Hernández',  0, '2026-09-20T14:00:00Z'),
   ('seed-adopter',         'ana.adoptante@ejemplo.do',         'Ana Pérez',       0, NULL);
 
 -- Shelters. Five verified; Refugio Cibao is deliberately unverified so the review path can be tested.
@@ -46,7 +47,7 @@ INSERT OR IGNORE INTO shelter_members (shelter_id, user_id, role) VALUES
 INSERT OR IGNORE INTO litters (id, listed_by, shelter_id, place_id, name, born_on, notes) VALUES
   ('seed-litter-luna', 'seed-private-approved', NULL, 'ensanche-naco-distrito-nacional', 'Camada de Luna', '2026-08-01', 'La madre, Luna, vive con la familia y será esterilizada en noviembre.');
 
-INSERT OR IGNORE INTO dogs (id, listed_by, shelter_id, place_id, litter_id, name, sex, birth_date, birth_date_estimated, size, energy,
+INSERT OR IGNORE INTO pets (id, listed_by, shelter_id, place_id, litter_id, name, sex, birth_date, birth_date_estimated, size, energy,
   good_with_kids, good_with_dogs, good_with_cats, vaccinated, sterilized, dewormed, story, needs, adoption_fee_dop, status, in_care_since, published_at) VALUES
   ('canela',   'seed-vol-gazcue',       'seed-patitas-gazcue',       'gazcue-distrito-nacional',     NULL, 'Canela',   'hembra', '2022-10-12', 1, 'mediano', 'media',     1, 1, NULL, 1, 1, 1,
    'La encontraron durmiendo debajo de una guagua en la avenida Bolívar. Es tranquila en casa y le encanta ir de paseo por el Malecón temprano, antes del calor. Saluda a todo el mundo con la cola.',
@@ -88,8 +89,8 @@ INSERT OR IGNORE INTO dogs (id, listed_by, shelter_id, place_id, litter_id, name
   ('rocky',    'seed-private-new',      NULL, 'gazcue-distrito-nacional', NULL, 'Rocky', 'macho', '2023-03-01', 1, 'grande', 'media', 1, 0, NULL, 1, 1, 1,
    'Me mudo a un apartamento donde no permiten perros grandes y busco una familia con patio para Rocky.', '["Patio","Ser el único perro"]', NULL, 'in_review', NULL, NULL);
 
--- Photos: sample images ship with the web app under /perros/, so keys here point at those static files.
-INSERT OR IGNORE INTO dog_photos (id, dog_id, r2_key, position, focus) VALUES
+-- Photos: sample images ship with the web app under /perros/ and /gatos/, so keys here point at those static files.
+INSERT OR IGNORE INTO pet_photos (id, pet_id, r2_key, position, focus) VALUES
   ('seed-photo-canela',   'canela',   'static:/perros/canela.jpg',   0, '50% 40%'),
   ('seed-photo-pinto',    'pinto',    'static:/perros/pinto.jpg',    0, '50% 35%'),
   ('seed-photo-morena',   'morena',   'static:/perros/morena.jpg',   0, '50% 30%'),
@@ -100,3 +101,42 @@ INSERT OR IGNORE INTO dog_photos (id, dog_id, r2_key, position, focus) VALUES
   ('seed-photo-brisa',    'brisa',    'static:/perros/brisa.jpg',    0, '50% 45%'),
   ('seed-photo-miel',     'miel',     'static:/perros/miel.jpg',     0, '50% 30%'),
   ('seed-photo-algodon',  'algodon',  'static:/perros/algodon.jpg',  0, '50% 45%');
+
+-- ---------- Cats ----------
+INSERT OR IGNORE INTO litters (id, listed_by, shelter_id, place_id, name, born_on, notes) VALUES
+  ('seed-litter-mota', 'seed-private-gatos', NULL, 'los-mina-norte-santo-domingo', 'Camada de Mota', '2026-07-20', 'Mota llegó embarazada al patio; ya está esterilizada.');
+
+INSERT OR IGNORE INTO pets (id, species, listed_by, shelter_id, place_id, litter_id, name, sex, birth_date, birth_date_estimated, size, energy,
+  good_with_kids, good_with_dogs, good_with_cats, vaccinated, sterilized, dewormed, story, needs, adoption_fee_dop, status, in_care_since, published_at) VALUES
+  ('domino',    'gato', 'seed-vol-gazcue',       'seed-patitas-gazcue',       'gazcue-distrito-nacional',     NULL, 'Dominó',    'macho',  '2024-09-13', 1, 'mediano', 'media',     1, 0, 1, 1, 1, 1,
+   'Lo encontraron dentro de una caja de dominó en un colmado de Gazcue, y de ahí el nombre. Es curioso, conversador y se acomoda en cualquier rodilla disponible.',
+   '["Ventanas con malla","Rascador"]', 800, 'available', '2026-06-15', '2026-06-18T12:00:00Z'),
+  ('tamarindo', 'gato', 'seed-vol-alcarrizos',   'seed-huellas-alcarrizos',   'los-alcarrizos-santo-domingo', NULL, 'Tamarindo', 'macho',  '2021-10-13', 1, 'mediano', 'tranquila', 1, 1, 1, 1, 1, 1,
+   'Tamarindo tiene cinco años y una sola meta en la vida: encontrar el rayito de sol de la tarde. Convive con perros sin problema.',
+   '["Un lugar soleado","Comida para gatos adultos"]', NULL, 'available', '2026-05-02', '2026-05-04T12:00:00Z'),
+  ('cafe',      'gato', 'seed-vol-bocachica',    'seed-amigos-bocachica',     'andres-santo-domingo',         NULL, 'Café',      'hembra', '2023-10-13', 1, 'mediano', 'media',     1, NULL, 0, 1, 1, 1,
+   'Café es independiente pero cariñosa a su manera: te sigue de cuarto en cuarto sin pedir nada. Prefiere ser la única gata de la casa.',
+   '["Ser la única gata","Rutina tranquila"]', NULL, 'available', '2026-07-10', '2026-07-12T12:00:00Z'),
+  ('batata',    'gato', 'seed-vol-sancristobal', 'seed-rescate-sancristobal', 'madre-vieja-san-cristobal',    NULL, 'Batata',    'macho',  '2025-10-13', 1, 'mediano', 'alta',      1, 1, 1, 1, 1, 1,
+   'Batata es puro movimiento: persigue todo lo que se mueve y luego cae rendido en el lugar menos pensado.',
+   '["Juego diario","Juguetes y rascador"]', 500, 'available', '2026-08-20', '2026-08-22T12:00:00Z'),
+  ('ceniza',    'gato', 'seed-vol-gazcue',       'seed-patitas-gazcue',       'gazcue-distrito-nacional',     NULL, 'Ceniza',    'hembra', '2018-10-13', 1, 'mediano', 'tranquila', 1, NULL, 1, 1, 1, 1,
+   'Ceniza tiene ocho años. Su dueña falleció y la familia no podía quedarse con ella. Es serena, limpia y agradecida; los gatos mayores son los que más esperan.',
+   '["Hogar tranquilo","Chequeo veterinario anual"]', NULL, 'available', '2026-04-01', '2026-04-03T12:00:00Z'),
+  -- Private kitten litter (approved lister): shows as "Particular".
+  ('chinola',   'gato', 'seed-private-gatos', NULL, 'los-mina-norte-santo-domingo', 'seed-litter-mota', 'Chinola',  'hembra', '2026-07-20', 0, 'pequeno', 'alta', 1, NULL, 1, 1, 0, 1,
+   'Chinola es la exploradora de la camada de Mota: siempre la primera en subirse a todo.', '["Completar vacunas","Esterilización cuando tenga edad"]', NULL, 'available', '2026-07-20', '2026-10-01T12:00:00Z'),
+  ('guayaba',   'gato', 'seed-private-gatos', NULL, 'los-mina-norte-santo-domingo', 'seed-litter-mota', 'Guayaba',  'macho',  '2026-07-20', 0, 'pequeno', 'alta', 1, NULL, 1, 1, 0, 1,
+   'Guayaba ronronea apenas lo cargas. Le encantan los cordones y las cajas vacías.', '["Completar vacunas","Esterilización cuando tenga edad"]', NULL, 'available', '2026-07-20', '2026-10-01T12:00:00Z'),
+  -- Too young to list (under 8 weeks): must stay hidden from search even though it's "available".
+  ('mini',      'gato', 'seed-private-gatos', NULL, 'los-mina-norte-santo-domingo', 'seed-litter-mota', 'Mini',     'hembra', '2026-09-10', 0, 'pequeno', 'media', NULL, NULL, NULL, 0, 0, 0,
+   'La más pequeña de la camada.', '[]', NULL, 'available', '2026-09-10', '2026-10-01T12:00:00Z');
+
+INSERT OR IGNORE INTO pet_photos (id, pet_id, r2_key, position, focus) VALUES
+  ('seed-photo-domino',    'domino',    'static:/gatos/domino.jpg',    0, '50% 35%'),
+  ('seed-photo-tamarindo', 'tamarindo', 'static:/gatos/tamarindo.jpg', 0, '55% 50%'),
+  ('seed-photo-cafe',      'cafe',      'static:/gatos/cafe.jpg',      0, '45% 45%'),
+  ('seed-photo-batata',    'batata',    'static:/gatos/batata.jpg',    0, '40% 45%'),
+  ('seed-photo-ceniza',    'ceniza',    'static:/gatos/ceniza.jpg',    0, '50% 40%'),
+  ('seed-photo-chinola',   'chinola',   'static:/gatos/chinola.jpg',   0, '50% 40%'),
+  ('seed-photo-guayaba',   'guayaba',   'static:/gatos/guayaba.jpg',   0, '50% 35%');
