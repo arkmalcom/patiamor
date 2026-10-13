@@ -3,6 +3,7 @@ import { nowIso } from './auth/crypto';
 import { hasEmailBudget, sendShelterDecisionEmail, type ShelterDecision } from './auth/email';
 import { appOrigin } from './auth/routes';
 import { forgetCatalogVersion } from './cache';
+import { runDigest } from './digest';
 import type { AppContext } from './env';
 import { placeById } from './places';
 
@@ -102,4 +103,14 @@ admin.post('/shelters/:id/decision', async (c) => {
     );
   }
   return c.json({ shelter: { id, status: rule.to } });
+});
+
+// Run the morning job now (it also runs daily at 8:00): for checking the emails on staging, or catching
+// up after a problem. It only sends what's new, so running it twice sends nothing more.
+admin.post('/digest', async (c) => {
+  const result = await runDigest(c.env, appOrigin(c));
+  await c.env.DB.prepare("INSERT INTO admin_actions (id, admin_id, action, subject_type, subject_id, note) VALUES (?, ?, 'digest.run', 'system', 'digest', ?)")
+    .bind(crypto.randomUUID(), c.get('user')!.id, JSON.stringify(result))
+    .run();
+  return c.json(result);
 });

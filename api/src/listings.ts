@@ -148,7 +148,7 @@ type PetRow = {
   id: string; shelter_id: string | null; species: string; name: string; sex: string; birth_date: string | null; birth_date_estimated: number;
   size: string; energy: string; good_with_kids: number | null; good_with_dogs: number | null; good_with_cats: number | null;
   vaccinated: number; sterilized: number; dewormed: number; story: string; needs: string; adoption_fee_dop: number | null;
-  in_care_since: string | null; status: string; published_at: string | null; open_requests: number; updated_at: string;
+  in_care_since: string | null; status: string; published_at: string | null; open_requests: number; requests_paused: number; updated_at: string;
 };
 const triOut = (v: number | null) => (v === null ? null : v === 1);
 
@@ -186,6 +186,7 @@ listings.get('/pets/:id', async (c) => {
       adoptionFeeDop: r.adoption_fee_dop,
       inCareSince: r.in_care_since,
       status: r.status,
+      requestsPaused: r.requests_paused === 1,
       openRequests: r.open_requests,
       updatedAt: r.updated_at,
       photos: photos.map((p) => ({ id: p.id, url: photoUrl(p.r2_key), thumb: photoUrl(p.thumb_key), focus: p.focus })),

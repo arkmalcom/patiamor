@@ -79,6 +79,40 @@ function renderShelterDecision(o: { shelter: string; decision: ShelterDecision; 
   return { subject: copy.subject, text, html };
 }
 
+const listOf = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} y ${names.at(-1)}`);
+
+/** The shelter's morning summary: new requests since the last one, and how many are still unopened. */
+function renderDigest(o: { shelter: string; fresh: number; pets: string[]; unopened: number; inboxUrl: string }): Message {
+  const what = o.fresh === 1 ? `1 solicitud nueva para ${o.pets[0]}` : `${o.fresh} solicitudes nuevas para ${listOf(o.pets)}`;
+  const subject = `${o.shelter}: ${o.fresh === 1 ? '1 solicitud nueva' : `${o.fresh} solicitudes nuevas`} en Patiamor`;
+  const waiting = o.unopened > o.fresh ? `En total tienes ${o.unopened} sin abrir.` : '';
+  const text = [`Buenos días. ${sentenceCase(what)}.`, waiting, '', `Míralas y responde desde el portal: ${o.inboxUrl}`, '', 'Te escribimos una vez al día, solo cuando hay solicitudes nuevas.']
+    .filter((l, i) => l || i === 2 || i === 4)
+    .join('\n');
+  const html = shell(`
+      <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">Buenos días. ${escape(sentenceCase(what))}.</td></tr>
+      ${waiting ? `<tr><td style="padding:8px 28px;font-size:16px;line-height:1.5">${escape(waiting)}</td></tr>` : ''}
+      <tr><td style="padding:16px 28px 24px">${button(o.inboxUrl, 'Ver solicitudes')}</td></tr>
+      <tr><td style="padding:0 28px 28px;font-size:13px;line-height:1.5;color:#4a5275">Te escribimos una vez al día, solo cuando hay solicitudes nuevas.</td></tr>`);
+  return { subject, text, html };
+}
+
+/** "Avísame": pets this person was waiting for can take requests again. */
+function renderAvailable(o: { pets: { name: string; url: string }[] }): Message {
+  const names = listOf(o.pets.map((p) => p.name));
+  const one = o.pets.length === 1;
+  const subject = one ? `${names} vuelve a recibir solicitudes` : `${names} vuelven a recibir solicitudes`;
+  const lede = one ? `${names} vuelve a recibir solicitudes en Patiamor. Nos pediste que te avisáramos.` : `${names} vuelven a recibir solicitudes en Patiamor. Nos pediste que te avisáramos.`;
+  const text = [lede, '', ...o.pets.map((p) => `${p.name}: ${p.url}`)].join('\n');
+  const html = shell(`
+      <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">${escape(lede)}</td></tr>
+      ${o.pets.map((p) => `<tr><td style="padding:12px 28px 4px">${button(p.url, `Ver a ${p.name}`)}</td></tr>`).join('')}
+      <tr><td style="padding:16px 28px 28px;font-size:13px;line-height:1.5;color:#4a5275">Si ya no te interesa, no tienes que hacer nada: este aviso no se repite.</td></tr>`);
+  return { subject, text, html };
+}
+
+const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 /** Resend's free tier allows 100 emails a day (and 3,000 a month) across the whole account. */
 export class EmailQuotaError extends Error {}
 
@@ -92,7 +126,7 @@ export function isQuotaError(status: number, body: string): boolean {
   }
 }
 
-export type EmailKind = 'signin' | 'request_sent' | 'shelter_decision';
+export type EmailKind = 'signin' | 'request_sent' | 'shelter_decision' | 'digest' | 'available';
 
 // One budget for every email (email_log, migration 0007). Sign-in codes may use all of it; everything
 // else stops short, so a busy day of confirmations can never lock people out of signing in.
@@ -104,8 +138,17 @@ export async function hasEmailBudget(db: D1Database, kind: EmailKind): Promise<b
   return (row?.n ?? 0) < (kind === 'signin' ? DAILY_CAP : DAILY_CAP - SIGNIN_RESERVE);
 }
 
+/** Addresses that are never real people: the staging sample data (@ejemplo.do) and the reserved example
+ *  domains. Mail to them would only bounce, which hurts our sender reputation, and waste the budget.
+ *  (.test stays sendable: the API tests use it to count what would be sent.) */
+const FAKE_RECIPIENT = /@(ejemplo\.do|example\.(com|org|net))$/i;
+
 /** Sends through Resend (or logs it outside production when no key is configured) and records it in the budget. */
 async function send(env: Env, kind: EmailKind, to: string, { subject, text, html }: Message, devNote: string): Promise<void> {
+  if (FAKE_RECIPIENT.test(to)) {
+    console.log(`[skipped email: sample address] kind=${kind} to=${to} ${devNote}`);
+    return;
+  }
   if (!env.RESEND_API_KEY) {
     if (env.ENVIRONMENT === 'production') throw new Error('RESEND_API_KEY is not configured');
     console.log(`[dev email] kind=${kind} to=${to} ${devNote}`);
@@ -132,3 +175,9 @@ export const sendRequestSentEmail = (env: Env, to: string, o: { pet: string; lis
 
 export const sendShelterDecisionEmail = (env: Env, to: string, o: { shelter: string; decision: ShelterDecision; reason: string | null; portalUrl: string }) =>
   send(env, 'shelter_decision', to, renderShelterDecision(o), `shelter=${o.shelter} decision=${o.decision}`);
+
+export const sendDigestEmail = (env: Env, to: string, o: { shelter: string; fresh: number; pets: string[]; unopened: number; inboxUrl: string }) =>
+  send(env, 'digest', to, renderDigest(o), `shelter=${o.shelter} fresh=${o.fresh} unopened=${o.unopened}`);
+
+export const sendAvailableEmail = (env: Env, to: string, o: { pets: { name: string; url: string }[] }) =>
+  send(env, 'available', to, renderAvailable(o), `pets=${o.pets.map((p) => p.name).join('|')}`);

@@ -102,12 +102,13 @@ portal.use('*', async (c, next) => {
 // The person's shelters and where each stands.
 portal.get('/shelters', async (c) => {
   const { results } = await c.env.DB.prepare(
-    `SELECT s.id, s.name, s.slug, s.status, s.status_reason, s.place_id, m.role, a.submitted_at
+    `SELECT s.id, s.name, s.slug, s.status, s.status_reason, s.place_id, m.role, a.submitted_at,
+            (SELECT count(*) FROM adoption_requests r JOIN pets d ON d.id = r.pet_id WHERE d.shelter_id = s.id AND r.status = 'sent') AS new_requests
        FROM shelter_members m JOIN shelters s ON s.id = m.shelter_id LEFT JOIN shelter_applications a ON a.shelter_id = s.id
       WHERE m.user_id = ? ORDER BY s.created_at`,
   )
     .bind(c.get('user')!.id)
-    .all<{ id: string; name: string; slug: string; status: string; status_reason: string | null; place_id: string; role: Role; submitted_at: string | null }>();
+    .all<{ id: string; name: string; slug: string; status: string; status_reason: string | null; place_id: string; role: Role; submitted_at: string | null; new_requests: number }>();
   return c.json({
     shelters: results.map((r) => ({
       id: r.id,
@@ -118,6 +119,7 @@ portal.get('/shelters', async (c) => {
       place: placeById(r.place_id) ?? null,
       role: r.role,
       submittedAt: r.submitted_at,
+      newRequests: r.new_requests,
     })),
   });
 });

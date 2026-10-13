@@ -20,6 +20,8 @@ Both exist so a slip can't take down production or lose real shelters' data.
 | `main` | staging | `patiamor-staging` | `patiamor-db-staging` (seeded with sample data) | https://patiamor-staging.patiamor-api.workers.dev |
 | `prod` | production | `patiamor` | `patiamor-db` (real data only) | https://patiamor.com |
 
+A cron trigger (`triggers.crons`, `0 12 * * *`, which is 8:00 in the DR) runs the morning job in `api/src/digest.ts` in each environment. The free plan allows 5 cron triggers per account, and we use one per environment. Test it locally with `cf dev --test-scheduled`, then open `/__scheduled`. On staging, an admin can run it from #/refugio/admin ("Enviar ahora el resumen de la mañana").
+
 Pet photos live in R2, bound as `PHOTOS`. Staging uses `patiamor-photos-staging`, created 2026-10-13. Production uses `patiamor-photos`, which doesn't exist yet: creating it is a production resource, so ask first, and do it before the first production deploy. Both CI tokens have R2 read/write. Upload safeguards are documented in `api/src/photos.ts`.
 
 Work happens on feature branches, which open PRs into `main`. GitHub Actions (`.github/workflows/`) do the deploys:

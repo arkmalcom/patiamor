@@ -149,7 +149,8 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
       <section class="portal portal--listing" aria-labelledby="portal-title">
         <a class="text-button portal__back" href="${list}">${t('listing.back')}</a>
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${existing ? existing.name : t('listing.newTitle')}</h1>
-        ${existing ? html`<p class="listing-status">${petChip(existing.status)}${existing.status === 'available' ? html`<a class="text-button" href="#/mascota/${encodeURIComponent(existing.id)}">${t('listing.viewLive')}</a>` : ''}</p>` : ''}
+        ${existing ? html`<p class="listing-status" data-status-line>${statusLine(existing)}</p>` : ''}
+        ${existing && ['available', 'reserved'].includes(existing.status) ? availability(existing) : ''}
         <form class="portal-form listing-form" id="pet-form" novalidate>
           <div class="listing-form__layout">
           <div class="listing-form__fields">
@@ -259,6 +260,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
       </section>`,
   );
 
+  if (existing) bindAvailability(root, existing);
   const formEl = $<HTMLFormElement>('#pet-form', root);
   const error = $('[data-error]', root);
 
@@ -484,6 +486,40 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
       fail(err instanceof ApiError ? err.code : 'network');
     }
   });
+}
+
+const statusLine = (p: Listing): Raw =>
+  html`${petChip(p.status)}${['available', 'reserved'].includes(p.status) ? html`<a class="text-button" href="#/mascota/${encodeURIComponent(p.id)}">${t('listing.viewLive')}</a>` : ''}`;
+
+/** "En proceso" and the pause switch: they apply at once (not on save), so a shelter can flip them
+ *  from the inbox's link without touching the rest of the form. */
+const availability = (p: Listing): Raw => html`
+  <section class="form-section listing-availability" aria-labelledby="availability-title">
+    <h2 class="section-title" id="availability-title">${t('listing.availability')}</h2>
+    <label class="check"><input type="checkbox" data-availability="reserved" ${p.status === 'reserved' ? 'checked' : ''} /><span>${t('listing.reserved')}</span></label>
+    <label class="check"><input type="checkbox" data-availability="paused" ${p.requestsPaused ? 'checked' : ''} /><span>${t('listing.paused')}</span></label>
+    <p class="muted">${t('listing.availabilityNote')}</p>
+  </section>`;
+
+function bindAvailability(root: HTMLElement, p: Listing) {
+  $$<HTMLInputElement>('[data-availability]', root).forEach((box) =>
+    box.addEventListener('change', async () => {
+      const key = box.dataset.availability as 'reserved' | 'paused';
+      box.disabled = true;
+      try {
+        const now = await api.setAvailability(p.id, { [key]: box.checked });
+        Object.assign(p, { status: now.status, requestsPaused: now.requestsPaused });
+        petChanged(p.id);
+        const line = root.querySelector('[data-status-line]');
+        if (line) mount(line, statusLine(p));
+        toast(t(`listing.${key}${box.checked ? 'On' : 'Off'}`, { name: p.name }));
+      } catch {
+        box.checked = !box.checked;
+        toast(t('auth.err.network'));
+      }
+      box.disabled = false;
+    }),
+  );
 }
 
 /** Sí / No / Por confirmar: null is "they haven't tried it yet". */

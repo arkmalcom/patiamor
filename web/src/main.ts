@@ -35,6 +35,7 @@ function parse(hash: string): Route {
     }
     if (b && c === 'editar') return { name: 'portal', view: 'editar', id: decodeURIComponent(b) };
     // A shelter's animals: #/refugio/<id>/animales, …/animales/nuevo, …/animales/<petId>
+    if (b && c === 'solicitudes') return { name: 'portal', view: 'solicitudes', id: decodeURIComponent(b) };
     if (b && c === 'animales')
       return d ? { name: 'portal', view: 'animal', id: decodeURIComponent(b), petId: d === 'nuevo' ? null : decodeURIComponent(d) } : { name: 'portal', view: 'animales', id: decodeURIComponent(b) };
     return { name: 'portal', view: 'home' };

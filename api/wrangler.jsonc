@@ -19,6 +19,8 @@
   ],
   // Pet photos (PAT-9). The production bucket is created with the owner's approval when production is set up.
   "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "patiamor-photos" }],
+  // The morning job (digest.ts): shelters' new requests and "Avísame" alerts. 12:00 UTC = 8:00 in the DR.
+  "triggers": { "crons": ["0 12 * * *"] },
   "env": {
     "staging": {
       // Bindings and routes are NOT inherited by environments; repeat them here.
@@ -26,7 +28,10 @@
         { "binding": "DB", "database_name": "patiamor-db-staging", "database_id": "60ec559a-2dbd-4b9e-87bf-de58a0793cb4", "migrations_dir": "migrations" }
       ],
       "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "patiamor-photos-staging" }],
-      "vars": { "ENVIRONMENT": "staging", "APP_ORIGIN": "", "EMAIL_FROM": "Patiamor <hola@patiamor.com>" },
+      // APP_ORIGIN: where links in emails sent outside a request (the morning job) point.
+      "vars": { "ENVIRONMENT": "staging", "APP_ORIGIN": "https://patiamor-staging.patiamor-api.workers.dev", "EMAIL_FROM": "Patiamor <hola@patiamor.com>" },
+      // Bindings and triggers are repeated per environment. 12:00 UTC = 8:00 in the Dominican Republic.
+      "triggers": { "crons": ["0 12 * * *"] },
       "routes": [],
       "workers_dev": true
     }

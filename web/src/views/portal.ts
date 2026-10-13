@@ -5,6 +5,7 @@ import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, t, type Key } from '../i18n';
 import { state } from '../store';
 import { renderAuth } from '../ui/auth';
+import { renderInbox } from './inbox';
 import { renderListingForm, renderListings } from './listings';
 import { toast } from '../ui/toast';
 
@@ -17,7 +18,8 @@ export type PortalView =
   | { view: 'editar'; id: string }
   | { view: 'admin'; status: ShelterStatus }
   | { view: 'animales'; id: string }
-  | { view: 'animal'; id: string; petId: string | null };
+  | { view: 'animal'; id: string; petId: string | null }
+  | { view: 'solicitudes'; id: string };
 
 const STATUS_ICON: Record<ShelterStatus, typeof Clock> = { pending: Clock, verified: BadgeCheck, rejected: CircleAlert, suspended: ShieldOff };
 
@@ -39,6 +41,7 @@ export function renderPortal(root: HTMLElement, route: PortalView) {
   if (route.view === 'admin') return void adminQueue(root, route.status);
   if (route.view === 'animales') return void renderListings(root, route.id);
   if (route.view === 'animal') return void renderListingForm(root, route.id, route.petId);
+  if (route.view === 'solicitudes') return void renderInbox(root, route.id);
   void home(root);
 }
 
@@ -96,7 +99,12 @@ function shelterCard(s: PortalShelter): Raw {
   const animals = `#/refugio/${encodeURIComponent(s.id)}/animales`;
   const next: Record<ShelterStatus, Raw> = {
     pending: html`<p>${t('portal.pendingBody')}</p><a class="button button--outline button--small" href="${animals}">${t('listing.prepare')}</a>`,
-    verified: html`<p>${t('portal.verifiedBody')}</p><a class="button button--primary button--small" href="${animals}">${t('listing.open')}</a>`,
+    verified: html`
+      <p>${t('portal.verifiedBody')}</p>
+      <div class="portal-card__actions">
+        <a class="button button--primary button--small" href="#/refugio/${encodeURIComponent(s.id)}/solicitudes">${t('inbox.open')}${s.newRequests ? html` <span class="portal-card__count">${s.newRequests}</span>` : ''}</a>
+        <a class="button button--outline button--small" href="${animals}">${t('listing.open')}</a>
+      </div>`,
     rejected: html`
       <p class="portal-card__reason"><strong>${t('portal.reason')}:</strong> ${s.statusReason ?? ''}</p>
       <div class="portal-card__actions">
@@ -345,12 +353,27 @@ async function adminQueue(root: HTMLElement, status: ShelterStatus) {
       <section class="portal portal--admin" aria-labelledby="portal-title">
         <a class="text-button portal__back" href="#/refugio">${t('portal.back')}</a>
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('portal.admin.title')}</h1>
+        <div class="portal-digest">
+          <button class="button button--outline button--small" type="button" data-digest>${t('portal.admin.digest')}</button>
+          <p class="muted">${t('portal.admin.digestNote')}</p>
+        </div>
         <nav class="list-tabs" aria-label="${t('portal.admin.title')}">
           ${QUEUE.map((s) => html`<a class="list-tabs__tab" href="#/refugio/admin?estado=${s}" aria-current="${s === status ? 'page' : 'false'}">${t(`portal.admin.tab.${s}`)}</a>`)}
         </nav>
         ${shelters.length ? html`<ul class="portal-list">${shelters.map(adminCard)}</ul>` : html`<p class="passed__empty">${t('portal.admin.empty')}</p>`}
       </section>`,
   );
+  root.querySelector<HTMLButtonElement>('[data-digest]')?.addEventListener('click', async (e) => {
+    const b = e.currentTarget as HTMLButtonElement;
+    b.disabled = true;
+    try {
+      const r = await api.runDigest();
+      toast(t('portal.admin.digestDone', { digests: r.digestEmails, alerts: r.alertEmails }) + (r.deferred ? t('portal.admin.digestDeferred') : ''));
+    } catch {
+      toast(t('auth.err.network'));
+    }
+    b.disabled = false;
+  });
   $$<HTMLFormElement>('[data-decide]', root).forEach((f) =>
     f.addEventListener('submit', async (e) => {
       e.preventDefault();

@@ -1,6 +1,6 @@
 // Thin client for the Patiamor Worker API (same origin in every environment).
 import type { Energy, PetDetail, PetSummary, LatLng, Place, Sex, Size, Species } from './data';
-import type { AdoptionRequest, ContactPref, MyRequest, RequestForm } from './store';
+import type { AdoptionRequest, ContactPref, MyRequest, RequestForm, RequestStatus } from './store';
 
 export interface Me {
   id: string;
@@ -32,6 +32,8 @@ export interface PortalShelter {
   place: Place | null;
   role: 'owner' | 'maintainer';
   submittedAt?: string | null;
+  /** Requests no one at the shelter has opened yet. */
+  newRequests?: number;
   description?: string | null;
   publicPhone?: string | null;
   email?: string | null;
@@ -114,12 +116,30 @@ export interface ListingPhoto {
 export interface Listing extends PetForm {
   id: string;
   status: PetStatus;
+  requestsPaused: boolean;
   openRequests: number;
   updatedAt: string;
   photos: ListingPhoto[];
 }
 
 export type ListingSummary = PetSummary & { status: PetStatus; openRequests: number; updatedAt: string };
+
+export type CloseReason = 'otra_familia' | 'no_encaja' | 'sin_respuesta' | 'otro';
+
+/** A request as the shelter's inbox shows it. Contact details only come while it's open. */
+export interface InboxRequest {
+  id: string;
+  status: RequestStatus;
+  createdAt: string;
+  updatedAt: string;
+  seenAt: string | null;
+  closedReason: string | null;
+  answers: { space: string; time: string; cost: string };
+  about: { home: string | null; otherPets: string[]; kids: string | null; experience: string | null; visit: string | null };
+  message: string | null;
+  contact: { name: string; email?: string; phone?: string | null; pref?: ContactPref };
+  pet: { id: string; name: string; species: string; status: PetStatus; requestsPaused: boolean; openRequests: number; photo: { url: string | null; thumb: string | null; focus: string } };
+}
 
 export class ApiError extends Error {
   readonly code: string;
@@ -184,6 +204,12 @@ export const api = {
   arrangePhotos: (petId: string, photos: { id: string; focus: string }[]) => call<{ ok: true }>(`/api/portal/pets/${encodeURIComponent(petId)}/photos`, 'PUT', { photos }),
   deletePhoto: (petId: string, photoId: string) =>
     call<{ ok: true }>(`/api/portal/pets/${encodeURIComponent(petId)}/photos/${encodeURIComponent(photoId)}`, 'DELETE', {}),
+  shelterRequests: (shelterId: string) => call<{ requests: InboxRequest[] }>(`/api/portal/shelters/${encodeURIComponent(shelterId)}/requests`).then((r) => r.requests),
+  moveRequest: (id: string, status: 'seen' | 'contacted' | 'visit' | 'closed', reason?: CloseReason) =>
+    call<{ request: InboxRequest }>(`/api/portal/requests/${encodeURIComponent(id)}/status`, 'POST', { status, reason }).then((r) => r.request),
+  setAvailability: (petId: string, change: { reserved?: boolean; paused?: boolean }) =>
+    call<{ pet: { id: string; status: PetStatus; requestsPaused: boolean } }>(`/api/portal/pets/${encodeURIComponent(petId)}/availability`, 'POST', change).then((r) => r.pet),
+  runDigest: () => call<{ shelters: number; digestEmails: number; alertEmails: number; deferred: boolean }>('/api/admin/digest', 'POST', {}),
   adminShelters: (status: ShelterStatus) => call<{ shelters: AdminShelter[] }>(`/api/admin/shelters?status=${status}`).then((r) => r.shelters),
   adminDecision: (id: string, action: 'verify' | 'reject' | 'suspend', reason?: string) =>
     call<{ shelter: { id: string; status: ShelterStatus } }>(`/api/admin/shelters/${encodeURIComponent(id)}/decision`, 'POST', { action, reason }),

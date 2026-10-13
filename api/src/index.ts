@@ -7,6 +7,8 @@ import { pets, readPoint } from './pets';
 import type { AppContext, Env } from './env';
 import { inDR, nearestPlace, PLACES_ATTRIBUTION, placeById, searchPlaces } from './places';
 import { admin } from './admin';
+import { runDigest } from './digest';
+import { inbox } from './inbox';
 import { listings } from './listings';
 import { photoRoutes, servePhoto } from './photos';
 import { portal } from './portal';
@@ -53,6 +55,7 @@ app.route('/api/alerts', alerts);
 app.route('/api/portal', portal);
 app.route('/api/portal', listings);
 app.route('/api/portal', photoRoutes);
+app.route('/api/portal', inbox);
 app.get('/api/photos/:key', servePhoto);
 app.route('/api/admin', admin);
 
@@ -146,5 +149,9 @@ export default Sentry.withSentry<Env>(
     tracesSampleRate: 0, // errors only, to stay within the free plan's quota
     beforeSend: scrub,
   }),
-  app,
+  {
+    fetch: app.fetch,
+    // The morning job: shelters' daily summaries and "Avísame" alerts (cron in wrangler.jsonc).
+    scheduled: (_event, env, ctx) => ctx.waitUntil(runDigest(env).then((r) => console.log('morning job', r))),
+  },
 );
