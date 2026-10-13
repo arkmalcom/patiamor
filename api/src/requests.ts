@@ -22,7 +22,25 @@ const OTHER_PETS = ['perros', 'gatos', 'otros'] as const;
 const KIDS = ['no', 'menores', 'mayores'] as const;
 const EXPERIENCE = ['si', 'primera'] as const;
 const VISIT = ['semana', 'fin', 'cualquiera'] as const;
-const WITHDRAW_REASONS = ['otra_mascota', 'situacion', 'prefiero_no_decir'] as const;
+const WITHDRAW_REASONS = ['situacion', 'vivienda', 'otra_mascota', 'refugio', 'otro'] as const;
+
+/** This many withdrawals within the window pause new requests until an admin clears the account. */
+const WITHDRAW_LIMIT = 3;
+const WITHDRAW_WINDOW_DAYS = 90;
+
+/** Whether new requests are paused for this adopter because of recent withdrawals. */
+export async function requestsRestricted(db: D1Database, userId: string): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT count(*) AS n FROM adoption_requests r JOIN users u ON u.id = r.user_id
+        WHERE r.user_id = ? AND r.status = 'withdrawn'
+          AND r.updated_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-${WITHDRAW_WINDOW_DAYS} days')
+          AND (u.requests_cleared_at IS NULL OR r.updated_at > u.requests_cleared_at)`,
+    )
+    .bind(userId)
+    .first<{ n: number }>();
+  return (row?.n ?? 0) >= WITHDRAW_LIMIT;
+}
 const oneOf = <T extends readonly string[]>(list: T, v: unknown): v is T[number] => list.includes(v as T[number]);
 const optional = <T extends readonly string[]>(list: T, v: unknown): T[number] | null | undefined =>
   v === undefined || v === null || v === '' ? null : oneOf(list, v) ? v : undefined; // undefined = invalid
@@ -114,6 +132,7 @@ requests.post('/', async (c) => {
   }
 
   const db = c.env.DB;
+  if (await requestsRestricted(db, user.id)) return c.json({ error: 'restricted' }, 403);
   const pet = await db
     .prepare(`SELECT d.name, d.status, d.open_requests, d.requests_paused, s.name AS shelter_name FROM pets d LEFT JOIN shelters s ON s.id = d.shelter_id WHERE d.id = ? AND ${VIEWABLE}`)
     .bind(b.petId)
@@ -160,11 +179,13 @@ requests.post('/', async (c) => {
   return c.json({ request: { id, status: 'sent', createdAt: now } }, 201);
 });
 
-// Withdrawing frees the slot at once. The lister always sees that it was withdrawn (and why, if given).
+// Withdrawing is a serious step: it needs a reason, frees the slot at once, and the lister always sees
+// it (with the reason). Several in a short time pause new requests (requestsRestricted).
 requests.post('/:id/withdraw', async (c) => {
   const user = c.get('user')!;
   const b = await c.req.json<{ reason?: string }>().catch(() => ({}) as { reason?: string });
-  const reason = oneOf(WITHDRAW_REASONS, b.reason) ? b.reason : null;
+  if (!oneOf(WITHDRAW_REASONS, b.reason)) return c.json({ error: 'reason_required' }, 400);
+  const reason = b.reason;
   await c.env.DB.prepare(`UPDATE adoption_requests SET status = 'withdrawn', closed_reason = ?, updated_at = ? WHERE id = ? AND user_id = ? AND status IN ${OPEN_STATUSES}`)
     .bind(reason, nowIso(), c.req.param('id'), user.id)
     .run();

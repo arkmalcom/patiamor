@@ -197,7 +197,7 @@ const es = {
   'auth.signedIn': 'Listo, entraste como {who}.',
 
   'full.title': 'Ya tienes 3 solicitudes activas',
-  'full.body': 'Para empezar el proceso con {name}, retira una de tus solicitudes. El refugio verá que la retiraste.',
+  'full.body': 'Cuando una de estas termine, podrás empezar un proceso nuevo con {name}.',
   'full.release': 'Retirar',
   'full.manyTitle': '¿Puedes darle hogar a más de tres?',
   'full.manyBody': 'Si de verdad deseas darle tu corazón a tantos animales, te ponemos en contacto directo con los refugios.',
@@ -255,7 +255,6 @@ const es = {
   'request.next1': 'Revisan tus respuestas.',
   'request.next2': 'Si es buena opción, te escriben por WhatsApp o correo para coordinar una visita.',
   'request.next3': 'Cada avance aparece en Mi lista.',
-  'request.doneNote': 'Puedes retirarla cuando quieras; {lister} verá que la retiraste.',
   'request.done': 'Listo',
   'request.err.invalid_phone': 'Revisa el número: debe ser dominicano, de 10 dígitos (809, 829 o 849).',
   'request.err.invalid_name': 'Escribe tu nombre (al menos 2 letras).',
@@ -279,11 +278,10 @@ const es = {
   'request.sentOn': 'Enviada el {date}',
   'request.withdraw': 'Retirar solicitud',
   'request.withdrawTitle': '¿Retirar tu solicitud para {name}?',
-  'request.withdrawWhy': '¿Por qué? (opcional)',
+  'request.withdrawWhy': '¿Qué cambió?',
   'request.withdraw.otra_mascota': 'Ya adopté otra mascota',
-  'request.withdraw.situacion': 'Cambió mi situación',
-  'request.withdraw.prefiero_no_decir': 'Prefiero no decir',
-  'request.keep': 'Mantenerla',
+  'request.withdraw.situacion': 'Cambió mi situación (mudanza, trabajo, salud)',
+  'request.keep': 'Seguir con la solicitud',
   'request.withdrawn': 'Retiraste la solicitud para {name}.',
   'request.inList': 'Ver en Mi lista',
   'request.reservedShort': 'En proceso de adopción',
@@ -297,8 +295,8 @@ const es = {
   'request.pref.llamada': 'Llamada',
   'request.pref.correo': 'Correo',
   'request.more': 'Cuéntale más a {lister}',
-  'request.warning': 'Al enviarla, {name} ocupa uno de tus 3 espacios hasta que termine. Puedes retirarla cuando quieras, pero {lister} verá que la retiraste.',
-  'request.withdrawBody': '{lister} verá que retiraste tu solicitud. Tu espacio queda libre al momento.',
+  'request.warning': 'Al enviarla, {name} ocupa uno de tus 3 espacios hasta que el proceso termine. Envíala solo si estás decidido: {lister} contará contigo.',
+  'request.withdrawBody': '{lister} verá que retiraste tu solicitud y el motivo.',
   'request.status.withdrawn': 'Retiraste la solicitud',
   'request.status.withdrawn.body': '{lister} sabe que ya no sigues adelante.',
   'request.err.requests_full': 'Ya tienes 3 solicitudes activas.',
@@ -313,7 +311,18 @@ const es = {
   'profile.ready.body': 'Al empezar el proceso, {lister} recibe tu solicitud y te contacta para conocer a {name}.',
   'profile.ready.fee': 'Cuota de adopción: {fee}.',
   'profile.ready.go': 'Sí, quiero empezar el proceso',
-  'profile.ready.note': 'Ocupa uno de tus 3 espacios. Puedes retirarla cuando quieras.',
+  'profile.ready.note': 'Ocupa uno de tus 3 espacios hasta que el proceso termine. Empiézalo solo si estás decidido.',
+  'profile.ready.restricted': 'Retiraste varias solicitudes en poco tiempo, así que por ahora no puedes empezar procesos nuevos. Escríbenos y lo revisamos contigo.',
+  'full.toList': 'Ver mis solicitudes',
+  'request.withdrawWarning': 'Cada {animal} merece una oportunidad, pero entendemos que adoptar es un compromiso serio que no se decide a la ligera.',
+  'request.withdrawLimit': 'Ten en cuenta que, si retiras demasiadas solicitudes, tu cuenta podría quedar restringida y te pediríamos verificaciones adicionales antes de empezar nuevos procesos.',
+  'request.withdraw.vivienda': 'Donde vivo no lo permiten',
+  'request.withdraw.refugio': 'No logré coordinar con el refugio',
+  'request.withdraw.otro': 'Otro motivo',
+  'request.restrictedTitle': 'Antes de un proceso nuevo',
+  'request.restrictedBody': 'Retiraste varias solicitudes en poco tiempo. Antes de empezar un proceso nuevo queremos hablar contigo y hacer unas verificaciones. Escríbenos a {email}.',
+  'request.restrictedSubject': 'Revisión de mi cuenta para adoptar',
+  'request.err.restricted': 'Por ahora no puedes empezar procesos nuevos.',
   'alert.on': 'Avísame si vuelve a estar disponible',
   'alert.set': 'Te avisaremos',
   'alert.toastOn': 'Te avisaremos si {name} vuelve a estar disponible.',
@@ -331,6 +340,9 @@ const es = {
 } as const;
 
 export type Key = keyof typeof es;
+
+/** Capitalises a sentence that opens with a name or phrase ("la persona que lo publicó verá…"). */
+export const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 export function t(key: Key, params: Record<string, string | number> = {}): string {
   return es[key].replace(/\{(\w+)\}/g, (_, p) => String(params[p] ?? ''));

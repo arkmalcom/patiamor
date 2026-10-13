@@ -98,5 +98,35 @@ function street(): string {
     </svg>`;
 }
 
+// ---------- The wall behind everything: painted bands and faint motifs for the animals in view ----------
+
+// Flat shapes drawn around (0, 0). One colour (the layer's ink) and the sky for cut-outs, so the whole
+// motif fades as one when the layer's opacity is low.
+const PAW = `<ellipse cx="0" cy="7" rx="10" ry="8.5"/><circle cx="-11" cy="-5" r="4"/><circle cx="-4.5" cy="-12" r="4.2"/><circle cx="4.5" cy="-12" r="4.2"/><circle cx="11" cy="-5" r="4"/>`;
+const BONE = `<rect x="-15" y="-4" width="30" height="8" rx="3"/><circle cx="-15" cy="-4.5" r="5.5"/><circle cx="-15" cy="4.5" r="5.5"/><circle cx="15" cy="-4.5" r="5.5"/><circle cx="15" cy="4.5" r="5.5"/>`;
+const YARN = `<circle r="14"/><path d="M-13 -4 C -5 -9, 6 -9, 13 -3 M-14 3 C -5 -2, 6 -2, 14 4 M-11 9 C -4 5, 5 5, 11 10 M-3 -14 C 4 -6, 4 6, -3 14" fill="none" stroke="var(--sky)" stroke-width="2.4" stroke-linecap="round"/><path d="M-10 10 C -14 16, -8 20, -13 25 C -17 29, -24 27, -27 31" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>`;
+const FISH = `<path d="M-16 0 C -8 -11, 8 -11, 14 0 C 8 11, -8 11, -16 0 Z"/><path d="M12 0 L 24 -9 L 22 0 L 24 9 Z"/><circle cx="-8" cy="-2" r="2" fill="var(--sky)"/>`;
+
+const at = (shape: string, x: number, y: number, deg: number, k = 1) => `<g transform="translate(${x} ${y}) rotate(${deg}) scale(${k})">${shape}</g>`;
+
+// Both sets share one 280-unit tile and take different spots in it, so "Ambos" shows them side by side
+// without collisions: dogs in the top-left and bottom-right of each tile, cats in the other two.
+const TILE = 280;
+const DOG_TILE = at(PAW, 52, 58, -18, 1.15) + at(BONE, 196, 206, 28) + at(PAW, 214, 104, 12, 0.8) + at(BONE, 76, 168, -40, 0.75);
+const CAT_TILE = at(YARN, 206, 54, 0, 1.05) + at(FISH, 62, 214, -22, 1.1) + at(FISH, 238, 160, 160, 0.8) + at(YARN, 132, 120, 0, 0.7);
+
+const motifs = `
+  <svg class="motifs" aria-hidden="true" focusable="false">
+    <defs>
+      <pattern id="motif-dogs" width="${TILE}" height="${TILE}" patternUnits="userSpaceOnUse">${DOG_TILE}</pattern>
+      <pattern id="motif-cats" width="${TILE}" height="${TILE}" patternUnits="userSpaceOnUse">${CAT_TILE}</pattern>
+    </defs>
+    <rect class="motifs__dogs" width="100%" height="100%" fill="url(#motif-dogs)"/>
+    <rect class="motifs__cats" width="100%" height="100%" fill="url(#motif-cats)"/>
+  </svg>`;
+
+/** Painted bands and the animal motifs, fixed behind every screen. */
+export const backdrop = raw(`<div class="backdrop" aria-hidden="true">${motifs}</div>`);
+
 /** The painted street every screen sits on. */
 export const landscape = raw(street());

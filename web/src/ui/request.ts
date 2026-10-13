@@ -2,7 +2,7 @@ import { Bell, BellRing, CalendarCheck, Check, Eye, HeartHandshake, House, Mail,
 import { ApiError } from '../api';
 import { CONTACT_EMAIL, type PetDetail, type PetSummary } from '../data';
 import { $, $$, html, icon, type Raw } from '../dom';
-import { formatDate, t } from '../i18n';
+import { formatDate, sentence, t } from '../i18n';
 import {
   activeRequestFor,
   activeRequests,
@@ -48,12 +48,12 @@ export function cautions(pet: PetSummary): string[] {
   return [...out, ...((pet as PetDetail).needs ?? [])];
 }
 
-function choice(name: string, legend: string, values: string[], label: (v: string) => string, opts: { type?: 'radio' | 'checkbox'; hint?: string } = {}): Raw {
+function choice(name: string, legend: string, values: string[], label: (v: string) => string, opts: { type?: 'radio' | 'checkbox'; hint?: string; stack?: boolean } = {}): Raw {
   return html`
     <fieldset class="question">
       <legend>${legend}</legend>
       ${opts.hint ? html`<p class="question__hint">${opts.hint}</p>` : ''}
-      <div class="segmented segmented--wrap">
+      <div class="segmented ${opts.stack ? 'segmented--stack' : 'segmented--wrap'}">
         ${values.map((v) => html`<label><input type="${opts.type ?? 'radio'}" name="${name}" value="${v}" /><span>${label(v)}</span></label>`)}
       </div>
     </fieldset>`;
@@ -78,6 +78,7 @@ export function startRequest(petId: string) {
   const pet = petCache.get(petId);
   if (!pet || activeRequestFor(petId)) return;
   if (!state.signedIn) return showAuth(pet);
+  if (state.user?.requestsRestricted) return void openRestricted();
   if (activeRequests().length >= MAX_SLOTS) return openFull(pet);
   openForm(pet);
 }
@@ -102,6 +103,7 @@ function showAuth(pet: PetSummary) {
   });
 }
 
+/** Three requests in progress: no swapping on the spot. Another can start when one of them ends. */
 function openFull(pet: PetSummary) {
   const subject = encodeURIComponent(t('full.manySubject'));
   const mailBody = encodeURIComponent(`Hola, me interesa adoptar a ${pet.name} y a otros animales más.`);
@@ -113,10 +115,10 @@ function openFull(pet: PetSummary) {
           ({ pet: d }) => html`<li class="full__slot">
             ${miniFrame(d, 'sm')}
             <span class="full__slot-text"><strong>${d.name}</strong><span class="muted">${listerLabel(d)}</span></span>
-            <button class="button button--outline button--small" type="button" data-withdraw="${d.id}">${t('full.release')}</button>
           </li>`,
         )}
       </ul>
+      <a class="text-button" href="#/lista" data-to-list>${t('full.toList')}</a>
       <div class="many">
         <h3 class="many__title">${t('full.manyTitle')}</h3>
         <p>${t('full.manyBody')}</p>
@@ -124,12 +126,16 @@ function openFull(pet: PetSummary) {
       </div>
     </div>`;
   const dialog = openSheet(t('full.title'), body);
-  $$<HTMLButtonElement>('[data-withdraw]', dialog).forEach((b) =>
-    b.addEventListener('click', () => {
-      const item = activeRequestFor(b.dataset.withdraw!);
-      if (item) openWithdraw(item, () => startRequest(pet.id));
-    }),
-  );
+  $('[data-to-list]', dialog).addEventListener('click', () => closeSheet());
+}
+
+/** New requests are paused after several withdrawals, until Patiamor has checked in. */
+function openRestricted() {
+  const body = html`<div class="request-done"><p>${t('request.restrictedBody', { email: CONTACT_EMAIL })}</p></div>`;
+  const dialog = openSheet(t('request.restrictedTitle'), body, {
+    footer: html`<a class="button button--ink" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(t('request.restrictedSubject'))}">${icon(Mail, 18)}${t('full.manyCta')}</a>`,
+  });
+  return dialog;
 }
 
 const PREFS: ContactPref[] = ['whatsapp', 'llamada', 'correo'];
@@ -260,9 +266,10 @@ function openForm(pet: PetSummary) {
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'network';
       if (code === 'requests_full') return openFull(pet);
+      if (code === 'restricted') return void openRestricted();
       if (code === 'invalid_phone' || code === 'invalid_name') showFields(); // so it can be fixed
       const known = ['invalid_phone', 'invalid_name', 'reserved', 'paused'];
-      error.textContent = known.includes(code) ? t(`request.err.${code as 'invalid_phone'}`, { name: pet.name, lister }) : t('auth.err.network');
+      error.textContent = known.includes(code) ? sentence(t(`request.err.${code as 'invalid_phone'}`, { name: pet.name, lister })) : t('auth.err.network');
       error.hidden = false;
       error.scrollIntoView({ block: 'nearest' });
       sync();
@@ -275,13 +282,12 @@ function showDone(pet: PetSummary) {
   const body = html`
     <div class="request-done">
       <span class="request-done__mark" aria-hidden="true">${icon(Send, 26)}</span>
-      <p class="request-done__lede">${t('request.doneBody', { lister, name: pet.name })}</p>
+      <p class="request-done__lede">${sentence(t('request.doneBody', { lister, name: pet.name }))}</p>
       <ol class="request-done__steps">
         <li>${t('request.next1')}</li>
         <li>${t('request.next2')}</li>
         <li>${t('request.next3')}</li>
       </ol>
-      <p class="muted">${t('request.doneNote', { lister })}</p>
     </div>`;
   const dialog = openSheet(t('request.doneTitle'), body, {
     footer: html`<button class="button button--primary" type="button" data-done>${icon(Check, 18)}${t('request.done')}</button>`,
@@ -289,28 +295,37 @@ function showDone(pet: PetSummary) {
   $('[data-done]', dialog).addEventListener('click', () => closeSheet());
 }
 
-export function openWithdraw(item: MyRequest, after?: () => void) {
+/** Withdrawing is a serious step: a plain warning, a required reason, and the lister always sees it. */
+export function openWithdraw(item: MyRequest) {
   const { pet, request } = item;
   const lister = listerName(pet);
   const body = html`
     <form class="request" id="withdraw-form">
-      <p>${t('request.withdrawBody', { lister })}</p>
-      ${choice('reason', t('request.withdrawWhy'), ['otra_mascota', 'situacion', 'prefiero_no_decir'], (v) => t(`request.withdraw.${v as 'situacion'}`))}
+      <div class="withdraw-warning">
+        <p>${t('request.withdrawWarning', { animal: t(`animal.${pet.species}.one`) })}</p>
+        <p>${t('request.withdrawLimit')}</p>
+      </div>
+      <p>${sentence(t('request.withdrawBody', { lister }))}</p>
+      ${choice('reason', t('request.withdrawWhy'), ['situacion', 'vivienda', 'otra_mascota', 'refugio', 'otro'], (v) => t(`request.withdraw.${v as 'situacion'}`), { stack: true })}
     </form>`;
   const footer = html`
-    <button class="button button--ghost" type="button" data-keep>${t('request.keep')}</button>
-    <button class="button button--outline button--danger" type="submit" form="withdraw-form" data-go>${icon(X, 18)}${t('request.withdraw')}</button>`;
+    <button class="button button--primary" type="button" data-keep>${t('request.keep')}</button>
+    <button class="button button--outline button--danger" type="submit" form="withdraw-form" disabled data-go>${icon(X, 18)}${t('request.withdraw')}</button>`;
   const dialog = openSheet(t('request.withdrawTitle', { name: pet.name }), body, { footer });
+  const form = $<HTMLFormElement>('#withdraw-form', dialog);
+  const go = $<HTMLButtonElement>('[data-go]', dialog);
+  const reason = () => new FormData(form).get('reason') as string | null;
+  form.addEventListener('change', () => (go.disabled = !reason()));
   $('[data-keep]', dialog).addEventListener('click', () => closeSheet());
-  $<HTMLFormElement>('#withdraw-form', dialog).addEventListener('submit', async (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const go = $<HTMLButtonElement>('[data-go]', dialog);
+    const why = reason();
+    if (!why) return;
     go.disabled = true;
     try {
-      await withdrawRequest(request.id, (new FormData(e.target as HTMLFormElement).get('reason') as string | null) ?? null);
+      await withdrawRequest(request.id, why);
       toast(t('request.withdrawn', { name: pet.name }));
-      if (after) after();
-      else closeSheet();
+      closeSheet();
     } catch {
       go.disabled = false;
       toast(t('auth.err.network'));
@@ -340,8 +355,8 @@ export function requestStatus(item: MyRequest): Raw {
     <div class="req-status req-status--${request.status}" role="status">
       <span class="req-status__mark" aria-hidden="true">${icon(STATUS_ICON[request.status], 18)}</span>
       <div>
-        <p class="req-status__title">${t(`request.status.${key as 'sent'}`, { lister, name: pet.name })}</p>
-        <p class="req-status__body">${t(`request.status.${key as 'sent'}.body`, { lister, name: pet.name, lo: lo(pet) })}</p>
+        <p class="req-status__title">${sentence(t(`request.status.${key as 'sent'}`, { lister, name: pet.name }))}</p>
+        <p class="req-status__body">${sentence(t(`request.status.${key as 'sent'}.body`, { lister, name: pet.name, lo: lo(pet) }))}</p>
         <p class="req-status__date">${t('request.sentOn', { date: formatDate(request.createdAt.slice(0, 10)) })}</p>
       </div>
     </div>`;

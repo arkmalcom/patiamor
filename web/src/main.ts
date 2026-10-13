@@ -3,7 +3,7 @@ import '@fontsource-variable/atkinson-hyperlegible-next/wght.css';
 import './styles.css';
 
 import { Compass, MapPin, SlidersHorizontal, User } from 'lucide';
-import { landscape } from './art';
+import { backdrop, landscape } from './art';
 import { $, $$, html, icon, mount, transition } from './dom';
 import { t } from './i18n';
 import { activeFilterCount, loadPets, setLocation, setUser, state, subscribe, takePendingRequest, update } from './store';
@@ -37,6 +37,7 @@ const app = $('#app');
 mount(
   app,
   html`
+    ${backdrop}
     ${landscape}
     <a class="skip-link" href="#view">Saltar al contenido</a>
     <header class="topbar">
@@ -86,6 +87,8 @@ $$('[data-open-radius]').forEach((b) => b.addEventListener('click', openRadiusSh
 
 function chrome(route: Route) {
   document.documentElement.dataset.route = route.name;
+  // The background's motifs follow the species switch: paws and bones, yarn and fish, or both.
+  document.documentElement.dataset.species = state.species;
   $('[data-radius-place]').textContent = state.location ? `${state.location.name} · ` : '';
   $('[data-radius-label]').textContent = t('radius.chip', { km: state.radiusKm });
   const n = activeFilterCount();

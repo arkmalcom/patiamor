@@ -6,7 +6,7 @@ import { currentUser } from './auth/session';
 import { pets, readPoint } from './pets';
 import type { AppContext, Env } from './env';
 import { inDR, nearestPlace, PLACES_ATTRIBUTION, placeById, searchPlaces } from './places';
-import { alerts, requests } from './requests';
+import { alerts, requests, requestsRestricted } from './requests';
 
 export type { Env } from './env';
 
@@ -88,7 +88,8 @@ app.get('/api/me', async (c) => {
     .bind(user.id)
     .all<{ id: string; name: string; role: 'owner' | 'maintainer' }>();
   const contact = await c.env.DB.prepare('SELECT phone, contact_pref FROM users WHERE id = ?').bind(user.id).first<{ phone: string | null; contact_pref: string | null }>();
-  return c.json({ user: { ...publicUser(user), phone: contact?.phone ?? null, contactPref: contact?.contact_pref ?? null, shelters } });
+  const restricted = await requestsRestricted(c.env.DB, user.id);
+  return c.json({ user: { ...publicUser(user), phone: contact?.phone ?? null, contactPref: contact?.contact_pref ?? null, requestsRestricted: restricted, shelters } });
 });
 
 app.patch('/api/me', async (c) => {

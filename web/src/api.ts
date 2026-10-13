@@ -8,6 +8,8 @@ export interface Me {
   name: string | null;
   phone?: string | null;
   contactPref?: ContactPref | null;
+  /** New requests paused after several withdrawals, until Patiamor clears the account. */
+  requestsRestricted?: boolean;
   isAdmin: boolean;
   shelters?: { id: string; name: string; role: 'owner' | 'maintainer' }[];
 }
@@ -53,7 +55,7 @@ export const api = {
   whereami: () => call<{ place: Place; source: 'ip' | 'default' }>('/api/whereami'),
   myRequests: () => call<{ items: MyRequest[]; alerts: string[] }>('/api/requests'),
   requestAdoption: (form: RequestForm) => call<{ request: AdoptionRequest }>('/api/requests', 'POST', form).then((r) => r.request),
-  withdrawRequest: (id: string, reason: string | null) => call<{ ok: true }>(`/api/requests/${encodeURIComponent(id)}/withdraw`, 'POST', { reason }),
+  withdrawRequest: (id: string, reason: string) => call<{ ok: true }>(`/api/requests/${encodeURIComponent(id)}/withdraw`, 'POST', { reason }),
   alertOn: (petId: string) => call<{ ok: true }>(`/api/alerts/${encodeURIComponent(petId)}`, 'PUT', {}),
   alertOff: (petId: string) => call<{ ok: true }>(`/api/alerts/${encodeURIComponent(petId)}`, 'DELETE', {}),
 };

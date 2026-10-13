@@ -1,7 +1,7 @@
 import { Compass, Eye, Undo2 } from 'lucide';
 import { frameFor } from '../data';
 import { $$, html, icon, mount, type Raw } from '../dom';
-import { away, t } from '../i18n';
+import { away, sentence, t } from '../i18n';
 import { activeRequests, isOpen, MAX_SLOTS, petCache, placePet, state, update, type Answer, type MyRequest } from '../store';
 import { listerLabel, miniFrame, photo } from '../ui/canvas';
 import { listerName, openWithdraw, requestStatus, statusKey } from '../ui/request';
@@ -29,7 +29,7 @@ function filled(s: MyRequest, compact: boolean): Raw {
         <h2 class="slot__name">${pet.name}</h2>
         <p class="muted">${away(p.km)} · ${listerLabel(pet)}</p>
         ${compact
-          ? html`<p class="slot__status">${t(`request.status.${statusKey(s) as 'sent'}`, { lister: listerName(pet), name: pet.name })}</p>`
+          ? html`<p class="slot__status">${sentence(t(`request.status.${statusKey(s) as 'sent'}`, { lister: listerName(pet), name: pet.name }))}</p>`
           : html`
               ${requestStatus(s)}
               <ul class="answers" aria-label="${t('list.answers')}">

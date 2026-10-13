@@ -99,6 +99,22 @@ a { color: inherit; text-underline-offset: 0.2em; }
   line-height: 1.4;
 }
 
+/* ---------- The wall behind everything ---------- */
+
+/* Asymmetric painted bands in the street's wall paints, sharp-edged like a hand-painted wall. */
+.backdrop {
+  position: fixed; inset: 0; z-index: -2;
+  pointer-events: none;
+  background:
+    linear-gradient(101deg, transparent 0 58%, color-mix(in srgb, var(--casa-turquesa) 55%, transparent) 58% 71%, transparent 71%),
+    linear-gradient(78deg, transparent 0 9%, color-mix(in srgb, var(--casa-mango) 50%, transparent) 9% 19%, transparent 19%),
+    linear-gradient(171deg, transparent 0 22%, color-mix(in srgb, var(--casa-anil) 38%, transparent) 22% 30%, transparent 30%),
+    var(--sky);
+}
+/* Faint motifs for the animals in view: paws and bones, yarn and fish, or both. */
+.motifs { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--ink); fill: var(--ink); opacity: 0.055; }
+html[data-species='perro'] .motifs__cats, html[data-species='gato'] .motifs__dogs { display: none; }
+
 /* ---------- The street ---------- */
 
 /* Houses keep their proportions at every width ("slice" crops the row, never stretches it). */
@@ -830,11 +846,11 @@ html.sheet-open { overflow: hidden; }
 .question::before { content: ''; position: absolute; top: 0; left: 0; right: 0; border-top: 1px solid var(--rule); }
 .question legend { float: left; width: 100%; padding: 0; margin-bottom: 8px; font-weight: 700; font-size: 1.05rem; line-height: 1.4; text-wrap: pretty; }
 .segmented { clear: both; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.segmented label { position: relative; }
+.segmented label { position: relative; display: grid; }
 .segmented input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
 .segmented span {
   display: flex; align-items: center; justify-content: center; text-align: center;
-  min-height: 48px; padding: 6px 12px;
+  min-height: 48px; height: 100%; padding: 6px 12px;
   border: 1.5px solid var(--rule-strong);
   border-radius: 12px;
   font-weight: 700;
@@ -859,6 +875,9 @@ html.sheet-open { overflow: hidden; }
 .request .question legend { margin-bottom: 0; }
 .question__hint { clear: both; margin-top: -6px; font-size: 0.9rem; color: var(--ink-2); }
 .segmented--wrap { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+/* Long options (withdrawal reasons) read as a list: one per row, left-aligned, all the same width. */
+.segmented--stack { grid-template-columns: 1fr; }
+.segmented--stack span { justify-content: flex-start; text-align: left; padding-inline: 16px; }
 .field__hint { font-size: 0.88rem; color: var(--ink-2); }
 .field__input--area { min-height: 96px; padding: 12px 16px; line-height: 1.5; resize: vertical; }
 .request > .field { padding: 20px 0 6px; border-top: 1px solid var(--rule); }
@@ -903,6 +922,10 @@ html.sheet-open { overflow: hidden; }
 .slot__status { font-size: 0.85rem; font-weight: 700; color: var(--ink); line-height: 1.3; }
 .request__slot { margin-top: 4px; font-weight: 700; }
 .request__warning { margin-top: 16px; font-size: 0.95rem; line-height: 1.45; }
+/* Withdrawing, and a paused account: said plainly, on the warm tint, never as an alarm. */
+.withdraw-warning { display: grid; gap: 8px; padding: 14px 16px; margin-bottom: 14px; background: var(--mango-tint); border-radius: 14px; line-height: 1.45; }
+.full > .text-button { justify-self: start; }
+.ready__write { justify-self: start; }
 .contact { display: grid; gap: 12px; }
 .contact__known { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; justify-content: space-between; padding: 12px 14px; background: var(--sky-tint); border-radius: 12px; }
 .contact__known p { font-weight: 700; }
@@ -1023,7 +1046,8 @@ html.sheet-open { overflow: hidden; }
 
 .profile { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
 .profile__media { position: relative; padding: 6px 20px 0; }
-.profile__media .canvas { height: clamp(440px, 72dvh, 680px); }
+/* The portrait stays portrait at any width (landscape phones too): a wide, short arch distorts the frame. */
+.profile__media .canvas { --canvas-h: clamp(440px, 72dvh, 680px); height: var(--canvas-h); width: min(100%, calc(var(--canvas-h) * 0.8)); margin-inline: auto; }
 .profile__back { position: absolute; top: 22px; left: 34px; z-index: 3; }
 
 /* The text sits on paper so the street behind never runs through it, wherever the page scrolls. */
@@ -1299,7 +1323,7 @@ html[data-route='profile'] .toast-region { bottom: calc(96px + env(safe-area-ins
     padding: 6px 28px 48px;
   }
   .profile__media { position: sticky; top: 0; padding: 6px 0 0; }
-  .profile__media .canvas { height: calc(100dvh - 120px); max-height: 760px; }
+  .profile__media .canvas { --canvas-h: min(calc(100dvh - 120px), 760px); }
   .profile__back { left: 14px; top: 18px; }
   .profile__body { margin: 6px 0 0; }
   .profile__bar {

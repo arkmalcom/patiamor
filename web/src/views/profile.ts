@@ -1,6 +1,6 @@
-import { ArrowLeft, Check, CircleHelp, Clock, Heart, HeartHandshake, House, Send, User, X } from 'lucide';
+import { ArrowLeft, Check, CircleHelp, Clock, Heart, HeartHandshake, House, Mail, Send, User, X } from 'lucide';
 import { api, ApiError } from '../api';
-import { companionKey, frameFor, type Companion, type PetDetail, type PetSummary } from '../data';
+import { companionKey, CONTACT_EMAIL, frameFor, type Companion, type PetDetail, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, reducedMotion, type Raw } from '../dom';
 import { formatDate, t, away } from '../i18n';
 import { activeRequestFor, cachePets, petCache, placePet, state, update } from '../store';
@@ -135,8 +135,13 @@ function ready(pet: PetDetail): Raw {
         ? html`<div class="mind"><h3 class="mind__title">${t('reflect.mind')}</h3><ul class="mind__list">${notes.map((n) => html`<li>${n}</li>`)}</ul></div>`
         : ''}
       ${pet.adoptionFeeDop !== null ? html`<p class="ready__fee">${t('profile.ready.fee', { fee: `RD$${pet.adoptionFeeDop.toLocaleString('es-DO')}` })}</p>` : ''}
-      <button class="button button--primary ready__go" type="button" data-start>${icon(HeartHandshake, 20)}${t('profile.ready.go')}</button>
-      <p class="muted ready__note">${t('profile.ready.note')}</p>
+      ${state.user?.requestsRestricted
+        ? html`<div class="withdraw-warning">
+            <p>${t('profile.ready.restricted')}</p>
+            <a class="button button--ink button--small ready__write" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(t('request.restrictedSubject'))}">${icon(Mail, 18)}${t('full.manyCta')}</a>
+          </div>`
+        : html`<button class="button button--primary ready__go" type="button" data-start>${icon(HeartHandshake, 20)}${t('profile.ready.go')}</button>
+            <p class="muted ready__note">${t('profile.ready.note')}</p>`}
     </section>`;
 }
 

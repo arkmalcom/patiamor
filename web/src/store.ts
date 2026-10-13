@@ -256,9 +256,12 @@ export async function sendRequest(form: RequestForm) {
   await loadRequests();
 }
 
-export async function withdrawRequest(id: string, reason: string | null) {
+export async function withdrawRequest(id: string, reason: string) {
   await api.withdrawRequest(id, reason);
   await loadRequests();
+  // Several withdrawals pause new requests; keep the account's flag current.
+  const me = await api.me().catch(() => null);
+  if (me) update((s) => s.user && (s.user.requestsRestricted = !!me.requestsRestricted));
 }
 
 export async function toggleAlert(petId: string) {
