@@ -30,7 +30,7 @@ const STREET: House[] = [
   { w: 150, h: 142, wall: 'var(--casa-mango)', trim: 'var(--turquesa)', roof: 'pitched', windows: 2, door: 'square' },
 ];
 
-const BASE = 236; // y of the sidewalk line in the 0 0 1600 300 viewBox
+const BASE = 236; // y of the sidewalk line in the 300-tall viewBox
 
 /** A painted window with open shutters (slats as a few strokes). */
 function facadeWindow(x: number, y: number, trim: string): string {
@@ -74,19 +74,27 @@ function house(x: number, d: House): string {
   return parts.join('');
 }
 
+// The drawing is much wider than any screen. The CSS fills the width and keeps the street on the ground
+// (xMidYMax slice), so a wide or short window crops the sides, never the roofs: a 1600-wide drawing lost
+// its rooftops from about 1920px wide. Phones and laptops see the middle at the same scale as before.
+const WIDTH = 4800;
+
 function street(): string {
-  let x = -40;
-  const houses = STREET.map((d) => {
-    const out = house(x, d);
+  const houses: string[] = [];
+  // The fixed row repeats until the street is full, so it stays the same on every load.
+  for (let x = -40, i = 0; x < WIDTH; i++) {
+    const d = STREET[i % STREET.length];
+    houses.push(house(x, d));
     x += d.w + 4;
-    return out;
-  }).join('');
+  }
+  // Gentle hills behind the houses: a smooth wave that repeats across the whole width.
+  const hills = `M0 112 Q 200 72 400 104${Array.from({ length: WIDTH / 400 - 1 }, (_, i) => ` T ${800 + i * 400} 104`).join('')} L${WIDTH} 300 L0 300 Z`;
   return `
-    <svg class="street" viewBox="0 0 1600 300" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false">
-      <path d="M0 120 C 260 70, 560 74, 820 104 C 1080 134, 1320 96, 1600 84 L1600 300 L0 300 Z" fill="var(--hill-far)"/>
-      ${houses}
-      <rect x="0" y="${BASE}" width="1600" height="10" fill="var(--paper)"/>
-      <rect x="0" y="${BASE + 10}" width="1600" height="${300 - BASE - 10}" fill="var(--street)"/>
+    <svg class="street" viewBox="0 0 ${WIDTH} 300" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false">
+      <path d="${hills}" fill="var(--hill-far)"/>
+      ${houses.join('')}
+      <rect x="0" y="${BASE}" width="${WIDTH}" height="10" fill="var(--paper)"/>
+      <rect x="0" y="${BASE + 10}" width="${WIDTH}" height="${300 - BASE - 10}" fill="var(--street)"/>
     </svg>`;
 }
 
