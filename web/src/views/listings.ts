@@ -3,7 +3,7 @@ import { api, ApiError, type Listing, type ListingPhoto, type ListingShelter, ty
 import { ageMonths, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { t, type Key } from '../i18n';
-import { placePet } from '../store';
+import { petChanged, placePet } from '../store';
 import { age, canvas, miniFrame } from '../ui/canvas';
 import { PhotoError, preparePhoto, toBase64, type PreparedPhoto } from '../ui/photos';
 import { toast } from '../ui/toast';
@@ -477,6 +477,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
       arranged = false;
       progress.textContent = '';
       const status = !fresh || publish ? (await api.savePet(petId, body, publish)).status : 'draft';
+      petChanged(petId);
       toast(t(publish ? 'listing.published' : status === 'draft' ? 'listing.savedDraft' : 'listing.saved', { name: body.name }));
       location.hash = list.slice(1);
     } catch (err) {

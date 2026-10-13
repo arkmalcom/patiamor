@@ -166,12 +166,24 @@ export function cachePets(pets: PetSummary[]) {
 
 let petsRequest = 0;
 /** Loads the pets within reach of the chosen area; nearby areas share one cached list at the edge. */
-export async function loadPets() {
+/** Pets changed in this session (a shelter just saved one): their next profile read skips the browser's cache. */
+const changed = new Set<string>();
+/** Whether this pet's profile must be read fresh; asking clears it. */
+export const takeChanged = (id: string) => changed.delete(id);
+
+/** A shelter saved this pet: forget the copies held here and reload the list, so Explorar and the profile show the change. */
+export function petChanged(id: string) {
+  petCache.delete(id);
+  changed.add(id);
+  void loadPets(true);
+}
+
+export async function loadPets(fresh = false) {
   if (!state.location) return;
   const id = ++petsRequest;
   update((s) => (s.petsStatus = 'loading'));
   try {
-    const pets = await api.pets(state.location);
+    const pets = await api.pets(state.location, fresh);
     if (id !== petsRequest) return; // a newer location won the race
     cachePets(pets);
     update((s) => ((s.pets = pets), (s.petsStatus = 'ready')));

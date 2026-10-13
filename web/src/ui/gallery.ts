@@ -3,7 +3,7 @@ import { api } from '../api';
 import type { PetSummary } from '../data';
 import { html, icon, reducedMotion, type Raw } from '../dom';
 import { t } from '../i18n';
-import { cachePets, petCache } from '../store';
+import { cachePets, petCache, takeChanged } from '../store';
 
 // Going through a pet's photos, on the Explorar card and the profile: tap the left or right side of the
 // photo (or its arrows), with pips showing which photo and how many. The list only says how many there
@@ -24,7 +24,7 @@ export function photosOf(pet: PetSummary): Promise<Photo[]> {
   let p = pending.get(pet.id);
   if (!p) {
     p = api
-      .pet(pet.id)
+      .pet(pet.id, takeChanged(pet.id))
       .then((detail) => {
         cachePets(detail.siblings);
         petCache.set(pet.id, detail);

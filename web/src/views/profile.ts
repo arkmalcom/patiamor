@@ -3,7 +3,7 @@ import { api, ApiError } from '../api';
 import { companionKey, CONTACT_EMAIL, frameFor, type Companion, type PetDetail, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, reducedMotion, type Raw } from '../dom';
 import { formatDate, t, away } from '../i18n';
-import { activeRequestFor, cachePets, petCache, placePet, state, update } from '../store';
+import { activeRequestFor, cachePets, petCache, placePet, state, takeChanged, update } from '../store';
 import { alertButton, bindAlerts, cautions, listerName, startRequest } from '../ui/request';
 import { age, canvas, companionLabel, photo } from '../ui/canvas';
 import { bindGallery } from '../ui/gallery';
@@ -29,7 +29,7 @@ function fetchDetail(id: string) {
   if (loading.has(id)) return;
   loading.add(id);
   api
-    .pet(id)
+    .pet(id, takeChanged(id))
     .then((pet) => {
       cachePets(pet.siblings);
       petCache.set(id, pet);
