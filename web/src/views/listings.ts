@@ -151,6 +151,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${existing ? existing.name : t('listing.newTitle')}</h1>
         ${existing ? html`<p class="listing-status">${petChip(existing.status)}${existing.status === 'available' ? html`<a class="text-button" href="#/mascota/${encodeURIComponent(existing.id)}">${t('listing.viewLive')}</a>` : ''}</p>` : ''}
         <form class="portal-form listing-form" id="pet-form" novalidate>
+          <div class="listing-form__layout">
           <div class="listing-form__fields">
             <fieldset class="form-section">
               <legend class="section-title">${t('listing.photos')}</legend>
@@ -240,6 +241,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
             <h2 class="form-subsection__title" id="preview-title">${t('listing.preview')}</h2>
             <div class="listing-preview__card" data-preview aria-hidden="true"></div>
           </aside>
+          </div>
 
           <div class="listing-form__actions">
             ${draft && !canPublish ? html`<p class="muted">${t('listing.publishLater')}</p>` : ''}
@@ -248,8 +250,8 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
             <div class="listing-form__buttons">
               ${draft
                 ? html`
-                    ${canPublish ? html`<button class="button button--primary" type="submit" value="publish" data-send>${t('listing.publish')}</button>` : ''}
-                    <button class="button ${canPublish ? 'button--outline' : 'button--primary'}" type="submit" value="draft" data-send>${t('listing.saveDraft')}</button>`
+                    <button class="button ${canPublish ? 'button--outline' : 'button--primary'}" type="submit" value="draft" data-send>${t('listing.saveDraft')}</button>
+                    ${canPublish ? html`<button class="button button--primary" type="submit" value="publish" data-send>${t('listing.publish')}</button>` : ''}`
                 : html`<button class="button button--primary" type="submit" value="save" data-send>${t('listing.save')}</button>`}
             </div>
           </div>

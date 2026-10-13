@@ -43,13 +43,13 @@ function renderRequestSent(o: { pet: string; lister: string; listUrl: string }):
     '',
     `Revisarán tus respuestas y, si es buena opción, te escribirán por WhatsApp o correo para coordinar una visita. Suele tomar unos días.`,
     '',
-    `Puedes ver cómo va, o retirar la solicitud, en Mi lista: ${o.listUrl}`,
+    `Puedes ver cómo va, o retirar la solicitud, en mi lista: ${o.listUrl}`,
   ].join('\n');
   const html = shell(`
       <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">Tu solicitud para conocer a ${escape(o.pet)} fue enviada a ${escape(o.lister)}.</td></tr>
       <tr><td style="padding:8px 28px;font-size:16px;line-height:1.5">Revisarán tus respuestas y, si es buena opción, te escribirán por WhatsApp o correo para coordinar una visita. Suele tomar unos días.</td></tr>
-      <tr><td style="padding:16px 28px 24px">${button(o.listUrl, 'Ver Mi lista')}</td></tr>
-      <tr><td style="padding:0 28px 28px;font-size:13px;line-height:1.5;color:#4a5275">Puedes retirar la solicitud cuando quieras desde Mi lista.</td></tr>`);
+      <tr><td style="padding:16px 28px 24px">${button(o.listUrl, 'Ver mi lista')}</td></tr>
+      <tr><td style="padding:0 28px 28px;font-size:13px;line-height:1.5;color:#4a5275">Puedes retirar la solicitud cuando quieras desde mi lista.</td></tr>`);
   return { subject, text, html };
 }
 

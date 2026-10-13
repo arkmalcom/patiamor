@@ -3,6 +3,7 @@ import { $, html, icon, mount, reducedMotion, type Raw } from '../dom';
 import { animals, away, t } from '../i18n';
 import { activeFilterCount, emptyFilters, loadPets, nextRadius, queue, state, update } from '../store';
 import { canvas } from '../ui/canvas';
+import { bindGallery } from '../ui/gallery';
 import { bindSpeciesSwitch, speciesSwitch } from '../ui/species';
 import { toast } from '../ui/toast';
 
@@ -81,7 +82,7 @@ export function renderDeck(root: HTMLElement, deps: DeckDeps) {
           <article class="card card--top" tabindex="0" data-card
             aria-label="${top.pet.name}, ${away(top.km)}"
             aria-describedby="deck-keys">
-            ${canvas(top, { photoName: 'pet-photo' })}
+            ${canvas(top, { photoName: 'pet-photo', gallery: 'card' })}
             ${stamps()}
           </article>
         </div>
@@ -96,6 +97,8 @@ export function renderDeck(root: HTMLElement, deps: DeckDeps) {
 
   bindSpeciesSwitch(root);
   const card = $('[data-card]', root);
+  const gallery = bindGallery(card, top.pet, 'card');
+  const picture = $('.canvas__picture', card);
   const skipStamp = $('.stamp--skip', card);
   const saveStamp = $('.stamp--save', card);
 
@@ -145,7 +148,13 @@ export function renderDeck(root: HTMLElement, deps: DeckDeps) {
     if (card.hasPointerCapture(id)) card.releasePointerCapture(id);
     card.classList.remove('is-dragging');
     if (kind === 'cancel') return springBack(dx, dy * 0.2);
-    if (!dragging) return deps.openProfile(top.pet.id);
+    if (!dragging) {
+      // A tap on the photo's left or right third goes through the photos; anywhere else opens the profile.
+      const r = picture.getBoundingClientRect();
+      const x = (startX - r.left) / r.width;
+      if (gallery && startY >= r.top && startY <= r.bottom && (x < 0.33 || x > 0.67)) return gallery.step(x < 0.33 ? -1 : 1);
+      return deps.openProfile(top.pet.id);
+    }
     if (dx < -THRESHOLD) return skip(dx);
     springBack(dx, dy * 0.2);
     if (dx > THRESHOLD) save();

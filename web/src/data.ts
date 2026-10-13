@@ -45,7 +45,8 @@ export interface PetSummary {
   place: Place;
   lister: Lister;
   /** `thumb` (about 480 px) is for small frames; sample photos have none. */
-  photo: { url: string | null; thumb?: string | null; focus: string };
+  /** `count`: how many photos the pet has (the others arrive with the profile). */
+  photo: { url: string | null; thumb?: string | null; focus: string; count?: number };
   km?: number;
 }
 

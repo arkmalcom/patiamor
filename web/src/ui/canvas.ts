@@ -2,6 +2,7 @@ import { Baby, Cat, Check, CircleHelp, Dog, House, MapPin, PawPrint, User, X, ty
 import { ageMonths, companionKey, frameFor, type Companion, type PetSummary } from '../data';
 import { html, icon, type Raw } from '../dom';
 import { formatAge, t, away } from '../i18n';
+import { galleryControls } from './gallery';
 import type { Placed } from '../store';
 
 export function age(pet: PetSummary): string {
@@ -42,6 +43,8 @@ interface CanvasOpts {
   heading?: 'h1' | 'h2';
   loading?: 'eager' | 'lazy';
   photoName?: string;
+  /** Pips and arrows for going through the photos (bind with bindGallery after mounting). */
+  gallery?: 'card' | 'profile';
 }
 
 /** "Otros perros" on a dog's card, "Perros" on a cat's (and the reverse for cats). */
@@ -71,7 +74,7 @@ export function compat(pet: PetSummary): Raw {
 
 /** A pet's portrait: an arched, hand-painted frame (echoing the street's arched doors), the name on a
  *  painted sign nailed across it, and convivencia badges at the photo's corner. */
-export function canvas(p: Placed, { heading = 'h2', loading = 'eager', photoName }: CanvasOpts = {}): Raw {
+export function canvas(p: Placed, { heading = 'h2', loading = 'eager', photoName, gallery }: CanvasOpts = {}): Raw {
   const { pet } = p;
   const name = heading === 'h1' ? html`<h1 class="canvas__name" id="pet-name" tabindex="-1">${pet.name}</h1>` : html`<h2 class="canvas__name">${pet.name}</h2>`;
   return html`
@@ -80,6 +83,7 @@ export function canvas(p: Placed, { heading = 'h2', loading = 'eager', photoName
         <div class="canvas__frame">
           <div class="canvas__photo">
             <div class="canvas__picture"${photoName ? html` style="view-transition-name:${photoName}"` : ''}>${photo(pet, loading)}</div>
+            ${gallery ? galleryControls(pet, gallery) : ''}
             ${compat(pet)}
           </div>
           <div class="canvas__band rotulo">

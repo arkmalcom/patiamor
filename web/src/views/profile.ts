@@ -6,6 +6,7 @@ import { formatDate, t, away } from '../i18n';
 import { activeRequestFor, cachePets, petCache, placePet, state, update } from '../store';
 import { alertButton, bindAlerts, cautions, listerName, startRequest } from '../ui/request';
 import { age, canvas, companionLabel, photo } from '../ui/canvas';
+import { bindGallery } from '../ui/gallery';
 import { toast } from '../ui/toast';
 
 interface ProfileDeps {
@@ -182,7 +183,7 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
       <article class="profile" aria-labelledby="pet-name">
         <div class="profile__media">
           <button class="icon-button icon-button--float profile__back" type="button" data-back aria-label="${t('profile.back')}">${icon(ArrowLeft, 22)}</button>
-          ${canvas(p, { heading: 'h1', photoName: 'pet-photo' })}
+          ${canvas(p, { heading: 'h1', photoName: 'pet-photo', gallery: 'profile' })}
         </div>
         <div class="profile__body">
           ${isDetail(pet) ? body(pet, p.km) : html`<p class="loading-note" role="status">${t('profile.loading')}</p>`}
@@ -192,6 +193,7 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
   );
 
   $('[data-back]', root).addEventListener('click', deps.back);
+  bindGallery($('.profile__media', root), pet, 'profile');
   root.querySelector('[data-to-ready]')?.addEventListener('click', () => {
     const end = root.querySelector<HTMLElement>('#ready');
     end?.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'center' });
