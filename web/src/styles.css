@@ -529,6 +529,8 @@ html[data-route='deck'] .view { min-height: 0; }
 .species__opt:has(input:focus-visible) { outline: 3px solid var(--anil); outline-offset: 2px; }
 .species__opt .icon { flex: none; }
 .species__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Narrow desktops squeeze the deck between both side panels: drop the icons before the words. */
+@media (min-width: 1100px) and (max-width: 1279px) { .deck .species__opt .icon { display: none; } }
 .species__count {
   flex: none;
   min-width: 22px; padding: 1px 6px;
@@ -867,22 +869,29 @@ html.sheet-open { overflow: hidden; }
   font-size: 0.75rem; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
   color: var(--ink-2);
 }
-.chip-group__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Each group is one row of equal chips, lined up in columns. Selecting one never changes the layout:
+   the check is a badge on the chip's corner, not extra width inside it. */
+.chip-group__chips { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
 .chip {
-  display: inline-flex; align-items: center; gap: 6px;
-  min-height: 42px; padding: 0 16px;
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  min-width: 0; min-height: 42px; padding: 0 6px;
   border-radius: 999px;
   border: 1.5px solid var(--rule-strong);
   background: var(--paper);
-  font-weight: 700; font-size: 0.95rem;
+  font-weight: 700; font-size: 0.9rem; line-height: 1.15; text-align: center;
   cursor: pointer;
   transition: background-color 140ms, color 140ms, border-color 140ms, transform 160ms var(--ease-out);
 }
 .chip:hover { border-color: var(--ink); }
 .chip:active { transform: scale(0.96); }
 .chip__check { display: none; }
-.chip[aria-pressed='true'] { background: var(--ink); color: #fff; border-color: var(--ink); padding-left: 12px; }
-.chip[aria-pressed='true'] .chip__check { display: inline; }
+.chip[aria-pressed='true'] { background: var(--ink); color: #fff; border-color: var(--ink); }
+.chip[aria-pressed='true'] .chip__check {
+  display: block; position: absolute; top: -7px; right: 8px; /* inside the chip's width, so a scrolling sheet never clips it */
+  width: 18px; height: 18px; padding: 2px; border-radius: 50%;
+  background: var(--mango); color: var(--ink); box-shadow: 0 0 0 2px var(--paper);
+}
 
 /* ---------- Reflection / save flow ---------- */
 
@@ -1521,7 +1530,7 @@ html[data-route='profile'] .toast-region { bottom: calc(96px + env(safe-area-ins
 @media (min-width: 1100px) {
   #app {
     height: 100dvh;
-    grid-template-columns: 360px minmax(0, 1fr) 340px;
+    grid-template-columns: 380px minmax(0, 1fr) 340px;
     grid-template-rows: auto minmax(0, 1fr);
   }
   .topbar { grid-column: 1 / -1; padding: 14px 28px; }
@@ -1541,7 +1550,7 @@ html[data-route='profile'] .toast-region { bottom: calc(96px + env(safe-area-ins
   html[data-route='deck'] .side {
     display: grid; align-content: start; gap: 12px;
     margin: 4px 0 24px;
-    padding: 22px;
+    padding: 22px 20px;
     background: var(--paper);
     border-radius: 16px;
     box-shadow: var(--shadow-soft);
