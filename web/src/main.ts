@@ -24,7 +24,7 @@ type Route = { name: 'deck' } | { name: 'profile'; id: string } | { name: 'list'
 
 function parse(hash: string): Route {
   const [path, query = ''] = hash.replace(/^#/, '').split('?');
-  const [, a, b, c] = path.split('/');
+  const [, a, b, c, d] = path.split('/');
   if (a === 'mascota' && b) return { name: 'profile', id: decodeURIComponent(b) };
   // The shelter portal: #/refugio, #/refugio/registro, #/refugio/<id>/editar, #/refugio/admin?estado=…
   if (a === 'refugio') {
@@ -34,6 +34,9 @@ function parse(hash: string): Route {
       return { name: 'portal', view: 'admin', status: (['pending', 'verified', 'rejected', 'suspended'] as const).find((s) => s === estado) ?? 'pending' };
     }
     if (b && c === 'editar') return { name: 'portal', view: 'editar', id: decodeURIComponent(b) };
+    // A shelter's animals: #/refugio/<id>/animales, …/animales/nuevo, …/animales/<petId>
+    if (b && c === 'animales')
+      return d ? { name: 'portal', view: 'animal', id: decodeURIComponent(b), petId: d === 'nuevo' ? null : decodeURIComponent(d) } : { name: 'portal', view: 'animales', id: decodeURIComponent(b) };
     return { name: 'portal', view: 'home' };
   }
   if (a === 'lista') return { name: 'list' };

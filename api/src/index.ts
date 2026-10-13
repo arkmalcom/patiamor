@@ -7,6 +7,7 @@ import { pets, readPoint } from './pets';
 import type { AppContext, Env } from './env';
 import { inDR, nearestPlace, PLACES_ATTRIBUTION, placeById, searchPlaces } from './places';
 import { admin } from './admin';
+import { listings } from './listings';
 import { portal } from './portal';
 import { alerts, requests, requestsRestricted } from './requests';
 
@@ -49,6 +50,7 @@ app.route('/api/pets', pets);
 app.route('/api/requests', requests);
 app.route('/api/alerts', alerts);
 app.route('/api/portal', portal);
+app.route('/api/portal', listings);
 app.route('/api/admin', admin);
 
 // ---------- Places (in-memory; no D1 reads) ----------

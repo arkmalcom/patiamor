@@ -5,12 +5,19 @@ import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, t, type Key } from '../i18n';
 import { state } from '../store';
 import { renderAuth } from '../ui/auth';
+import { renderListingForm, renderListings } from './listings';
 import { toast } from '../ui/toast';
 
 // The shelter portal (#/refugio): register a shelter, follow its verification, and (for admins) work the
-// verification queue. Publishing animals arrives with the listing form (PAT-8).
+// verification queue. A shelter's animals live in listings.ts (PAT-8).
 
-export type PortalView = { view: 'home' } | { view: 'registro' } | { view: 'editar'; id: string } | { view: 'admin'; status: ShelterStatus };
+export type PortalView =
+  | { view: 'home' }
+  | { view: 'registro' }
+  | { view: 'editar'; id: string }
+  | { view: 'admin'; status: ShelterStatus }
+  | { view: 'animales'; id: string }
+  | { view: 'animal'; id: string; petId: string | null };
 
 const STATUS_ICON: Record<ShelterStatus, typeof Clock> = { pending: Clock, verified: BadgeCheck, rejected: CircleAlert, suspended: ShieldOff };
 
@@ -30,6 +37,8 @@ export function renderPortal(root: HTMLElement, route: PortalView) {
   if (route.view === 'registro') return form(root, null);
   if (route.view === 'editar') return void edit(root, route.id);
   if (route.view === 'admin') return void adminQueue(root, route.status);
+  if (route.view === 'animales') return void renderListings(root, route.id);
+  if (route.view === 'animal') return void renderListingForm(root, route.id, route.petId);
   void home(root);
 }
 
@@ -78,18 +87,22 @@ async function home(root: HTMLElement) {
         ${shelters.length
           ? html`<ul class="portal-list">${shelters.map(shelterCard)}</ul>`
           : html`<p class="portal__lede">${t('portal.lede')}</p>${steps()}`}
-        ${owned < 3 ? html`<a class="button button--primary portal__new" href="#/refugio/registro">${icon(Plus, 20)}${t('portal.register')}</a>` : ''}
+        ${owned < 3 ? html`<a class="button ${shelters.length ? 'button--outline' : 'button--primary'} portal__new" href="#/refugio/registro">${icon(Plus, 20)}${t('portal.register')}</a>` : ''}
       </section>`,
   );
 }
 
 function shelterCard(s: PortalShelter): Raw {
+  const animals = `#/refugio/${encodeURIComponent(s.id)}/animales`;
   const next: Record<ShelterStatus, Raw> = {
-    pending: html`<p>${t('portal.pendingBody')}</p>`,
-    verified: html`<p>${t('portal.verifiedBody')}</p>`,
+    pending: html`<p>${t('portal.pendingBody')}</p><a class="button button--outline button--small" href="${animals}">${t('listing.prepare')}</a>`,
+    verified: html`<p>${t('portal.verifiedBody')}</p><a class="button button--primary button--small" href="${animals}">${t('listing.open')}</a>`,
     rejected: html`
       <p class="portal-card__reason"><strong>${t('portal.reason')}:</strong> ${s.statusReason ?? ''}</p>
-      ${s.role === 'owner' ? html`<a class="button button--outline button--small" href="#/refugio/${s.id}/editar">${t('portal.fix')}</a>` : ''}`,
+      <div class="portal-card__actions">
+        ${s.role === 'owner' ? html`<a class="button button--outline button--small" href="#/refugio/${s.id}/editar">${t('portal.fix')}</a>` : ''}
+        <a class="button button--ghost button--small" href="${animals}">${t('listing.prepare')}</a>
+      </div>`,
     suspended: html`
       <p class="portal-card__reason"><strong>${t('portal.reason')}:</strong> ${s.statusReason ?? ''}</p>
       <a class="button button--ink button--small" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(t('portal.suspendedSubject', { name: s.name }))}">${icon(Mail, 16)}${t('full.manyCta')}</a>`,

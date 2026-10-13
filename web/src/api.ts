@@ -1,5 +1,5 @@
 // Thin client for the Patiamor Worker API (same origin in every environment).
-import type { PetDetail, PetSummary, LatLng, Place } from './data';
+import type { Energy, PetDetail, PetSummary, LatLng, Place, Sex, Size, Species } from './data';
 import type { AdoptionRequest, ContactPref, MyRequest, RequestForm } from './store';
 
 export interface Me {
@@ -76,6 +76,43 @@ export interface AdminShelter extends Omit<PortalShelter, 'role'> {
   application: ShelterApplication | null;
 }
 
+export type PetStatus = 'draft' | 'in_review' | 'available' | 'reserved' | 'adopted' | 'withdrawn';
+
+/** A shelter as its listing screens need it. */
+export interface ListingShelter {
+  id: string;
+  name: string;
+  status: ShelterStatus;
+  place: Place | null;
+  role: 'owner' | 'maintainer';
+}
+
+/** A listing as the form edits it (and sends it back). */
+export interface PetForm {
+  species: Species;
+  name: string;
+  sex: Sex;
+  birthDate: string;
+  birthDateEstimated: boolean;
+  size: Size;
+  energy: Energy;
+  goodWith: { kids: boolean | null; dogs: boolean | null; cats: boolean | null };
+  health: { vaccinated: boolean; sterilized: boolean; dewormed: boolean };
+  story: string;
+  needs: string[];
+  adoptionFeeDop: number | null;
+  inCareSince: string | null;
+}
+
+export interface Listing extends PetForm {
+  id: string;
+  status: PetStatus;
+  openRequests: number;
+  updatedAt: string;
+}
+
+export type ListingSummary = PetSummary & { status: PetStatus; openRequests: number; updatedAt: string };
+
 export class ApiError extends Error {
   readonly code: string;
   readonly data: Record<string, unknown>;
@@ -126,6 +163,12 @@ export const api = {
   registerShelter: (form: ShelterForm) => call<{ shelter: { id: string; slug: string; status: ShelterStatus } }>('/api/portal/shelters', 'POST', form).then((r) => r.shelter),
   shelter: (id: string) => call<{ shelter: PortalShelter; application: ShelterApplication | null }>(`/api/portal/shelters/${encodeURIComponent(id)}`),
   resubmitShelter: (id: string, form: ShelterForm) => call<{ shelter: { id: string; status: ShelterStatus } }>(`/api/portal/shelters/${encodeURIComponent(id)}/application`, 'PUT', form),
+  shelterPets: (id: string) => call<{ shelter: ListingShelter; pets: ListingSummary[] }>(`/api/portal/shelters/${encodeURIComponent(id)}/pets`),
+  createPet: (shelterId: string, form: PetForm, publish: boolean) =>
+    call<{ pet: { id: string; status: PetStatus } }>(`/api/portal/shelters/${encodeURIComponent(shelterId)}/pets`, 'POST', { ...form, publish }).then((r) => r.pet),
+  listing: (petId: string) => call<{ shelter: ListingShelter; pet: Listing }>(`/api/portal/pets/${encodeURIComponent(petId)}`),
+  savePet: (petId: string, form: PetForm, publish: boolean) =>
+    call<{ pet: { id: string; status: PetStatus } }>(`/api/portal/pets/${encodeURIComponent(petId)}`, 'PUT', { ...form, publish }).then((r) => r.pet),
   adminShelters: (status: ShelterStatus) => call<{ shelters: AdminShelter[] }>(`/api/admin/shelters?status=${status}`).then((r) => r.shelters),
   adminDecision: (id: string, action: 'verify' | 'reject' | 'suspend', reason?: string) =>
     call<{ shelter: { id: string; status: ShelterStatus } }>(`/api/admin/shelters/${encodeURIComponent(id)}/decision`, 'POST', { action, reason }),
