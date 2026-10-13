@@ -1,8 +1,10 @@
+import * as Sentry from '@sentry/cloudflare';
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import { appOrigin, auth, publicUser } from './auth/routes';
 import { currentUser } from './auth/session';
 import { pets, readPoint } from './pets';
-import type { AppContext } from './env';
+import type { AppContext, Env } from './env';
 import { inDR, nearestPlace, PLACES_ATTRIBUTION, placeById, searchPlaces } from './places';
 import { shortlist } from './shortlist';
 
@@ -21,8 +23,17 @@ app.use('/api/*', async (c, next) => {
   await next();
 });
 
+// Private by default: anything that doesn't choose its own caching (account, Mi lista, sign-in) is
+// never stored by browsers or Cloudflare.
 app.use('/api/*', async (c, next) => {
-  c.set('user', await currentUser(c));
+  await next();
+  if (!c.res.headers.has('Cache-Control')) c.res.headers.set('Cache-Control', 'no-store');
+});
+
+// Public reads are the same for everyone, so they skip the session lookup (a D1 read per request).
+const PUBLIC_READ = /^\/api\/(pets|places|whereami|health)(\/|$)/;
+app.use('/api/*', async (c, next) => {
+  c.set('user', c.req.method === 'GET' && PUBLIC_READ.test(c.req.path) ? null : await currentUser(c));
   await next();
 });
 
@@ -90,5 +101,38 @@ app.patch('/api/me', async (c) => {
   return c.json({ user: publicUser({ ...user, name }) });
 });
 
+// Unexpected errors: reported to Sentry, answered with a plain 500 that leaks nothing.
+app.onError((err, c) => {
+  if (err instanceof HTTPException) return err.getResponse();
+  Sentry.captureException(err);
+  console.error(err);
+  return c.json({ error: 'server_error' }, 500);
+});
+
+const PRIVATE_HEADERS = ['cookie', 'authorization', 'cf-connecting-ip', 'x-forwarded-for', 'x-real-ip', 'true-client-ip'];
+
+/** Nothing personal leaves for Sentry: no cookies, bodies, query strings (OAuth codes) or IPs. */
+function scrub(event: Sentry.ErrorEvent): Sentry.ErrorEvent {
+  const req = event.request;
+  if (req) {
+    delete req.cookies;
+    delete req.data;
+    delete req.query_string;
+    if (req.url) req.url = req.url.split('?')[0];
+    if (req.headers) for (const h of Object.keys(req.headers)) if (PRIVATE_HEADERS.includes(h.toLowerCase())) delete req.headers[h];
+  }
+  delete event.user;
+  return event;
+}
+
 // Requests outside /api/* are served from static assets (web/dist) before the Worker runs.
-export default app;
+export default Sentry.withSentry<Env>(
+  (env) => ({
+    dsn: env.SENTRY_DSN, // unset (local dev): the SDK stays off
+    environment: env.ENVIRONMENT,
+    sendDefaultPii: false,
+    tracesSampleRate: 0, // errors only, to stay within the free plan's quota
+    beforeSend: scrub,
+  }),
+  app,
+);

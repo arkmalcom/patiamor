@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { summary, VISIBLE, type SummaryRow } from './pets';
+import { PET_JOINS, SUMMARY_COLUMNS, summary, VISIBLE, type SummaryRow } from './pets';
 import type { AppContext } from './env';
 
 // "Mi lista": three deliberate slots per account. The database trigger enforces the limit.
@@ -18,14 +18,8 @@ shortlist.get('/', async (c) => {
   const user = c.get('user')!;
   // Saved pets stay listed even if they're later adopted or withdrawn; `status` tells the UI.
   const { results } = await c.env.DB.prepare(
-    `SELECT d.id, d.species, d.name, d.sex, d.birth_date, d.birth_date_estimated, d.size, d.energy,
-            d.good_with_kids, d.good_with_dogs, d.good_with_cats, d.vaccinated, d.sterilized, d.dewormed, d.litter_id, d.status,
-            p.id AS place_id, p.name AS place_name, p.municipality, p.province, p.lat, p.lng,
-            s.id AS shelter_id, s.name AS shelter_name,
-            (SELECT r2_key FROM pet_photos ph WHERE ph.pet_id = d.id ORDER BY ph.position LIMIT 1) AS photo_key,
-            (SELECT focus FROM pet_photos ph WHERE ph.pet_id = d.id ORDER BY ph.position LIMIT 1) AS photo_focus,
-            sl.answer_space, sl.answer_time, sl.answer_cost, sl.saved_at
-       FROM shortlist sl JOIN pets d ON d.id = sl.pet_id JOIN places p ON p.id = d.place_id LEFT JOIN shelters s ON s.id = d.shelter_id
+    `SELECT ${SUMMARY_COLUMNS}, sl.answer_space, sl.answer_time, sl.answer_cost, sl.saved_at
+       FROM shortlist sl JOIN pets d ON d.id = sl.pet_id ${PET_JOINS}
       WHERE sl.user_id = ? ORDER BY sl.saved_at`,
   )
     .bind(user.id)

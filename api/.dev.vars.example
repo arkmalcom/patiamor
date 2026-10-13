@@ -7,3 +7,5 @@ RESEND_API_KEY=
 # From Google Cloud Console → APIs & Services → Credentials (OAuth client, type "Web application").
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+# Sentry DSN for the Worker. Leave empty locally so development errors aren't reported.
+SENTRY_DSN=

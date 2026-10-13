@@ -120,7 +120,8 @@ export let placedById = new Map<string, Placed>();
 export const petCache = new Map<string, PetSummary | PetDetail>();
 
 function recompute() {
-  placed = state.pets.map(place);
+  // The list reaches a little past the furthest radius (it's shared by a whole area); trim to it.
+  placed = state.pets.map(place).filter((p) => p.km <= RADIUS_MAX);
   placedById = new Map(placed.map((p) => [p.pet.id, p]));
 }
 
@@ -133,6 +134,7 @@ export function cachePets(pets: PetSummary[]) {
 }
 
 let petsRequest = 0;
+/** Loads the pets within reach of the chosen area; nearby areas share one cached list at the edge. */
 export async function loadPets() {
   if (!state.location) return;
   const id = ++petsRequest;

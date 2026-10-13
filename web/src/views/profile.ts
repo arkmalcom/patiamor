@@ -3,7 +3,7 @@ import { api, ApiError } from '../api';
 import { companionKey, frameFor, type Companion, type PetDetail, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, t, away } from '../i18n';
-import { cachePets, petCache, isSaved, placePet, state, update } from '../store';
+import { cachePets, petCache, isSaved, placePet, update } from '../store';
 import { age, canvas, companionLabel, photo } from '../ui/canvas';
 import { removeFromList, startSave } from '../ui/save';
 import { toast } from '../ui/toast';
@@ -28,7 +28,7 @@ function fetchDetail(id: string) {
   if (loading.has(id)) return;
   loading.add(id);
   api
-    .pet(id, state.location)
+    .pet(id)
     .then((pet) => {
       cachePets(pet.siblings);
       petCache.set(id, pet);

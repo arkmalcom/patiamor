@@ -41,10 +41,11 @@ export const api = {
   logout: () => call<{ ok: true }>('/api/auth/logout', 'POST', {}),
   googleUrl: (next: string) => `/api/auth/google/start?next=${encodeURIComponent(next)}`,
 
-  // Coordinates are rounded to ~1 km before they leave the device.
+  // Coordinates are rounded to ~1 km before they leave the device. The server snaps them to a ~55 km
+  // square and everyone in that square shares one cached list; the phone works out exact distances.
   pets: (from: LatLng) => call<{ pets: PetSummary[] }>(`/api/pets?${point(from)}`).then((r) => r.pets),
-  pet: (id: string, from?: LatLng | null) =>
-    call<{ pet: PetDetail }>(`/api/pets/${encodeURIComponent(id)}${from ? `?${point(from)}` : ''}`).then((r) => r.pet),
+  // Profiles are the same for everyone (and cached at Cloudflare's edge); the phone adds the distance.
+  pet: (id: string) => call<{ pet: PetDetail }>(`/api/pets/${encodeURIComponent(id)}`).then((r) => r.pet),
   searchPlaces: (q: string) => call<{ places: Place[] }>(`/api/places?q=${encodeURIComponent(q)}`).then((r) => r.places),
   nearestPlace: (at: LatLng) => call<{ place: Place }>(`/api/places/nearest?${point(at)}`).then((r) => r.place),
   whereami: () => call<{ place: Place; source: 'ip' | 'default' }>('/api/whereami'),
