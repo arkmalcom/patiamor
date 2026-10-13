@@ -111,6 +111,8 @@ A manual `CF_APPROVED=1 cf deploy` is only for emergencies, and only with an exp
 
 **Logs**: `cf tail --env staging --format pretty` streams live requests. Production tail is read-only, so it's allowed.
 
+**Tests** (free, local): `npm test` in `api/` runs the Vitest suite inside the Workers runtime (`@cloudflare/vitest-plugin`) against a local D1 with every migration applied (`vitest.config.ts`, `test/setup.ts`). Helpers in `test/helpers.ts` sign users in with a real session row and call the Worker like the app does. CI runs them on every pull request. Write a test for every permission rule: who can read or change what is where bugs cost the most.
+
 ## When you're unsure
 
 Wrangler and Cloudflare change quickly, and your memory of flags may be stale. Check before guessing:

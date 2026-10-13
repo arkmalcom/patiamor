@@ -6,6 +6,8 @@ import { currentUser } from './auth/session';
 import { pets, readPoint } from './pets';
 import type { AppContext, Env } from './env';
 import { inDR, nearestPlace, PLACES_ATTRIBUTION, placeById, searchPlaces } from './places';
+import { admin } from './admin';
+import { portal } from './portal';
 import { alerts, requests, requestsRestricted } from './requests';
 
 export type { Env } from './env';
@@ -46,6 +48,8 @@ app.route('/api/auth', auth);
 app.route('/api/pets', pets);
 app.route('/api/requests', requests);
 app.route('/api/alerts', alerts);
+app.route('/api/portal', portal);
+app.route('/api/admin', admin);
 
 // ---------- Places (in-memory; no D1 reads) ----------
 
@@ -83,10 +87,10 @@ app.get('/api/me', async (c) => {
   const user = c.get('user');
   if (!user) return c.json({ user: null });
   const { results: shelters } = await c.env.DB.prepare(
-    `SELECT s.id, s.name, m.role FROM shelter_members m JOIN shelters s ON s.id = m.shelter_id WHERE m.user_id = ? ORDER BY s.name`,
+    `SELECT s.id, s.name, s.status, m.role FROM shelter_members m JOIN shelters s ON s.id = m.shelter_id WHERE m.user_id = ? ORDER BY s.name`,
   )
     .bind(user.id)
-    .all<{ id: string; name: string; role: 'owner' | 'maintainer' }>();
+    .all<{ id: string; name: string; status: string; role: 'owner' | 'maintainer' }>();
   const contact = await c.env.DB.prepare('SELECT phone, contact_pref FROM users WHERE id = ?').bind(user.id).first<{ phone: string | null; contact_pref: string | null }>();
   const restricted = await requestsRestricted(c.env.DB, user.id);
   return c.json({ user: { ...publicUser(user), phone: contact?.phone ?? null, contactPref: contact?.contact_pref ?? null, requestsRestricted: restricted, shelters } });

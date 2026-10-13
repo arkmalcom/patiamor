@@ -11,7 +11,63 @@ export interface Me {
   /** New requests paused after several withdrawals, until Patiamor clears the account. */
   requestsRestricted?: boolean;
   isAdmin: boolean;
-  shelters?: { id: string; name: string; role: 'owner' | 'maintainer' }[];
+  shelters?: { id: string; name: string; status?: ShelterStatus; role: 'owner' | 'maintainer' }[];
+}
+
+export type ShelterStatus = 'pending' | 'verified' | 'rejected' | 'suspended';
+export type ReferenceKind = 'veterinaria' | 'refugio' | 'otro';
+
+/** A shelter as its members see it in the portal. */
+export interface PortalShelter {
+  id: string;
+  name: string;
+  slug: string;
+  status: ShelterStatus;
+  statusReason: string | null;
+  place: Place | null;
+  role: 'owner' | 'maintainer';
+  submittedAt?: string | null;
+  description?: string | null;
+  publicPhone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  visitHours?: string | null;
+}
+
+/** What Patiamor needs to verify a shelter. Private: never shown to adopters. */
+export interface ShelterApplication {
+  contactName: string;
+  contactPhone: string;
+  rnc: string | null;
+  address: string;
+  social: string[];
+  history: string;
+  reference: { name: string; contact: string; kind: ReferenceKind };
+  submittedAt?: string;
+}
+
+/** The registration form's body: the public profile, the private application, and the rules. */
+export interface ShelterForm {
+  name: string;
+  placeId: string;
+  description: string;
+  visitHours: string;
+  publicPhone: string;
+  email: string;
+  website: string;
+  contactName: string;
+  contactPhone: string;
+  rnc: string;
+  address: string;
+  social: string[];
+  history: string;
+  reference: { name: string; contact: string; kind: ReferenceKind | '' };
+  rules: boolean;
+}
+
+export interface AdminShelter extends Omit<PortalShelter, 'role'> {
+  owners: string | null;
+  application: ShelterApplication | null;
 }
 
 export class ApiError extends Error {
@@ -58,6 +114,15 @@ export const api = {
   withdrawRequest: (id: string, reason: string) => call<{ ok: true }>(`/api/requests/${encodeURIComponent(id)}/withdraw`, 'POST', { reason }),
   alertOn: (petId: string) => call<{ ok: true }>(`/api/alerts/${encodeURIComponent(petId)}`, 'PUT', {}),
   alertOff: (petId: string) => call<{ ok: true }>(`/api/alerts/${encodeURIComponent(petId)}`, 'DELETE', {}),
+
+  // The shelter portal and the verification queue.
+  myShelters: () => call<{ shelters: PortalShelter[] }>('/api/portal/shelters').then((r) => r.shelters),
+  registerShelter: (form: ShelterForm) => call<{ shelter: { id: string; slug: string; status: ShelterStatus } }>('/api/portal/shelters', 'POST', form).then((r) => r.shelter),
+  shelter: (id: string) => call<{ shelter: PortalShelter; application: ShelterApplication | null }>(`/api/portal/shelters/${encodeURIComponent(id)}`),
+  resubmitShelter: (id: string, form: ShelterForm) => call<{ shelter: { id: string; status: ShelterStatus } }>(`/api/portal/shelters/${encodeURIComponent(id)}/application`, 'PUT', form),
+  adminShelters: (status: ShelterStatus) => call<{ shelters: AdminShelter[] }>(`/api/admin/shelters?status=${status}`).then((r) => r.shelters),
+  adminDecision: (id: string, action: 'verify' | 'reject' | 'suspend', reason?: string) =>
+    call<{ shelter: { id: string; status: ShelterStatus } }>(`/api/admin/shelters/${encodeURIComponent(id)}/decision`, 'POST', { action, reason }),
 };
 
 function point({ lat, lng }: LatLng) {

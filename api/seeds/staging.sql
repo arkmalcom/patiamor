@@ -143,3 +143,5 @@ INSERT OR IGNORE INTO pet_photos (id, pet_id, r2_key, position, focus) VALUES
 
 -- Corrections to rows earlier seeds already inserted (INSERT OR IGNORE won't touch them).
 UPDATE pet_photos SET focus = '78% 40%' WHERE id = 'seed-photo-pinto';
+-- Shelters seeded as verified (verified_at set) get the matching status (migration 0009 added it).
+UPDATE shelters SET status = 'verified' WHERE verified_at IS NOT NULL AND status = 'pending';

@@ -17,6 +17,11 @@ const VERSION_TTL = 30_000; // ms an isolate trusts the version it read, so most
 
 let known: { v: number; at: number } | null = null;
 
+/** Drops this isolate's remembered version, so the next read sees a change made just now. */
+export function forgetCatalogVersion() {
+  known = null;
+}
+
 async function catalogVersion(db: D1Database): Promise<number> {
   if (known && Date.now() - known.at < VERSION_TTL) return known.v;
   const row = await db.prepare('SELECT v FROM catalog_version WHERE id = 1').first<{ v: number }>();

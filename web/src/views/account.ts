@@ -1,6 +1,5 @@
 import { Globe, House, LogOut } from 'lucide';
 import { api } from '../api';
-import { CONTACT_EMAIL } from '../data';
 import { html, icon, mount } from '../dom';
 import { t } from '../i18n';
 import { setUser, state } from '../store';
@@ -8,7 +7,6 @@ import { renderAuth } from '../ui/auth';
 import { toast } from '../ui/toast';
 
 export function renderAccount(root: HTMLElement) {
-  const subject = encodeURIComponent('Quiero publicar perros de mi refugio');
   const user = state.user;
   mount(
     root,
@@ -32,7 +30,10 @@ export function renderAccount(root: HTMLElement) {
           <div>
             <h2 class="account__shelter-title">${t('account.shelterTitle')}</h2>
             <p>${t('account.shelterBody')}</p>
-            <a class="button button--ink" href="mailto:${CONTACT_EMAIL}?subject=${subject}">${t('account.shelterCta')}</a>
+            ${user?.shelters?.length
+              ? html`<p class="account__shelters">${user.shelters.map((sh) => html`<span>${sh.name} · ${t(`portal.status.${(sh.status ?? 'pending') as 'pending'}`)}</span>`)}</p>`
+              : ''}
+            <a class="button button--ink" href="#/refugio">${user?.shelters?.length ? t('account.shelterPortal') : t('account.shelterCta')}</a>
           </div>
         </div>
         <p class="sample-note">${t('app.sampleNote')}</p>

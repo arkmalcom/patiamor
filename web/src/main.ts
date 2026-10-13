@@ -17,13 +17,25 @@ import { errorText } from './ui/auth';
 import { renderAccount } from './views/account';
 import { renderDeck } from './views/deck';
 import { bindSlots, renderList, slots } from './views/list';
+import { renderPortal, type PortalView } from './views/portal';
 import { renderProfile } from './views/profile';
 
-type Route = { name: 'deck' } | { name: 'profile'; id: string } | { name: 'list' } | { name: 'account' };
+type Route = { name: 'deck' } | { name: 'profile'; id: string } | { name: 'list' } | { name: 'account' } | ({ name: 'portal' } & PortalView);
 
 function parse(hash: string): Route {
-  const [, a, b] = hash.replace(/^#/, '').split('?')[0].split('/');
+  const [path, query = ''] = hash.replace(/^#/, '').split('?');
+  const [, a, b, c] = path.split('/');
   if (a === 'mascota' && b) return { name: 'profile', id: decodeURIComponent(b) };
+  // The shelter portal: #/refugio, #/refugio/registro, #/refugio/<id>/editar, #/refugio/admin?estado=…
+  if (a === 'refugio') {
+    if (b === 'registro') return { name: 'portal', view: 'registro' };
+    if (b === 'admin') {
+      const estado = new URLSearchParams(query).get('estado');
+      return { name: 'portal', view: 'admin', status: (['pending', 'verified', 'rejected', 'suspended'] as const).find((s) => s === estado) ?? 'pending' };
+    }
+    if (b && c === 'editar') return { name: 'portal', view: 'editar', id: decodeURIComponent(b) };
+    return { name: 'portal', view: 'home' };
+  }
   if (a === 'lista') return { name: 'list' };
   if (a === 'cuenta') return { name: 'account' };
   return { name: 'deck' };
@@ -97,7 +109,7 @@ function chrome(route: Route) {
   badge.textContent = String(n);
   $$('[data-pips]').forEach(mountPips);
   $$<HTMLAnchorElement>('[data-nav]').forEach((a) => {
-    const active = a.dataset.nav === route.name || (route.name === 'profile' && a.dataset.nav === 'deck');
+    const active = a.dataset.nav === route.name || (route.name === 'profile' && a.dataset.nav === 'deck') || (route.name === 'portal' && a.dataset.nav === 'account');
     if (active) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   });
@@ -117,6 +129,8 @@ function render(route = parse(location.hash)) {
       return renderList(view, { openProfile, explore });
     case 'account':
       return renderAccount(view);
+    case 'portal':
+      return renderPortal(view, route);
   }
 }
 

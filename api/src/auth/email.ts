@@ -53,6 +53,32 @@ function renderRequestSent(o: { pet: string; lister: string; listUrl: string }):
   return { subject, text, html };
 }
 
+export type ShelterDecision = 'verified' | 'rejected' | 'suspended';
+
+function renderShelterDecision(o: { shelter: string; decision: ShelterDecision; reason: string | null; portalUrl: string }): Message {
+  const copy = {
+    verified: {
+      subject: `${o.shelter} ya está verificado en Patiamor`,
+      lede: `¡Listo! Verificamos a ${o.shelter}. Ya puedes publicar a tus animales y aparecerán con el sello de refugio verificado.`,
+    },
+    rejected: {
+      subject: `Tu solicitud para ${o.shelter} necesita cambios`,
+      lede: `Revisamos la solicitud de ${o.shelter} y por ahora no pudimos verificarla. Puedes corregirla y enviarla de nuevo desde el portal.`,
+    },
+    suspended: {
+      subject: `${o.shelter} está suspendido en Patiamor`,
+      lede: `Suspendimos a ${o.shelter} y sus animales ya no se muestran. Escríbenos si crees que es un error.`,
+    },
+  }[o.decision];
+  const reason = o.reason ? `Motivo: ${o.reason}` : '';
+  const text = [copy.lede, reason, '', `Portal de refugios: ${o.portalUrl}`].filter((l, i) => l || i === 2).join('\n');
+  const html = shell(`
+      <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">${escape(copy.lede)}</td></tr>
+      ${reason ? `<tr><td style="padding:8px 28px;font-size:16px;line-height:1.5">${escape(reason)}</td></tr>` : ''}
+      <tr><td style="padding:16px 28px 28px">${button(o.portalUrl, 'Ir al portal')}</td></tr>`);
+  return { subject: copy.subject, text, html };
+}
+
 /** Resend's free tier allows 100 emails a day (and 3,000 a month) across the whole account. */
 export class EmailQuotaError extends Error {}
 
@@ -66,7 +92,7 @@ export function isQuotaError(status: number, body: string): boolean {
   }
 }
 
-export type EmailKind = 'signin' | 'request_sent';
+export type EmailKind = 'signin' | 'request_sent' | 'shelter_decision';
 
 // One budget for every email (email_log, migration 0007). Sign-in codes may use all of it; everything
 // else stops short, so a busy day of confirmations can never lock people out of signing in.
@@ -103,3 +129,6 @@ export const sendSignInEmail = (env: Env, to: string, code: string, link: string
 
 export const sendRequestSentEmail = (env: Env, to: string, o: { pet: string; lister: string; listUrl: string }) =>
   send(env, 'request_sent', to, renderRequestSent(o), `pet=${o.pet} lister=${o.lister}`);
+
+export const sendShelterDecisionEmail = (env: Env, to: string, o: { shelter: string; decision: ShelterDecision; reason: string | null; portalUrl: string }) =>
+  send(env, 'shelter_decision', to, renderShelterDecision(o), `shelter=${o.shelter} decision=${o.decision}`);

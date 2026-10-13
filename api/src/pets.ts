@@ -4,7 +4,7 @@ import type { AppContext } from './env';
 
 // Who may see a pet publicly. One definition, used by search, profiles, siblings and adoption requests:
 // available; from a verified shelter or a private lister; and at least 8 weeks old (anti puppy-mill rule).
-const PUBLIC = `(d.shelter_id IS NULL OR s.verified_at IS NOT NULL)
+const PUBLIC = `(d.shelter_id IS NULL OR s.status = 'verified')
   AND (d.birth_date IS NULL OR d.birth_date <= date('now', '-56 days'))`;
 export const VISIBLE = `d.status = 'available' AND ${PUBLIC}`;
 /** Browsing shows available pets; a profile (and saving) also works for one "en proceso" with a family. */

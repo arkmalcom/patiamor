@@ -34,6 +34,9 @@ jobs:
       - name: Type-check API
         run: npm run typecheck --prefix api
 
+      - name: Test API (Workers runtime, local D1 with every migration)
+        run: npm test --prefix api
+
       - name: Bundle the Worker for the target environment (dry run)
         working-directory: api
         run: |
