@@ -194,6 +194,9 @@ requests.post('/:id/withdraw', async (c) => {
 
 // ---------- "Avísame si vuelve a estar disponible" ----------
 
+/** "Avísame" wishes per person at a time: plenty for a family, a ceiling for a script. */
+const MAX_ALERTS = 20;
+
 export const alerts = new Hono<AppContext>();
 
 alerts.use('*', async (c, next) => {
@@ -206,6 +209,8 @@ alerts.put('/:petId', async (c) => {
   const petId = c.req.param('petId');
   const pet = await db.prepare(`SELECT 1 FROM pets d LEFT JOIN shelters s ON s.id = d.shelter_id WHERE d.id = ? AND ${VIEWABLE}`).bind(petId).first();
   if (!pet) return c.json({ error: 'not_found' }, 404);
+  const mine = await db.prepare('SELECT count(*) AS n FROM availability_alerts WHERE user_id = ?').bind(c.get('user')!.id).first<{ n: number }>();
+  if ((mine?.n ?? 0) >= MAX_ALERTS) return c.json({ error: 'too_many_alerts' }, 409);
   await db.prepare('INSERT OR IGNORE INTO availability_alerts (user_id, pet_id) VALUES (?, ?)').bind(c.get('user')!.id, petId).run();
   return c.json({ ok: true });
 });

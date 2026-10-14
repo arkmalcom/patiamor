@@ -43,6 +43,21 @@ app.use('/api/*', async (c, next) => {
   await next();
 });
 
+// Every write is rate limited: per account when signed in, per IP otherwise (sign-in, sign-up). The free
+// plan stops serving for the day when its D1 write quota is spent, so a flood must stop here, long before.
+// Slower limits (shelters per day, animals per shelter) live with each endpoint, in the database.
+app.use('/api/*', async (c, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(c.req.method) || !c.env.WRITE_LIMIT) return next();
+  const user = c.get('user');
+  const key = user ? `u:${user.id}` : `ip:${c.req.header('cf-connecting-ip') ?? 'local'}`;
+  const { success } = await c.env.WRITE_LIMIT.limit({ key });
+  if (!success) {
+    console.warn('write rate limit hit', user ? `user ${user.id}` : 'signed-out client', c.req.method, c.req.path);
+    return c.json({ error: 'rate_limited' }, 429);
+  }
+  await next();
+});
+
 app.get('/api/health', async (c) => {
   const row = await c.env.DB.prepare('SELECT 1 AS ok').first<{ ok: number }>();
   return c.json({ ok: row?.ok === 1 });

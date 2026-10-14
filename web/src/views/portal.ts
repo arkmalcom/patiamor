@@ -2,7 +2,7 @@ import { BadgeCheck, CircleAlert, Clock, House, Mail, MapPin, MessageCircle, Plu
 import { api, ApiError, type AdminShelter, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
 import { CONTACT_EMAIL, type Place } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
-import { formatDate, t, type Key } from '../i18n';
+import { formatDate, failText, t, type Key } from '../i18n';
 import { state } from '../store';
 import { renderAuth } from '../ui/auth';
 import { renderInbox } from './inbox';
@@ -325,8 +325,8 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
       location.hash = '/refugio';
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'network';
-      const known = ['invalid_more_reference', 'invalid_name', 'invalid_place', 'invalid_contact', 'invalid_phone', 'invalid_public_phone', 'invalid_email', 'invalid_address', 'history_too_short', 'invalid_reference', 'rules_required', 'too_many_shelters', 'not_editable'];
-      error.textContent = known.includes(code) ? t(`portal.err.${code as 'invalid_name'}`) : t('auth.err.network');
+      const known = ['invalid_more_reference', 'invalid_name', 'invalid_place', 'invalid_contact', 'invalid_phone', 'invalid_public_phone', 'invalid_email', 'invalid_address', 'history_too_short', 'invalid_reference', 'rules_required', 'too_many_shelters', 'not_editable', 'too_many_today', 'queue_full'];
+      error.textContent = known.includes(code) ? t(`portal.err.${code as 'invalid_name'}`) : failText(code);
       error.hidden = false;
       error.scrollIntoView({ block: 'center', behavior: 'smooth' });
       send.disabled = false;
@@ -369,8 +369,8 @@ async function adminQueue(root: HTMLElement, status: ShelterStatus) {
     try {
       const r = await api.runDigest();
       toast(t('portal.admin.digestDone', { digests: r.digestEmails, alerts: r.alertEmails }) + (r.deferred ? t('portal.admin.digestDeferred') : ''));
-    } catch {
-      toast(t('auth.err.network'));
+    } catch (err) {
+      toast(failText(err));
     }
     b.disabled = false;
   });
@@ -391,9 +391,9 @@ async function adminQueue(root: HTMLElement, status: ShelterStatus) {
         await api.adminDecision(f.dataset.decide!, action, reason || undefined);
         toast(t(`portal.admin.done.${action}`));
         void adminQueue(root, status);
-      } catch {
+      } catch (err) {
         $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = false));
-        toast(t('auth.err.network'));
+        toast(failText(err));
       }
     }),
   );

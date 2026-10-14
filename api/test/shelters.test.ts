@@ -81,7 +81,11 @@ describe('registering a shelter', () => {
 
   it('caps how many shelters one person can own', async () => {
     const u = await signIn();
-    for (let i = 0; i < 3; i++) expect((await register(u.cookie, { name: `Refugio ${i}` })).status).toBe(201);
+    // Registered over several days (two a day is its own limit, in limits.test.ts).
+    for (let i = 0; i < 3; i++) {
+      expect((await register(u.cookie, { name: `Refugio ${i}` })).status).toBe(201);
+      await env.DB.prepare("UPDATE shelter_members SET created_at = '2026-01-01T00:00:00Z' WHERE user_id = ?").bind(u.id).run();
+    }
     expect((await register(u.cookie, { name: 'Uno más' })).json.error).toBe('too_many_shelters');
   });
 

@@ -2,7 +2,7 @@ import { Mail, MessageCircle, Phone } from 'lucide';
 import { api, type CloseReason, type InboxRequest } from '../api';
 import { frameFor, type PetSummary } from '../data';
 import { $$, html, icon, mount, type Raw } from '../dom';
-import { formatDate, t, type Key } from '../i18n';
+import { formatDate, failText, t, type Key } from '../i18n';
 import { photo } from '../ui/canvas';
 import { toast } from '../ui/toast';
 
@@ -100,9 +100,9 @@ export async function renderInbox(root: HTMLElement, shelterId: string, tab: Tab
           current = TAB_OF[updated.status]; // follow the request to its tab, still open
           draw();
           root.querySelector<HTMLDetailsElement>(`details[data-request="${id}"]`)?.setAttribute('open', '');
-        } catch {
+        } catch (err) {
           b.disabled = false;
-          toast(t('auth.err.network'));
+          toast(failText(err));
         }
       }),
     );
@@ -116,8 +116,8 @@ export async function renderInbox(root: HTMLElement, shelterId: string, tab: Tab
           replace(await api.moveRequest(id, 'closed', reason));
           toast(t('inbox.done.closed'));
           draw(); // it leaves this tab for Cerradas
-        } catch {
-          toast(t('auth.err.network'));
+        } catch (err) {
+          toast(failText(err));
         }
       }),
     );

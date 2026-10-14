@@ -2,7 +2,7 @@ import { Camera, Eye, EyeOff, Handshake, HeartHandshake, PencilLine, Plus, Star,
 import { api, ApiError, type Listing, type ListingPhoto, type ListingShelter, type ListingSummary, type PetForm, type PetStatus } from '../api';
 import { ageMonths, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
-import { t, type Key } from '../i18n';
+import { failText, t, type Key } from '../i18n';
 import { petChanged, placePet } from '../store';
 import { age, canvas, miniFrame } from '../ui/canvas';
 import { PhotoError, preparePhoto, toBase64, type PreparedPhoto } from '../ui/photos';
@@ -120,7 +120,7 @@ function monthsAgo(months: number): string {
 const ERRORS = [
   'invalid_species', 'invalid_name', 'invalid_sex', 'invalid_birth_date', 'invalid_size', 'invalid_energy', 'invalid_fee',
   'invalid_in_care_since', 'shelter_not_verified', 'too_young', 'story_required', 'shelter_suspended',
-  'photo_required', 'photos_full', 'upload_limit', 'storage_full', 'image_too_large', 'invalid_image', 'duplicate_photo', 'last_photo',
+  'photo_required', 'photos_full', 'upload_limit', 'storage_full', 'image_too_large', 'invalid_image', 'duplicate_photo', 'last_photo', 'too_many_pets',
 ] as const;
 const MAX_PHOTOS = 5;
 
@@ -450,7 +450,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
     const buttons = $$<HTMLButtonElement>('[data-send]', root);
     const fail = (code: string) => {
       const known = code.startsWith('thumb_') ? 'invalid_image' : code === 'invalid_dimensions' ? 'invalid_image' : code;
-      error.textContent = (ERRORS as readonly string[]).includes(known) ? t(`listing.err.${known as (typeof ERRORS)[number]}`) : t('auth.err.network');
+      error.textContent = (ERRORS as readonly string[]).includes(known) ? t(`listing.err.${known as (typeof ERRORS)[number]}`) : failText(known);
       error.hidden = false;
       progress.textContent = '';
       error.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -513,9 +513,9 @@ function bindAvailability(root: HTMLElement, p: Listing) {
         const line = root.querySelector('[data-status-line]');
         if (line) mount(line, statusLine(p));
         toast(t(`listing.${key}${box.checked ? 'On' : 'Off'}`, { name: p.name }));
-      } catch {
+      } catch (err) {
         box.checked = !box.checked;
-        toast(t('auth.err.network'));
+        toast(failText(err));
       }
       box.disabled = false;
     }),

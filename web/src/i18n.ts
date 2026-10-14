@@ -589,6 +589,12 @@ const es = {
   'portal.admin.digestNote': 'Se envía solo cada día a las 8:00. Incluye solo lo nuevo, así que enviarlo ahora no duplica nada.',
   'portal.admin.digestDone': 'Listo: {digests} resúmenes a refugios y {alerts} avisos «Avísame».',
   'portal.admin.digestDeferred': ' El resto sale mañana: se acabó el presupuesto de correos de hoy.',
+  'err.rate_limited': 'Vas muy rápido. Espera un minuto y vuelve a intentarlo.',
+  'auth.err.rate_limited': 'Demasiados intentos seguidos. Espera un minuto y vuelve a intentarlo.',
+  'portal.err.too_many_today': 'Ya registraste refugios hoy. Si necesitas registrar otro, inténtalo mañana.',
+  'portal.err.queue_full': 'Ahora mismo tenemos muchas solicitudes por revisar. Inténtalo en unos días o escríbenos a hola@patiamor.com.',
+  'listing.err.too_many_pets': 'Llegaste al máximo de animales por refugio. Si necesitas más espacio, escríbenos a hola@patiamor.com.',
+  'alert.err.too_many': 'Ya tienes muchos avisos activos. Quita alguno para añadir otro.',
   'account.shelterPortal': 'Ir al portal de refugios',
   'nav.myAccount': 'Mi cuenta',
   'nav.signedInAs': 'Cuenta: entraste como {who}',
@@ -611,6 +617,12 @@ const es = {
 export type Key = keyof typeof es;
 
 /** Capitalises a sentence that opens with a name or phrase ("la persona que lo publicó verá…"). */
+/** The message for a failed request: "slow down" when we rate limited it, otherwise the network one. */
+export function failText(e?: unknown): string {
+  const code = typeof e === 'string' ? e : (e as { code?: string } | undefined)?.code;
+  return code === 'rate_limited' ? t('err.rate_limited') : t('auth.err.network');
+}
+
 export const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 export function t(key: Key, params: Record<string, string | number> = {}): string {

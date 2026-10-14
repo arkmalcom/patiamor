@@ -21,6 +21,9 @@ const ENERGIES = ['tranquila', 'media', 'alta'] as const;
 /** Adopters only ever see animals at least this old (the same rule as PUBLIC in pets.ts). */
 const MIN_AGE_DAYS = 56;
 const MAX_FEE_DOP = 50_000;
+/** Animals a shelter can have that aren't adopted: generous for a verified shelter, small for one still
+ *  in review (drafts only), so an unverified account can't fill the database. */
+const MAX_PETS = { verified: 300, other: 30 };
 const MIN_STORY = 20;
 
 const oneOf = <T extends readonly string[]>(list: T, v: unknown): v is T[number] => list.includes(v as T[number]);
@@ -124,6 +127,9 @@ listings.post('/shelters/:id/pets', async (c) => {
   // A new listing has no photos yet (they're added to its id), so it always starts as a draft in practice.
   const problem = publish ? publishProblem(w.shelter.status, pet, 0) : null;
   if (problem) return c.json({ error: problem }, 409);
+
+  const count = await c.env.DB.prepare("SELECT count(*) AS n FROM pets WHERE shelter_id = ? AND status != 'adopted'").bind(w.shelter.id).first<{ n: number }>();
+  if ((count?.n ?? 0) >= (w.shelter.status === 'verified' ? MAX_PETS.verified : MAX_PETS.other)) return c.json({ error: 'too_many_pets' }, 409);
 
   const id = crypto.randomUUID();
   const now = nowIso();

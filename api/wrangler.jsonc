@@ -21,6 +21,9 @@
   "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "patiamor-photos" }],
   // The morning job (digest.ts): shelters' new requests and "Avísame" alerts. 12:00 UTC = 8:00 in the DR.
   "triggers": { "crons": ["0 12 * * *"] },
+  // Writes per account (or per IP when signed out), per minute: the first guard against floods that would
+  // spend the free plan's daily D1 writes (index.ts). Counted per Cloudflare location, roughly.
+  "ratelimits": [{ "name": "WRITE_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } }],
   "env": {
     "staging": {
       // Bindings and routes are NOT inherited by environments; repeat them here.
@@ -32,6 +35,7 @@
       "vars": { "ENVIRONMENT": "staging", "APP_ORIGIN": "https://patiamor-staging.patiamor-api.workers.dev", "EMAIL_FROM": "Patiamor <hola@patiamor.com>" },
       // Bindings and triggers are repeated per environment. 12:00 UTC = 8:00 in the Dominican Republic.
       "triggers": { "crons": ["0 12 * * *"] },
+      "ratelimits": [{ "name": "WRITE_LIMIT", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } }],
       "routes": [],
       "workers_dev": true
     }

@@ -13,6 +13,10 @@ export type Role = 'owner' | 'maintainer';
 
 /** Owners can register this many shelters; enough for a real network, too few for a mill of fronts. */
 const MAX_OWNED = 3;
+/** Registrations per account per day, and how long the review queue may grow before new ones wait.
+ *  Real shelters register once; these only bite on someone scripting accounts. */
+const MAX_REGISTRATIONS_PER_DAY = 2;
+const MAX_PENDING_QUEUE = 30;
 const REFERENCE_KINDS = ['veterinaria', 'refugio', 'otro'] as const;
 const MAX_REFERENCES = 3;
 
@@ -134,6 +138,15 @@ portal.post('/shelters', async (c) => {
   const db = c.env.DB;
   const owned = await db.prepare("SELECT count(*) AS n FROM shelter_members WHERE user_id = ? AND role = 'owner'").bind(user.id).first<{ n: number }>();
   if ((owned?.n ?? 0) >= MAX_OWNED) return c.json({ error: 'too_many_shelters' }, 409);
+  const [today, queue] = await db.batch<{ n: number }>([
+    db.prepare("SELECT count(*) AS n FROM shelter_members WHERE user_id = ? AND role = 'owner' AND created_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-1 day')").bind(user.id),
+    db.prepare("SELECT count(*) AS n FROM shelters WHERE status = 'pending'"),
+  ]);
+  if ((today.results[0]?.n ?? 0) >= MAX_REGISTRATIONS_PER_DAY) return c.json({ error: 'too_many_today' }, 429);
+  if ((queue.results[0]?.n ?? 0) >= MAX_PENDING_QUEUE) {
+    console.error(`shelter review queue is full (${MAX_PENDING_QUEUE} pending): new registrations are refused until some are reviewed`);
+    return c.json({ error: 'queue_full' }, 503);
+  }
 
   // A readable, unique slug: "patitas-de-gazcue", then "patitas-de-gazcue-2", and so on.
   const base = slugify(app.name);

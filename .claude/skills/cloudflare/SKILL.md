@@ -22,6 +22,15 @@ Both exist so a slip can't take down production or lose real shelters' data.
 
 A cron trigger (`triggers.crons`, `0 12 * * *`, which is 8:00 in the DR) runs the morning job in `api/src/digest.ts` in each environment. The free plan allows 5 cron triggers per account, and we use one per environment. Test it locally with `cf dev --test-scheduled`, then open `/__scheduled`. On staging, an admin can run it from #/refugio/admin ("Enviar ahora el resumen de la mañana").
 
+Writes are rate limited by the Workers Rate Limiting binding `WRITE_LIMIT`: 30 per 60 s per account, or per IP when signed out. It works on the free plan, confirmed on staging on 2026-10-13. Namespace ids are `1001` for production and `1002` for staging; they must be unique per account. Counters are kept per machine and sync asynchronously, so it's loose. A staging test let about 330 requests through before limiting, then refused 90–96% of a sustained flood. Treat it as flood protection, not exact accounting. Exact limits live in D1:
+- shelter registrations: 2 per day per account;
+- the review queue: at most 30 pending;
+- animals per shelter: 300 if verified, 30 otherwise;
+- "Avísame" alerts: 20 per person;
+- photo and email budgets.
+
+The edge rule (PAT-30) is the layer that stops floods before they count against the request quota, and it needs patiamor.com.
+
 Pet photos live in R2, bound as `PHOTOS`. Staging uses `patiamor-photos-staging`, created 2026-10-13. Production uses `patiamor-photos`, which doesn't exist yet: creating it is a production resource, so ask first, and do it before the first production deploy. Both CI tokens have R2 read/write. Upload safeguards are documented in `api/src/photos.ts`.
 
 Work happens on feature branches, which open PRs into `main`. GitHub Actions (`.github/workflows/`) do the deploys:

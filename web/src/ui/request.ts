@@ -2,7 +2,7 @@ import { Bell, BellRing, CalendarCheck, Check, Eye, HeartHandshake, House, Mail,
 import { ApiError } from '../api';
 import { CONTACT_EMAIL, type PetDetail, type PetSummary } from '../data';
 import { $, $$, html, icon, type Raw } from '../dom';
-import { formatDate, sentence, t } from '../i18n';
+import { formatDate, sentence, failText, t } from '../i18n';
 import {
   activeRequestFor,
   activeRequests,
@@ -269,7 +269,7 @@ function openForm(pet: PetSummary) {
       if (code === 'restricted') return void openRestricted();
       if (code === 'invalid_phone' || code === 'invalid_name') showFields(); // so it can be fixed
       const known = ['invalid_phone', 'invalid_name', 'reserved', 'paused'];
-      error.textContent = known.includes(code) ? sentence(t(`request.err.${code as 'invalid_phone'}`, { name: pet.name, lister })) : t('auth.err.network');
+      error.textContent = known.includes(code) ? sentence(t(`request.err.${code as 'invalid_phone'}`, { name: pet.name, lister })) : failText(code);
       error.hidden = false;
       error.scrollIntoView({ block: 'nearest' });
       sync();
@@ -326,9 +326,9 @@ export function openWithdraw(item: MyRequest) {
       await withdrawRequest(request.id, why);
       toast(t('request.withdrawn', { name: pet.name }));
       closeSheet();
-    } catch {
+    } catch (err) {
       go.disabled = false;
-      toast(t('auth.err.network'));
+      toast(failText(err));
     }
   });
 }
@@ -379,9 +379,9 @@ export function bindAlerts(root: ParentNode) {
       try {
         await toggleAlert(id);
         toast(wasOn ? t('alert.toastOff', { name }) : t('alert.toastOn', { name }));
-      } catch {
+      } catch (err) {
         b.disabled = false;
-        toast(t('auth.err.network'));
+        toast((err as { code?: string }).code === 'too_many_alerts' ? t('alert.err.too_many') : failText(err));
       }
     }),
   );

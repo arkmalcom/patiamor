@@ -2,6 +2,8 @@ export type Env = {
   DB: D1Database;
   /** Pet photos (R2). Keys are chosen by the Worker, never by the client: pets/<petId>/<content hash>[-t].<ext>. */
   PHOTOS: R2Bucket;
+  /** Writes per account (or IP) per minute. Optional so a missing binding never takes the API down. */
+  WRITE_LIMIT?: RateLimit;
   ASSETS: Fetcher;
   /** 'production' | 'staging' | 'development'. Set in wrangler.jsonc vars; .dev.vars overrides locally. */
   ENVIRONMENT: string;
