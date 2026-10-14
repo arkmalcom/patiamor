@@ -1,9 +1,10 @@
-import { Mail, MessageCircle, Phone } from 'lucide';
+import { House, Mail, MessageCircle, Phone } from 'lucide';
 import { api, type CloseReason, type InboxRequest } from '../api';
 import { frameFor, type PetSummary } from '../data';
 import { $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, failText, t, type Key } from '../i18n';
 import { photo } from '../ui/canvas';
+import { openOutcome } from '../ui/outcome';
 import { toast } from '../ui/toast';
 
 // A shelter's requests (#/refugio/<id>/solicitudes, PAT-5). Shelters reach adopters through their own
@@ -13,6 +14,8 @@ import { toast } from '../ui/toast';
 type Tab = 'nuevas' | 'curso' | 'cerradas';
 const TAB_OF: Record<string, Tab> = { sent: 'nuevas', seen: 'curso', contacted: 'curso', visit: 'curso', adopted: 'cerradas', closed: 'cerradas', withdrawn: 'cerradas' };
 const CLOSE_REASONS: CloseReason[] = ['otra_familia', 'no_encaja', 'sin_respuesta', 'otro'];
+/** Reasons the server records when a request ends because its animal did (api/src/lifecycle.ts). */
+const AUTO_REASONS = ['adoptado', 'retirado', 'devuelto'] as const;
 const DAY = 86_400_000;
 
 /** "hoy", "ayer", "hace 3 días", then the date. */
@@ -31,7 +34,8 @@ const showPhone = (p: string) => {
   return d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : p;
 };
 
-export async function renderInbox(root: HTMLElement, shelterId: string, tab: Tab = 'nuevas') {
+export async function renderInbox(root: HTMLElement, shelterId: string, slug: string | null = null) {
+  const tab: Tab = (['nuevas', 'curso', 'cerradas'] as Tab[]).find((k) => k === slug) ?? 'nuevas';
   mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
   let requests: InboxRequest[];
   let shelterName = '';
@@ -43,6 +47,11 @@ export async function renderInbox(root: HTMLElement, shelterId: string, tab: Tab
     return mount(root, html`<section class="portal"><p class="loading-note" role="alert">${t('portal.notFound')}</p><a class="button button--outline" href="#/refugio">${t('portal.back')}</a></section>`);
   }
   let current = tab;
+  /** Shows a tab and records it in the URL (?ver=…), so a re-render stays on it. */
+  const go = (k: Tab) => {
+    current = k;
+    history.replaceState(null, '', `#/refugio/${encodeURIComponent(shelterId)}/solicitudes?ver=${k}`);
+  };
 
   const draw = () => {
     const counts = { nuevas: 0, curso: 0, cerradas: 0 };
@@ -66,7 +75,7 @@ export async function renderInbox(root: HTMLElement, shelterId: string, tab: Tab
           ${shown.length ? html`<ul class="inbox__list">${shown.map((r) => card(r, shelterName, shelterId))}</ul>` : html`<p class="passed__empty">${t(`inbox.empty.${current}`)}</p>`}
         </section>`,
     );
-    $$<HTMLButtonElement>('[data-tab]', root).forEach((b) => b.addEventListener('click', () => ((current = b.dataset.tab as Tab), draw())));
+    $$<HTMLButtonElement>('[data-tab]', root).forEach((b) => b.addEventListener('click', () => (go(b.dataset.tab as Tab), draw())));
     bind();
   };
 
@@ -97,13 +106,24 @@ export async function renderInbox(root: HTMLElement, shelterId: string, tab: Tab
           const updated = await api.moveRequest(id, to);
           replace(updated);
           toast(t(`inbox.done.${to}`));
-          current = TAB_OF[updated.status]; // follow the request to its tab, still open
+          go(TAB_OF[updated.status]); // follow the request to its tab, still open
           draw();
           root.querySelector<HTMLDetailsElement>(`details[data-request="${id}"]`)?.setAttribute('open', '');
         } catch (err) {
           b.disabled = false;
           toast(failText(err));
         }
+      }),
+    );
+    // "Se fue a casa con…": the animal's other requests close too, so the whole list is reloaded after.
+    $$<HTMLButtonElement>('[data-adopted]', root).forEach((b) =>
+      b.addEventListener('click', () => {
+        const r = requests.find((x) => x.id === b.dataset.adopted)!;
+        openOutcome({ id: r.pet.id, name: r.pet.name, status: r.pet.status }, shelterId, async () => {
+          go('cerradas');
+          requests = await api.shelterRequests(shelterId).catch(() => requests);
+          draw();
+        }, { requestId: r.id });
       }),
     );
     $$<HTMLFormElement>('form[data-close]', root).forEach((f) =>
@@ -146,7 +166,7 @@ function card(r: InboxRequest, shelter: string, shelterId: string): Raw {
         <div class="request-card__body">
           ${open && r.contact.pref ? contactButtons(r, shelter, first) : ''}
           ${r.status === 'withdrawn' ? html`<p class="portal-card__reason"><strong>${t('inbox.withdrew')}</strong> «${t(`request.withdraw.${r.closedReason as 'situacion'}`)}»</p>` : ''}
-          ${r.status === 'closed' ? html`<p class="muted">${t('inbox.closedBecause', { reason: t(`inbox.reason.${(r.closedReason ?? 'otro') as CloseReason}`) })}</p>` : ''}
+          ${r.status === 'closed' ? html`<p class="muted">${closedText(r)}</p>` : ''}
           ${r.message ? html`<blockquote class="request-card__message">${r.message}</blockquote>` : ''}
           <dl class="portal-facts">
             ${answer('inbox.q.space', r.answers.space)}
@@ -158,11 +178,17 @@ function card(r: InboxRequest, shelter: string, shelterId: string): Raw {
             ${fact('inbox.q.experience', r.about.experience && t(`request.experience.${r.about.experience as 'si'}`))}
             ${fact('inbox.q.visit', r.about.visit && t(`request.visit.${r.about.visit as 'semana'}`))}
           </dl>
-          ${open ? actions(r) : ''}
-          <a class="text-button request-card__pet" href="#/refugio/${encodeURIComponent(shelterId)}/animales/${encodeURIComponent(pet.id)}">${t('inbox.petLink', { pet: pet.name })}</a>
+          ${open ? actions(r, first) : ''}
+          <a class="text-button request-card__pet" href="#/refugio/${encodeURIComponent(shelterId)}/animales/${encodeURIComponent(pet.id)}">${t(pet.status === 'available' || pet.status === 'reserved' ? 'inbox.petLink' : 'inbox.petLinkEnded', { pet: pet.name })}</a>
         </div>
       </details>
     </li>`;
+}
+
+function closedText(r: InboxRequest): string {
+  const auto = AUTO_REASONS.find((k) => k === r.closedReason);
+  if (auto) return t(`inbox.auto.${auto}`, { pet: r.pet.name });
+  return t('inbox.closedBecause', { reason: t(`inbox.reason.${(r.closedReason ?? 'otro') as CloseReason}`) });
 }
 
 const fact = (label: Key, value: string | null) => (value ? html`<div><dt>${t(label)}</dt><dd>${value}</dd></div>` : '');
@@ -193,11 +219,13 @@ function contactButtons(r: InboxRequest, shelter: string, first: string): Raw {
     </div>`;
 }
 
-function actions(r: InboxRequest): Raw {
+function actions(r: InboxRequest, first: string): Raw {
   const next: ('contacted' | 'visit')[] = r.status === 'contacted' ? ['visit'] : r.status === 'visit' ? [] : ['contacted', 'visit'];
+  const live = r.pet.status === 'available' || r.pet.status === 'reserved';
   return html`
     <div class="request-card__actions">
       ${next.map((s) => html`<button class="button button--outline button--small" type="button" data-move="${s}">${t(`inbox.move.${s}`)}</button>`)}
+      ${live ? html`<button class="button button--outline button--small" type="button" data-adopted="${r.id}">${icon(House, 16)}${t('inbox.adopted', { name: first })}</button>` : ''}
     </div>
     <details class="request-card__close">
       <summary class="text-button">${t('inbox.close')}</summary>

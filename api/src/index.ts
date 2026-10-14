@@ -9,6 +9,7 @@ import { inDR, nearestPlace, PLACES_ATTRIBUTION, placeById, searchPlaces } from 
 import { admin } from './admin';
 import { runDigest } from './digest';
 import { inbox } from './inbox';
+import { lifecycle, trimAdoptedPhotos } from './lifecycle';
 import { listings } from './listings';
 import { photoRoutes, servePhoto } from './photos';
 import { portal } from './portal';
@@ -71,6 +72,7 @@ app.route('/api/portal', portal);
 app.route('/api/portal', listings);
 app.route('/api/portal', photoRoutes);
 app.route('/api/portal', inbox);
+app.route('/api/portal', lifecycle);
 app.get('/api/photos/:key', servePhoto);
 app.route('/api/admin', admin);
 
@@ -166,7 +168,11 @@ export default Sentry.withSentry<Env>(
   }),
   {
     fetch: app.fetch,
-    // The morning job: shelters' daily summaries and "Avísame" alerts (cron in wrangler.jsonc).
-    scheduled: (_event, env, ctx) => ctx.waitUntil(runDigest(env).then((r) => console.log('morning job', r))),
+    // The morning job (cron in wrangler.jsonc): shelters' daily summaries, "Avísame" alerts, and
+    // trimming the photos of animals adopted 90 days ago.
+    scheduled: (_event, env, ctx) => {
+      ctx.waitUntil(runDigest(env).then((r) => console.log('morning job', r)));
+      ctx.waitUntil(trimAdoptedPhotos(env).then((r) => console.log('photo trim', r)));
+    },
   },
 );

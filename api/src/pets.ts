@@ -132,7 +132,19 @@ pets.get('/:id', (c) => {
   return cachedJson(c, `/pets/${encodeURIComponent(id)}`, () => profile(c.env.DB, id));
 });
 
-async function profile(db: D1Database, id: string): Promise<{ body: unknown; status?: 404 }> {
+/** An animal that was public and has left, adopted or withdrawn: old links (Mi lista, shared ones) say
+ *  how it ended instead of failing. Only its name, species and main photo. */
+async function gone(db: D1Database, id: string): Promise<{ body: unknown; status: 404 | 410 }> {
+  const row = await db
+    .prepare(`SELECT ${SUMMARY_COLUMNS} ${FROM} WHERE d.id = ? AND d.status IN ('adopted', 'withdrawn') AND d.published_at IS NOT NULL AND ${PUBLIC}`)
+    .bind(id)
+    .first<SummaryRow>();
+  if (!row) return { body: { error: 'not_found' }, status: 404 };
+  const { name, species, status, photo } = summary(row);
+  return { body: { error: 'gone', pet: { id, name, species, status, photo } }, status: 410 };
+}
+
+async function profile(db: D1Database, id: string): Promise<{ body: unknown; status?: 404 | 410 }> {
   const row = await db
     .prepare(
       `SELECT ${SUMMARY_COLUMNS},
@@ -143,7 +155,7 @@ async function profile(db: D1Database, id: string): Promise<{ body: unknown; sta
     )
     .bind(id)
     .first<SummaryRow & { story: string; needs: string; adoption_fee_dop: number | null; in_care_since: string | null; visit_hours: string | null; shelter_description: string | null; shelter_place: string | null; shelter_municipality: string | null }>();
-  if (!row) return { body: { error: 'not_found' }, status: 404 };
+  if (!row) return gone(db, id);
 
   const [{ results: photos }, { results: siblings }] = await Promise.all([
     db.prepare('SELECT r2_key, focus FROM pet_photos WHERE pet_id = ? ORDER BY position').bind(id).all<{ r2_key: string; focus: string }>(),

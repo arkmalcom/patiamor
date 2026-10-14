@@ -17,9 +17,9 @@ export type PortalView =
   | { view: 'registro' }
   | { view: 'editar'; id: string }
   | { view: 'admin'; status: ShelterStatus }
-  | { view: 'animales'; id: string }
+  | { view: 'animales'; id: string; tab: string | null }
   | { view: 'animal'; id: string; petId: string | null }
-  | { view: 'solicitudes'; id: string };
+  | { view: 'solicitudes'; id: string; tab: string | null };
 
 const STATUS_ICON: Record<ShelterStatus, typeof Clock> = { pending: Clock, verified: BadgeCheck, rejected: CircleAlert, suspended: ShieldOff };
 
@@ -39,9 +39,9 @@ export function renderPortal(root: HTMLElement, route: PortalView) {
   if (route.view === 'registro') return form(root, null);
   if (route.view === 'editar') return void edit(root, route.id);
   if (route.view === 'admin') return void adminQueue(root, route.status);
-  if (route.view === 'animales') return void renderListings(root, route.id);
+  if (route.view === 'animales') return void renderListings(root, route.id, route.tab);
   if (route.view === 'animal') return void renderListingForm(root, route.id, route.petId);
-  if (route.view === 'solicitudes') return void renderInbox(root, route.id);
+  if (route.view === 'solicitudes') return void renderInbox(root, route.id, route.tab);
   void home(root);
 }
 

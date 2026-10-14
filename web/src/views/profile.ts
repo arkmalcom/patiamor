@@ -1,5 +1,5 @@
 import { ArrowLeft, Check, CircleHelp, Clock, Heart, HeartHandshake, House, Mail, Send, User, X } from 'lucide';
-import { api, ApiError } from '../api';
+import { api, ApiError, type GonePet } from '../api';
 import { companionKey, CONTACT_EMAIL, frameFor, type Companion, type PetDetail, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, reducedMotion, type Raw } from '../dom';
 import { formatDate, t, away } from '../i18n';
@@ -16,6 +16,8 @@ interface ProfileDeps {
 
 const loading = new Set<string>();
 const missing = new Set<string>();
+/** Animals that were adopted or withdrawn: what the API still tells about them (a 410). */
+const gone = new Map<string, GonePet>();
 const isDetail = (d: PetSummary | PetDetail | undefined): d is PetDetail => !!d && 'story' in d;
 
 function status(value: boolean | null, yes = t('profile.yes'), no = t('profile.no')): Raw {
@@ -35,7 +37,8 @@ function fetchDetail(id: string) {
       petCache.set(id, pet);
     })
     .catch((err) => {
-      if (err instanceof ApiError && err.code === 'not_found') missing.add(id);
+      if (err instanceof ApiError && err.code === 'gone') gone.set(id, err.data.pet as GonePet);
+      else if (err instanceof ApiError && err.code === 'not_found') missing.add(id);
       else toast(t('auth.err.network'));
     })
     .finally(() => {
@@ -146,9 +149,25 @@ function ready(pet: PetDetail): Raw {
     </section>`;
 }
 
+/** An old link (Mi lista, or one shared before) to an animal that found a home or was withdrawn. */
+function renderGone(root: HTMLElement, pet: GonePet | PetSummary) {
+  const adopted = pet.status === 'adopted';
+  mount(
+    root,
+    html`<section class="profile-missing profile-gone">
+      <span class="mini-frame profile-gone__frame" data-frame="${frameFor(pet.id)}">${photo({ id: pet.id, photo: pet.photo } as PetSummary, 'eager')}</span>
+      <h1 class="page-title" tabindex="-1" data-focus>${t(adopted ? 'profile.gone.adopted' : 'profile.gone.withdrawn', { name: pet.name })}</h1>
+      <p class="muted">${t(adopted ? 'profile.gone.adoptedBody' : 'profile.gone.withdrawnBody')}</p>
+      <a class="button button--primary" href="#/">${icon(adopted ? House : Heart, 18)}${t('profile.gone.explore')}</a>
+    </section>`,
+  );
+}
+
 export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) {
   const cached = petCache.get(id);
-  if (!isDetail(cached) && !missing.has(id)) fetchDetail(id);
+  if (!isDetail(cached) && !missing.has(id) && !gone.has(id)) fetchDetail(id);
+  const ended = gone.get(id) ?? (cached && (cached.status === 'adopted' || cached.status === 'withdrawn') ? cached : undefined);
+  if (ended) return renderGone(root, ended);
 
   if (!cached) {
     mount(

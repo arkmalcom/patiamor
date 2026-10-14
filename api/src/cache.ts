@@ -41,7 +41,7 @@ const forBrowser = (res: Response, state: 'HIT' | 'MISS') => {
  * string, so made-up parameters can't force fresh database reads. Not-found answers are cached too,
  * so guessing ids can't either.
  */
-export async function cachedJson(c: Context<AppContext>, path: string, build: () => Promise<{ body: unknown; status?: 200 | 404 }>) {
+export async function cachedJson(c: Context<AppContext>, path: string, build: () => Promise<{ body: unknown; status?: 200 | 404 | 410 }>) {
   const v = await catalogVersion(c.env.DB);
   const key = new Request(`${new URL(c.req.url).origin}/__catalog/v${v}${path}`);
   const cache = (caches as unknown as { default: Cache }).default;

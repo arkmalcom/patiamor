@@ -72,7 +72,7 @@ function readPet(b: Record<string, unknown>) {
 }
 
 /** What a listing needs before adopters can see it; null when it's ready. */
-function publishProblem(shelterStatus: string, pet: { birthDate: string; story: string }, photos: number) {
+export function publishProblem(shelterStatus: string, pet: { birthDate: string; story: string }, photos: number) {
   if (shelterStatus !== 'verified') return 'shelter_not_verified';
   if (pet.birthDate > daysAgo(MIN_AGE_DAYS)) return 'too_young';
   if (pet.story.length < MIN_STORY) return 'story_required';

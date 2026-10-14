@@ -343,8 +343,9 @@ const STATUS_ICON: Record<RequestStatus, IconNode> = {
   withdrawn: Undo2,
 };
 
-/** "closed" because the pet went home with another family reads differently from a lister's no. */
-export const statusKey = (item: MyRequest) => (item.request.status === 'closed' && item.pet.status === 'adopted' ? 'found' : item.request.status);
+/** "closed" because the pet went home with another family, or was withdrawn, reads differently from a lister's no. */
+export const statusKey = (item: MyRequest) =>
+  item.request.status !== 'closed' ? item.request.status : item.pet.status === 'adopted' ? 'found' : item.pet.status === 'withdrawn' ? 'gone' : 'closed';
 
 /** Where a request stands, in the adopter's words. */
 export function requestStatus(item: MyRequest): Raw {

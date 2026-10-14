@@ -17,7 +17,7 @@ type C = Context<AppContext>;
 /** Ended requests stay in the inbox this long. */
 const ENDED_DAYS = 90;
 const CLOSE_REASONS = ['otra_familia', 'no_encaja', 'sin_respuesta', 'otro'] as const;
-/** Where a shelter may move a request, from each status. Adopted comes with PAT-11. */
+/** Where a shelter may move a request, from each status. "Se fue a casa" is in lifecycle.ts: it ends the animal's other requests too. */
 const MOVES: Record<string, readonly string[]> = {
   seen: ['sent'],
   contacted: ['sent', 'seen', 'visit'],

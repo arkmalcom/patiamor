@@ -5,6 +5,7 @@ import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { failText, t, type Key } from '../i18n';
 import { petChanged, placePet } from '../store';
 import { age, canvas, miniFrame } from '../ui/canvas';
+import { openOutcome, outcomeButton } from '../ui/outcome';
 import { PhotoError, preparePhoto, toBase64, type PreparedPhoto } from '../ui/photos';
 import { toast } from '../ui/toast';
 
@@ -28,7 +29,14 @@ const notFound = (root: HTMLElement) =>
 
 // ---------- The shelter's animals ----------
 
-export async function renderListings(root: HTMLElement, shelterId: string) {
+type Tab = 'active' | 'adopted' | 'withdrawn';
+const tabOf = (s: PetStatus): Tab => (s === 'adopted' || s === 'withdrawn' ? s : 'active');
+/** How each tab reads in the URL (…/animales?ver=adoptados). */
+const SLUG: Record<Tab, string> = { active: 'activos', adopted: 'adoptados', withdrawn: 'retirados' };
+const tabFromSlug = (slug: string | null): Tab => (Object.keys(SLUG) as Tab[]).find((k) => SLUG[k] === slug) ?? 'active';
+
+export async function renderListings(root: HTMLElement, shelterId: string, slug: string | null = null) {
+  const tab = tabFromSlug(slug);
   mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
   let shelter: ListingShelter;
   let pets: ListingSummary[];
@@ -39,6 +47,12 @@ export async function renderListings(root: HTMLElement, shelterId: string) {
   }
   const base = `#/refugio/${encodeURIComponent(shelter.id)}/animales`;
   const canAdd = shelter.status !== 'suspended';
+  // Tabs appear once something has ended; empty ones (other than Activos) stay hidden. They carry no
+  // counts: with them, three tabs don't fit a 360 px phone.
+  const counts: Record<Tab, number> = { active: 0, adopted: 0, withdrawn: 0 };
+  for (const p of pets) counts[tabOf(p.status)]++;
+  const shown = pets.filter((p) => tabOf(p.status) === tab);
+  const empty = tab === 'active' ? t('listing.empty') : t(`listing.empty.${tab}`);
   mount(
     root,
     html`
@@ -50,17 +64,37 @@ export async function renderListings(root: HTMLElement, shelterId: string) {
         </div>
         ${shelter.status === 'verified' ? '' : html`<p class="portal-card__reason">${t(shelter.status === 'suspended' ? 'listing.suspendedNote' : 'listing.unverifiedNote')}</p>`}
         ${canAdd ? html`<a class="button button--primary portal__new" href="${base}/nuevo">${icon(Plus, 20)}${t('listing.add')}</a>` : ''}
-        ${pets.length
-          ? html`<ul class="listings">${pets.map((p) => row(p, base))}</ul>`
-          : html`<p class="passed__empty">${t('listing.empty')}</p>`}
+        ${counts.adopted || counts.withdrawn
+          ? html`<nav class="list-tabs listings__tabs" aria-label="${t('listing.title')}">
+              ${(['active', 'adopted', 'withdrawn'] as Tab[])
+                .filter((k) => counts[k] || k === 'active' || k === tab)
+                .map(
+                  (k) => html`<button class="list-tabs__tab" type="button" data-tab="${k}" aria-current="${k === tab ? 'page' : 'false'}">${t(`listing.tab.${k}`)}</button>`,
+                )}
+            </nav>`
+          : ''}
+        ${shown.length ? html`<ul class="listings">${shown.map((p) => row(p, base, canAdd))}</ul>` : html`<p class="passed__empty">${empty}</p>`}
       </section>`,
+  );
+  const show = (k: Tab) => {
+    history.replaceState(null, '', `${base}?ver=${SLUG[k]}`);
+    void renderListings(root, shelterId, SLUG[k]);
+  };
+  $$<HTMLButtonElement>('[data-tab]', root).forEach((b) => b.addEventListener('click', () => show(b.dataset.tab as Tab)));
+  // Ending or relisting moves the animal to another tab; follow it there.
+  $$<HTMLButtonElement>('[data-outcome]', root).forEach((b) =>
+    b.addEventListener('click', () => {
+      const p = pets.find((x) => x.id === b.dataset.outcome)!;
+      openOutcome(p, shelter.id, (change) => show(tabOf(change.pet.status)));
+    }),
   );
 }
 
-function row(p: ListingSummary, base: string): Raw {
+function row(p: ListingSummary, base: string, canChange: boolean): Raw {
   const bits = [t(`listing.species.${p.species}`), t(`sex.${p.sex}`), age(p)];
+  const ends = canChange && p.status !== 'draft' && p.status !== 'in_review';
   return html`
-    <li>
+    <li class="listing-item">
       <a class="listing-row" href="${base}/${encodeURIComponent(p.id)}" aria-label="${t('listing.editPet', { name: p.name })}">
         ${miniFrame(p, 'sm')}
         <span class="listing-row__text">
@@ -70,6 +104,7 @@ function row(p: ListingSummary, base: string): Raw {
         </span>
         ${petChip(p.status)}
       </a>
+      ${ends ? html`<div class="listing-item__actions">${outcomeButton(p, true)}</div>` : ''}
     </li>`;
 }
 
@@ -151,6 +186,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${existing ? existing.name : t('listing.newTitle')}</h1>
         ${existing ? html`<p class="listing-status" data-status-line>${statusLine(existing)}</p>` : ''}
         ${existing && ['available', 'reserved'].includes(existing.status) ? availability(existing) : ''}
+        ${existing && ['available', 'reserved', 'adopted', 'withdrawn'].includes(existing.status) ? ending(existing) : ''}
         <form class="portal-form listing-form" id="pet-form" novalidate>
           <div class="listing-form__layout">
           <div class="listing-form__fields">
@@ -261,6 +297,9 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
   );
 
   if (existing) bindAvailability(root, existing);
+  root.querySelector<HTMLButtonElement>('[data-outcome]')?.addEventListener('click', () =>
+    openOutcome(existing!, shelter.id, () => renderListingForm(root, shelter.id, existing!.id)),
+  );
   const formEl = $<HTMLFormElement>('#pet-form', root);
   const error = $('[data-error]', root);
 
@@ -500,6 +539,17 @@ const availability = (p: Listing): Raw => html`
     <label class="check"><input type="checkbox" data-availability="paused" ${p.requestsPaused ? 'checked' : ''} /><span>${t('listing.paused')}</span></label>
     <p class="muted">${t('listing.availabilityNote')}</p>
   </section>`;
+
+/** Marking it adopted or withdrawn (or relisting it): a sheet that says what happens to its requests first. */
+const ending = (p: Listing): Raw => {
+  const live = p.status === 'available' || p.status === 'reserved';
+  return html`
+    <section class="form-section listing-ending" aria-labelledby="ending-title">
+      <h2 class="section-title" id="ending-title">${t('listing.endTitle')}</h2>
+      <p class="muted">${live ? t('listing.endNote') : t(p.status === 'adopted' ? 'listing.endedAdopted' : 'listing.endedWithdrawn', { name: p.name })}</p>
+      ${outcomeButton(p)}
+    </section>`;
+};
 
 function bindAvailability(root: HTMLElement, p: Listing) {
   $$<HTMLInputElement>('[data-availability]', root).forEach((box) =>

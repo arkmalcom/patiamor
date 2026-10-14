@@ -1173,6 +1173,10 @@ html.sheet-open { overflow: hidden; }
 .fee__amount { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 .loading-note { padding: 32px 20px; text-align: center; color: var(--ink-2); font-weight: 700; }
 .profile-missing { max-width: 560px; margin: 0 auto; padding: 32px 20px; display: grid; gap: 14px; justify-items: start; }
+.profile-gone { justify-items: center; text-align: center; }
+.profile-gone .page-title { text-wrap: balance; }
+.mini-frame.profile-gone__frame { padding: 8px; border-radius: 110px 110px 8px 8px; }
+.profile-gone__frame img, .profile-gone__frame .no-photo { width: 200px; height: 244px; border-radius: 102px 102px 3px 3px; }
 .shelter__meta { font-size: 0.95rem; margin-top: 4px; }
 
 .profile__bar {
@@ -1317,14 +1321,40 @@ html[data-route='profile'] .tabbar { display: none; }
 .listings__head { display: grid; gap: 4px; }
 .listings__head .portal__who { margin-top: 0; }
 .listings { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.listing-row {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px;
-  padding: 12px 16px 12px 12px; background: var(--paper); border-radius: 16px; box-shadow: var(--shadow-soft);
-  color: inherit; text-decoration: none;
+/* Each animal is a card: the row links to its page, and the strip under it ends or relists it. */
+.listing-item {
+  background: var(--paper); border-radius: 16px; box-shadow: var(--shadow-soft);
   transition: transform 160ms cubic-bezier(.16,1,.3,1), box-shadow 160ms;
 }
-.listing-row:hover { transform: translateY(-1px); box-shadow: 0 14px 26px -18px rgba(29, 35, 64, 0.55); }
+.listing-item:has(.listing-row:hover) { transform: translateY(-1px); box-shadow: 0 14px 26px -18px rgba(29, 35, 64, 0.55); }
+.listing-row {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  padding: 12px 16px 12px 12px; border-radius: 16px;
+  color: inherit; text-decoration: none;
+}
 .listing-row:focus-visible { outline: 3px solid var(--anil); outline-offset: 3px; }
+/* Lined up under the name: the row's left padding, the small frame (44 + 10) and the gap. */
+.listing-item__actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 12px 80px; margin-top: -4px; }
+.listings__tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.listings__tabs .list-tabs__tab { border: 0; font: inherit; font-weight: 800; cursor: pointer; padding: 0 12px; gap: 4px; white-space: nowrap; flex: none; }
+.listings__tabs .list-tabs__tab:not([aria-current='page']) { background: none; }
+.listing-ending .button { justify-self: start; }
+
+/* The sheet for ending an animal's search: two big choices, then a short form. */
+.outcome__choices { display: grid; gap: 10px; }
+.outcome__choice {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px;
+  padding: 16px; border: 0; border-radius: 16px; background: var(--sky-tint); color: var(--ink);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.outcome__choice:hover { background: var(--mango-tint); }
+.outcome__choice:focus-visible { outline: 3px solid var(--anil); outline-offset: 2px; }
+.outcome__choice span { display: grid; gap: 2px; }
+.outcome__choice strong { font-size: 1.05rem; }
+.outcome__choice small { font-size: 0.92rem; color: var(--ink-2); }
+.outcome__form { display: grid; gap: 14px; }
+.segmented span.outcome__family { flex-direction: column; align-items: flex-start; gap: 0; padding-block: 8px; }
+.outcome__family small { font-size: 0.85rem; font-weight: 600; opacity: 0.8; }
 .listing-row__text { display: grid; gap: 2px; min-width: 0; }
 .listing-row__name { font-family: var(--font-display); font-weight: 400; font-size: 1.3rem; line-height: 1.1; overflow-wrap: anywhere; }
 .listing-row__meta { font-size: 0.92rem; color: var(--ink-2); }

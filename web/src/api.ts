@@ -125,6 +125,18 @@ export interface Listing extends PetForm {
 export type ListingSummary = PetSummary & { status: PetStatus; openRequests: number; updatedAt: string };
 
 export type CloseReason = 'otra_familia' | 'no_encaja' | 'sin_respuesta' | 'otro';
+/** Why a shelter withdrew an animal: for its own records; adopters only see "Ya no está disponible". */
+export type WithdrawReason = 'familia_original' | 'salud' | 'fallecio' | 'otro';
+/** An animal's state after a lifecycle change, and how many open requests that change closed. */
+export type PetChange = { pet: { id: string; status: PetStatus; requestsPaused: boolean }; closed: number };
+/** What an old link to an adopted or withdrawn animal still shows (the API answers 410 "gone"). */
+export interface GonePet {
+  id: string;
+  name: string;
+  species: Species;
+  status: 'adopted' | 'withdrawn';
+  photo: PetSummary['photo'];
+}
 
 /** A request as the shelter's inbox shows it. Contact details only come while it's open. */
 export interface InboxRequest {
@@ -210,6 +222,9 @@ export const api = {
     call<{ request: InboxRequest }>(`/api/portal/requests/${encodeURIComponent(id)}/status`, 'POST', { status, reason }).then((r) => r.request),
   setAvailability: (petId: string, change: { reserved?: boolean; paused?: boolean }) =>
     call<{ pet: { id: string; status: PetStatus; requestsPaused: boolean } }>(`/api/portal/pets/${encodeURIComponent(petId)}/availability`, 'POST', change).then((r) => r.pet),
+  markAdopted: (petId: string, requestId?: string) => call<PetChange>(`/api/portal/pets/${encodeURIComponent(petId)}/adopted`, 'POST', { requestId }),
+  withdrawPet: (petId: string, reason: WithdrawReason) => call<PetChange>(`/api/portal/pets/${encodeURIComponent(petId)}/withdraw`, 'POST', { reason }),
+  relistPet: (petId: string) => call<PetChange>(`/api/portal/pets/${encodeURIComponent(petId)}/relist`, 'POST', {}),
   runDigest: () => call<{ shelters: number; digestEmails: number; alertEmails: number; deferred: boolean }>('/api/admin/digest', 'POST', {}),
   adminShelters: (status: ShelterStatus) => call<{ shelters: AdminShelter[] }>(`/api/admin/shelters?status=${status}`).then((r) => r.shelters),
   adminDecision: (id: string, action: 'verify' | 'reject' | 'suspend', reason?: string) =>

@@ -34,10 +34,12 @@ function parse(hash: string): Route {
       return { name: 'portal', view: 'admin', status: (['pending', 'verified', 'rejected', 'suspended'] as const).find((s) => s === estado) ?? 'pending' };
     }
     if (b && c === 'editar') return { name: 'portal', view: 'editar', id: decodeURIComponent(b) };
-    // A shelter's animals: #/refugio/<id>/animales, …/animales/nuevo, …/animales/<petId>
-    if (b && c === 'solicitudes') return { name: 'portal', view: 'solicitudes', id: decodeURIComponent(b) };
+    // A shelter's animals: #/refugio/<id>/animales, …/animales/nuevo, …/animales/<petId>. Lists keep
+    // their tab in ?ver=…, so a re-render (any store update) stays on it.
+    const ver = new URLSearchParams(query).get('ver');
+    if (b && c === 'solicitudes') return { name: 'portal', view: 'solicitudes', id: decodeURIComponent(b), tab: ver };
     if (b && c === 'animales')
-      return d ? { name: 'portal', view: 'animal', id: decodeURIComponent(b), petId: d === 'nuevo' ? null : decodeURIComponent(d) } : { name: 'portal', view: 'animales', id: decodeURIComponent(b) };
+      return d ? { name: 'portal', view: 'animal', id: decodeURIComponent(b), petId: d === 'nuevo' ? null : decodeURIComponent(d) } : { name: 'portal', view: 'animales', id: decodeURIComponent(b), tab: ver };
     return { name: 'portal', view: 'home' };
   }
   if (a === 'lista') return { name: 'list' };
@@ -187,6 +189,8 @@ window.addEventListener('hashchange', () => {
 });
 
 subscribe(() => {
+  // The URL as it is now: a list records its tab with replaceState, which fires no hashchange.
+  current = parse(location.hash);
   render(current);
   inline.refresh();
 });
