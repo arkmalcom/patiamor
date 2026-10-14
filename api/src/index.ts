@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception';
 import { appOrigin, auth, publicUser } from './auth/routes';
 import { currentUser } from './auth/session';
 import { pets, readPoint } from './pets';
+import { petPage } from './share';
 import type { AppContext, Env } from './env';
 import { inDR, nearestPlace, PLACES_ATTRIBUTION, placeById, searchPlaces } from './places';
 import { admin } from './admin';
@@ -65,6 +66,8 @@ app.get('/api/health', async (c) => {
 });
 
 app.route('/api/auth', auth);
+// The app with link-preview tags for a pet (the only page path the Worker sees: run_worker_first).
+app.get('/mascota/:id', petPage);
 app.route('/api/pets', pets);
 app.route('/api/requests', requests);
 app.route('/api/alerts', alerts);

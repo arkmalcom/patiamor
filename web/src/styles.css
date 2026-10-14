@@ -1105,6 +1105,7 @@ html.sheet-open { overflow: hidden; }
 /* The portrait stays portrait at any width (landscape phones too): a wide, short arch distorts the frame. */
 .profile__media .canvas { --canvas-h: clamp(440px, 72dvh, 680px); height: var(--canvas-h); width: min(100%, calc(var(--canvas-h) * 0.8)); margin-inline: auto; }
 .profile__back { position: absolute; top: 22px; left: 34px; z-index: 3; }
+.profile__share { position: absolute; top: 22px; right: 34px; z-index: 3; }
 
 /* The text sits on paper so the street behind never runs through it, wherever the page scrolls. */
 .profile__body {
@@ -1192,7 +1193,7 @@ html.sheet-open { overflow: hidden; }
 
 html[data-route='profile'] .tabbar { display: none; }
 
-/* ---------- Shelter portal (#/refugio) ---------- */
+/* ---------- Shelter portal (/refugio) ---------- */
 
 .portal { width: 100%; max-width: 720px; margin: 0 auto; padding: 8px 20px 48px; display: grid; gap: 20px; }
 .portal__lede { font-size: 1.1rem; line-height: 1.55; max-width: 62ch; }
@@ -1271,7 +1272,7 @@ html[data-route='profile'] .tabbar { display: none; }
 .portal-card__auth { justify-self: stretch; }
 .portal-card__actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
-/* ---------- Shelter inbox (#/refugio/<id>/solicitudes) ---------- */
+/* ---------- Shelter inbox (/refugio/<id>/solicitudes) ---------- */
 
 .inbox__lede { font-size: 1rem; color: var(--ink-2); }
 .inbox .list-tabs__tab { border: 0; font: inherit; font-weight: 800; cursor: pointer; }
@@ -1316,7 +1317,7 @@ html[data-route='profile'] .tabbar { display: none; }
 .portal-digest { display: grid; gap: 6px; justify-items: start; }
 .listing-availability .check + .check { margin-top: -6px; }
 
-/* ---------- Shelter listings (#/refugio/<id>/animales) ---------- */
+/* ---------- Shelter listings (/refugio/<id>/animales) ---------- */
 
 .listings__head { display: grid; gap: 4px; }
 .listings__head .portal__who { margin-top: 0; }
@@ -1654,6 +1655,7 @@ html[data-route='profile'] .toast-region { bottom: calc(96px + env(safe-area-ins
   .profile__media { position: sticky; top: 0; padding: 6px 0 0; }
   .profile__media .canvas { --canvas-h: min(calc(100dvh - 120px), 760px); }
   .profile__back { left: 14px; top: 18px; }
+  .profile__share { right: 14px; top: 18px; }
   .profile__body { margin: 6px 0 0; }
   .profile__bar {
     position: sticky; bottom: 0; grid-column: 2;

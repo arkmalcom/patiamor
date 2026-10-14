@@ -33,14 +33,14 @@ export function renderAccount(root: HTMLElement) {
             ${user?.shelters?.length
               ? html`<p class="account__shelters">${user.shelters.map((sh) => html`<span>${sh.name} · ${t(`portal.status.${(sh.status ?? 'pending') as 'pending'}`)}</span>`)}</p>`
               : ''}
-            <a class="button button--ink" href="#/refugio">${user?.shelters?.length ? t('account.shelterPortal') : t('account.shelterCta')}</a>
+            <a class="button button--ink" href="/refugio">${user?.shelters?.length ? t('account.shelterPortal') : t('account.shelterCta')}</a>
           </div>
         </div>
         <p class="sample-note">${t('app.sampleNote')}</p>
       </section>`,
   );
   const authRoot = root.querySelector<HTMLElement>('[data-auth]');
-  if (authRoot) renderAuth(authRoot, { next: '#/cuenta', onSignedIn: (u) => toast(t('auth.signedIn', { who: u.name ?? u.email })) });
+  if (authRoot) renderAuth(authRoot, { next: '/cuenta', onSignedIn: (u) => toast(t('auth.signedIn', { who: u.name ?? u.email })) });
   root.querySelector('[data-signout]')?.addEventListener('click', async () => {
     try {
       await api.logout();

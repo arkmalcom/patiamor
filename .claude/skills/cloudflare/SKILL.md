@@ -35,6 +35,8 @@ Email sign-in (`/api/auth/email/start`) requires a Turnstile token (`api/src/aut
 
 Widgets are made in the dashboard (Turnstile → Add widget, mode Managed). Each lists the hostnames it works on. Locally and in tests, use Cloudflare's test keys (site `1x00000000000000000000AA`, secret `1x0000000000000000000000000000000AA`); they're in `.dev.vars.example` and `vitest.config.ts`.
 
+The app uses real paths (/mascota/<id>, /lista…), not hash routes. `assets.not_found_handling: single-page-application` serves the app for any path without running the Worker. `run_worker_first` lists `/api/*` and `/mascota/*`: the Worker writes link-preview tags into pet pages (`api/src/share.ts`). Keep other page paths off that list, since each Worker run counts against the free plan's 100,000 requests a day while static assets are free.
+
 The edge rule (PAT-30) is the layer that stops floods before they count against the request quota, and it needs patiamor.com.
 
 Pet photos live in R2, bound as `PHOTOS`. Staging uses `patiamor-photos-staging`, created 2026-10-13. Production uses `patiamor-photos`, which doesn't exist yet: creating it is a production resource, so ask first, and do it before the first production deploy. Both CI tokens have R2 read/write. Upload safeguards are documented in `api/src/photos.ts`.

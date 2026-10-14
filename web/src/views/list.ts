@@ -131,7 +131,7 @@ function casa(): Raw {
 }
 
 export function renderList(root: HTMLElement, deps: ListDeps) {
-  const showPassed = location.hash.startsWith('#/lista/pasados');
+  const showPassed = location.pathname.startsWith('/lista/pasados');
   const open = activeRequests();
   mount(
     root,
@@ -142,8 +142,8 @@ export function renderList(root: HTMLElement, deps: ListDeps) {
           <span class="list-view__count">${pips()}<span>${t('list.slots', { n: open.length })}</span></span>
         </header>
         <nav class="list-tabs" aria-label="${t('list.title')}">
-          <a class="list-tabs__tab" href="#/lista" aria-current="${showPassed ? 'false' : 'page'}">${t('list.tab.requests')}</a>
-          <a class="list-tabs__tab" href="#/lista/pasados" aria-current="${showPassed ? 'page' : 'false'}">${t('list.tab.passed')}${state.skipped.length ? html` <span class="list-tabs__count">${state.skipped.length}</span>` : ''}</a>
+          <a class="list-tabs__tab" href="/lista" aria-current="${showPassed ? 'false' : 'page'}">${t('list.tab.requests')}</a>
+          <a class="list-tabs__tab" href="/lista/pasados" aria-current="${showPassed ? 'page' : 'false'}">${t('list.tab.passed')}${state.skipped.length ? html` <span class="list-tabs__count">${state.skipped.length}</span>` : ''}</a>
         </nav>
         ${showPassed
           ? passed()

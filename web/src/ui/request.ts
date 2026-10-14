@@ -24,6 +24,7 @@ import { renderAuth } from './auth';
 import { listerLabel, miniFrame } from './canvas';
 import { closeSheet, openSheet } from './sheet';
 import { toast } from './toast';
+import { here, navigate } from '../nav';
 
 // Adoption requests. Liking a pet opens its full profile; the profile ends with "Sí, quiero empezar el
 // proceso", which opens this one form: the reflection questions, how to reach the adopter, consent, and
@@ -87,14 +88,14 @@ export function startRequest(petId: string) {
 export async function resumePendingRequest(petId: string | null) {
   if (!petId || !state.signedIn) return;
   await loadRequests().catch(() => {});
-  location.hash = `/mascota/${encodeURIComponent(petId)}`;
+  navigate(`/mascota/${encodeURIComponent(petId)}`);
   startRequest(petId);
 }
 
 function showAuth(pet: PetSummary) {
   const dialog = openSheet(t('auth.title', { name: pet.name }), html`<p class="muted auth__intro">${t('auth.body')}</p><div data-auth></div>`);
   renderAuth($('[data-auth]', dialog), {
-    next: location.hash || '#/',
+    next: here(),
     beforeRedirect: () => stashPendingRequest(pet.id),
     onSignedIn: async () => {
       await loadRequests().catch(() => {});
@@ -118,7 +119,7 @@ function openFull(pet: PetSummary) {
           </li>`,
         )}
       </ul>
-      <a class="text-button" href="#/lista" data-to-list>${t('full.toList')}</a>
+      <a class="text-button" href="/lista" data-to-list>${t('full.toList')}</a>
       <div class="many">
         <h3 class="many__title">${t('full.manyTitle')}</h3>
         <p>${t('full.manyBody')}</p>

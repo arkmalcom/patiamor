@@ -8,6 +8,7 @@ type PlaceKind = 'municipio' | 'distrito_municipal' | 'barrio' | 'paraje';
 import { emptyFilters, inReach, matchesFilters, placed, RADIUS_MAX, RADIUS_MIN, setLocation, state, update, type Filters, type Placed } from '../store';
 import { rollTo } from './roll';
 import { toast } from './toast';
+import { navigate } from '../nav';
 
 // Slider position (0–100) maps to km on a square curve: fine control nearby, reach to the whole country.
 const toKm = (v: number) => Math.round(RADIUS_MIN + (RADIUS_MAX - RADIUS_MIN) * (v / 100) ** 2);
@@ -387,7 +388,7 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
     const m = shown[Number((el as HTMLElement).dataset.m)];
     if (!m) return;
     const first = m.members[0];
-    if (m.kind === 'dot') return void (location.hash = `/mascota/${encodeURIComponent(first.pet.id)}`);
+    if (m.kind === 'dot') return void navigate(`/mascota/${encodeURIComponent(first.pet.id)}`);
     let next: Filters['from'] = null;
     if (m.kind === 'house' && first.pet.lister.type === 'shelter') next = { kind: 'shelter', id: first.pet.lister.id, name: first.pet.lister.name };
     else if (onePlace(m)) next = { kind: 'place', id: first.pet.place.id, name: t('radar.privateIn', { place: first.pet.place.name }) };

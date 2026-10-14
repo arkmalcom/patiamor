@@ -8,8 +8,9 @@ import { renderAuth } from '../ui/auth';
 import { renderInbox } from './inbox';
 import { renderListingForm, renderListings } from './listings';
 import { toast } from '../ui/toast';
+import { navigate } from '../nav';
 
-// The shelter portal (#/refugio): register a shelter, follow its verification, and (for admins) work the
+// The shelter portal (/refugio): register a shelter, follow its verification, and (for admins) work the
 // verification queue. A shelter's animals live in listings.ts (PAT-8).
 
 export type PortalView =
@@ -56,7 +57,7 @@ function signedOut(root: HTMLElement) {
         <div class="portal-card"><p>${t('portal.signIn')}</p><div class="portal-card__auth" data-auth></div></div>
       </section>`,
   );
-  renderAuth($('[data-auth]', root), { next: '#/refugio', onSignedIn: (u) => toast(t('auth.signedIn', { who: u.name ?? u.email })) });
+  renderAuth($('[data-auth]', root), { next: '/refugio', onSignedIn: (u) => toast(t('auth.signedIn', { who: u.name ?? u.email })) });
 }
 
 /** How it works, in three honest steps. */
@@ -85,30 +86,30 @@ async function home(root: HTMLElement) {
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('portal.title')}</h1>
         <p class="portal__who">${t('portal.who', { who: state.user?.name ? `${state.user.name} · ${state.user.email}` : (state.user?.email ?? '') })}</p>
         ${state.user?.isAdmin
-          ? html`<a class="portal-admin-link" href="#/refugio/admin">${icon(ShieldCheck, 20)}<span>${t('portal.admin.link')}</span>${pending ? html`<span class="list-tabs__count">${pending}</span>` : ''}</a>`
+          ? html`<a class="portal-admin-link" href="/refugio/admin">${icon(ShieldCheck, 20)}<span>${t('portal.admin.link')}</span>${pending ? html`<span class="list-tabs__count">${pending}</span>` : ''}</a>`
           : ''}
         ${shelters.length
           ? html`<ul class="portal-list">${shelters.map(shelterCard)}</ul>`
           : html`<p class="portal__lede">${t('portal.lede')}</p>${steps()}`}
-        ${owned < 3 ? html`<a class="button ${shelters.length ? 'button--outline' : 'button--primary'} portal__new" href="#/refugio/registro">${icon(Plus, 20)}${t('portal.register')}</a>` : ''}
+        ${owned < 3 ? html`<a class="button ${shelters.length ? 'button--outline' : 'button--primary'} portal__new" href="/refugio/registro">${icon(Plus, 20)}${t('portal.register')}</a>` : ''}
       </section>`,
   );
 }
 
 function shelterCard(s: PortalShelter): Raw {
-  const animals = `#/refugio/${encodeURIComponent(s.id)}/animales`;
+  const animals = `/refugio/${encodeURIComponent(s.id)}/animales`;
   const next: Record<ShelterStatus, Raw> = {
     pending: html`<p>${t('portal.pendingBody')}</p><a class="button button--outline button--small" href="${animals}">${t('listing.prepare')}</a>`,
     verified: html`
       <p>${t('portal.verifiedBody')}</p>
       <div class="portal-card__actions">
-        <a class="button button--primary button--small" href="#/refugio/${encodeURIComponent(s.id)}/solicitudes">${t('inbox.open')}${s.newRequests ? html` <span class="portal-card__count">${s.newRequests}</span>` : ''}</a>
+        <a class="button button--primary button--small" href="/refugio/${encodeURIComponent(s.id)}/solicitudes">${t('inbox.open')}${s.newRequests ? html` <span class="portal-card__count">${s.newRequests}</span>` : ''}</a>
         <a class="button button--outline button--small" href="${animals}">${t('listing.open')}</a>
       </div>`,
     rejected: html`
       <p class="portal-card__reason"><strong>${t('portal.reason')}:</strong> ${s.statusReason ?? ''}</p>
       <div class="portal-card__actions">
-        ${s.role === 'owner' ? html`<a class="button button--outline button--small" href="#/refugio/${s.id}/editar">${t('portal.fix')}</a>` : ''}
+        ${s.role === 'owner' ? html`<a class="button button--outline button--small" href="/refugio/${s.id}/editar">${t('portal.fix')}</a>` : ''}
         <a class="button button--ghost button--small" href="${animals}">${t('listing.prepare')}</a>
       </div>`,
     suspended: html`
@@ -139,7 +140,7 @@ async function edit(root: HTMLElement, id: string) {
     if (shelter.role !== 'owner' || !application) throw new ApiError('not_found', {});
     form(root, { shelter, application });
   } catch {
-    mount(root, html`<section class="portal"><p class="loading-note" role="alert">${t('portal.notFound')}</p><a class="button button--outline" href="#/refugio">${t('portal.back')}</a></section>`);
+    mount(root, html`<section class="portal"><p class="loading-note" role="alert">${t('portal.notFound')}</p><a class="button button--outline" href="/refugio">${t('portal.back')}</a></section>`);
   }
 }
 
@@ -159,7 +160,7 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
     root,
     html`
       <section class="portal" aria-labelledby="portal-title">
-        <a class="text-button portal__back" href="#/refugio">${t('portal.back')}</a>
+        <a class="text-button portal__back" href="/refugio">${t('portal.back')}</a>
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${existing ? t('portal.fixTitle', { name: s!.name }) : t('portal.registerTitle')}</h1>
         ${s?.statusReason ? html`<p class="withdraw-warning"><strong>${t('portal.reason')}:</strong> ${s.statusReason}</p>` : ''}
         <form class="portal-form" id="shelter-form" novalidate>
@@ -322,7 +323,7 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
       if (existing) await api.resubmitShelter(existing.shelter.id, body);
       else await api.registerShelter(body);
       toast(existing ? t('portal.resent') : t('portal.sent'));
-      location.hash = '/refugio';
+      navigate('/refugio');
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'network';
       const known = ['invalid_more_reference', 'invalid_name', 'invalid_place', 'invalid_contact', 'invalid_phone', 'invalid_public_phone', 'invalid_email', 'invalid_address', 'history_too_short', 'invalid_reference', 'rules_required', 'too_many_shelters', 'not_editable', 'too_many_today', 'queue_full'];
@@ -351,14 +352,14 @@ async function adminQueue(root: HTMLElement, status: ShelterStatus) {
     root,
     html`
       <section class="portal portal--admin" aria-labelledby="portal-title">
-        <a class="text-button portal__back" href="#/refugio">${t('portal.back')}</a>
+        <a class="text-button portal__back" href="/refugio">${t('portal.back')}</a>
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('portal.admin.title')}</h1>
         <div class="portal-digest">
           <button class="button button--outline button--small" type="button" data-digest>${t('portal.admin.digest')}</button>
           <p class="muted">${t('portal.admin.digestNote')}</p>
         </div>
         <nav class="list-tabs" aria-label="${t('portal.admin.title')}">
-          ${QUEUE.map((s) => html`<a class="list-tabs__tab" href="#/refugio/admin?estado=${s}" aria-current="${s === status ? 'page' : 'false'}">${t(`portal.admin.tab.${s}`)}</a>`)}
+          ${QUEUE.map((s) => html`<a class="list-tabs__tab" href="/refugio/admin?estado=${s}" aria-current="${s === status ? 'page' : 'false'}">${t(`portal.admin.tab.${s}`)}</a>`)}
         </nav>
         ${shelters.length ? html`<ul class="portal-list">${shelters.map(adminCard)}</ul>` : html`<p class="passed__empty">${t('portal.admin.empty')}</p>`}
       </section>`,

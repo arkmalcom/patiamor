@@ -98,7 +98,7 @@ admin.post('/shelters/:id/decision', async (c) => {
   const { results: owners } = await db.prepare("SELECT u.email FROM shelter_members m JOIN users u ON u.id = m.user_id WHERE m.shelter_id = ? AND m.role = 'owner'").bind(id).all<{ email: string }>();
   for (const o of owners) {
     if (!(await hasEmailBudget(db, 'shelter_decision'))) break;
-    await sendShelterDecisionEmail(c.env, o.email, { shelter: s.name, decision: rule.to, reason, portalUrl: `${appOrigin(c)}/#/refugio` }).catch((err) =>
+    await sendShelterDecisionEmail(c.env, o.email, { shelter: s.name, decision: rule.to, reason, portalUrl: `${appOrigin(c)}/refugio` }).catch((err) =>
       console.error('shelter decision email failed', err),
     );
   }

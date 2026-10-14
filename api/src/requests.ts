@@ -172,7 +172,7 @@ requests.post('/', async (c) => {
     await sendRequestSentEmail(c.env, user.email, {
       pet: pet.name,
       lister: pet.shelter_name ?? 'la persona que lo publicó',
-      listUrl: `${appOrigin(c)}/#/lista`,
+      listUrl: `${appOrigin(c)}/lista`,
     }).catch((err) => console.error('request confirmation email failed', err));
   } else console.warn('daily email budget reached: request confirmation not sent');
 

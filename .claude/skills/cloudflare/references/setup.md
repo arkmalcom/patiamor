@@ -59,7 +59,7 @@ To keep the wrapper using the pinned version, add `"scripts": { "dev": "wrangler
     "directory": "../web/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*", "/mascota/*"]
   },
   "d1_databases": [
     { "binding": "DB", "database_name": "patiamor-db", "database_id": "<prod id>", "migrations_dir": "migrations" }

@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cachedJson } from './cache';
 import type { AppContext } from './env';
 
@@ -131,6 +131,12 @@ pets.get('/:id', (c) => {
   const id = c.req.param('id');
   return cachedJson(c, `/pets/${encodeURIComponent(id)}`, () => profile(c.env.DB, id));
 });
+
+/** The same profile (and the same cached copy), read by the link preview in share.ts. */
+export async function cachedProfile(c: Context<AppContext>, id: string) {
+  const res = await cachedJson(c, `/pets/${encodeURIComponent(id)}`, () => profile(c.env.DB, id));
+  return res.json<{ pet?: never; error?: string }>();
+}
 
 /** An animal that was public and has left, adopted or withdrawn: old links (Mi lista, shared ones) say
  *  how it ended instead of failing. Only its name, species and main photo. */

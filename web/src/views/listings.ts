@@ -8,8 +8,9 @@ import { age, canvas, miniFrame } from '../ui/canvas';
 import { openOutcome, outcomeButton } from '../ui/outcome';
 import { PhotoError, preparePhoto, toBase64, type PreparedPhoto } from '../ui/photos';
 import { toast } from '../ui/toast';
+import { navigate } from '../nav';
 
-// A shelter's animals in the portal (PAT-8): the list at #/refugio/<id>/animales, and the form at
+// A shelter's animals in the portal (PAT-8): the list at /refugio/<id>/animales, and the form at
 // …/animales/nuevo or …/animales/<petId>. Any shelter that isn't suspended can prepare drafts; verified
 // shelters publish, and a published animal reaches adopters at once. Photos (PAT-9) are resized on the
 // phone and sent when the form is saved, along with their order and framing.
@@ -28,7 +29,7 @@ const petChip = (p: { status: PetStatus; sex: string }) =>
   html`<span class="status-chip status-chip--pet-${p.status}">${icon(STATUS_ICON[p.status], 16)}${t((p.sex === 'hembra' && FEMININE[p.status]) || `listing.status.${p.status}`)}</span>`;
 
 const notFound = (root: HTMLElement) =>
-  mount(root, html`<section class="portal"><p class="loading-note" role="alert">${t('listing.notFound')}</p><a class="button button--outline" href="#/refugio">${t('portal.back')}</a></section>`);
+  mount(root, html`<section class="portal"><p class="loading-note" role="alert">${t('listing.notFound')}</p><a class="button button--outline" href="/refugio">${t('portal.back')}</a></section>`);
 
 // ---------- The shelter's animals ----------
 
@@ -48,7 +49,7 @@ export async function renderListings(root: HTMLElement, shelterId: string, slug:
   } catch {
     return notFound(root);
   }
-  const base = `#/refugio/${encodeURIComponent(shelter.id)}/animales`;
+  const base = `/refugio/${encodeURIComponent(shelter.id)}/animales`;
   const canAdd = shelter.status !== 'suspended';
   // Tabs appear once something has ended; empty ones (other than Activos) stay hidden. They carry no
   // counts: with them, three tabs don't fit a 360 px phone.
@@ -60,7 +61,7 @@ export async function renderListings(root: HTMLElement, shelterId: string, slug:
     root,
     html`
       <section class="portal" aria-labelledby="portal-title">
-        <a class="text-button portal__back" href="#/refugio">${t('portal.back')}</a>
+        <a class="text-button portal__back" href="/refugio">${t('portal.back')}</a>
         <div class="listings__head">
           <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('listing.title')}</h1>
           <p class="portal__who">${shelter.name}</p>
@@ -170,7 +171,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
   const months = ageMonths(v.birthDate || null);
   const draft = !existing || existing.status === 'draft';
   const canPublish = shelter.status === 'verified';
-  const list = `#/refugio/${encodeURIComponent(shelter.id)}/animales`;
+  const list = `/refugio/${encodeURIComponent(shelter.id)}/animales`;
 
   const choice = (name: string, legend: string, options: [string, string][], value: string, wrap = false) => html`
     <fieldset class="question">
@@ -523,7 +524,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
       const status = !fresh || publish ? (await api.savePet(petId, body, publish)).status : 'draft';
       petChanged(petId);
       toast(t(publish ? 'listing.published' : status === 'draft' ? 'listing.savedDraft' : 'listing.saved', { name: body.name }));
-      location.hash = list.slice(1);
+      navigate(list);
     } catch (err) {
       fail(err instanceof ApiError ? err.code : 'network');
     }
@@ -531,7 +532,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
 }
 
 const statusLine = (p: Listing): Raw =>
-  html`${petChip(p)}${['available', 'reserved'].includes(p.status) ? html`<a class="text-button" href="#/mascota/${encodeURIComponent(p.id)}">${t('listing.viewLive')}</a>` : ''}`;
+  html`${petChip(p)}${['available', 'reserved'].includes(p.status) ? html`<a class="text-button" href="/mascota/${encodeURIComponent(p.id)}">${t('listing.viewLive')}</a>` : ''}`;
 
 /** "En proceso" and the pause switch: they apply at once (not on save), so a shelter can flip them
  *  from the inbox's link without touching the rest of the form. */

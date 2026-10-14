@@ -144,6 +144,10 @@ const es = {
   'profile.loading': 'Cargando…',
   'profile.unavailable': 'Ya no está disponible',
   'profile.unavailableBody': 'Puede que ya lo hayan adoptado o que el refugio lo haya retirado.',
+  'share.button': 'Compartir a {name}',
+  'share.text': 'Conoce a {name} en Patiamor.',
+  'share.copied': 'Enlace copiado. Pégalo donde quieras compartirlo.',
+  'share.failed': 'No pudimos copiar el enlace: {url}',
   'profile.gone.adopted': '¡{name} ya encontró hogar!',
   'profile.gone.adoptedBody': 'Una familia le abrió las puertas de su casa. Hay más esperando cerca de ti.',
   'profile.gone.withdrawn': '{name} ya no está disponible',
@@ -335,7 +339,7 @@ const es = {
   'request.restrictedBody': 'Retiraste varias solicitudes en poco tiempo. Antes de empezar un proceso nuevo queremos hablar contigo y hacer unas verificaciones. Escríbenos a {email}.',
   'request.restrictedSubject': 'Revisión de mi cuenta para adoptar',
   'request.err.restricted': 'Por ahora no puedes empezar procesos nuevos.',
-  // ---------- Shelter portal (#/refugio) ----------
+  // ---------- Shelter portal (/refugio) ----------
   'portal.title': 'Portal de refugios',
   'portal.who': 'Entraste como {who}',
   'portal.lede': 'Publica a tus animales en Patiamor y llega a familias que viven cerca. Antes de publicar verificamos cada refugio, para que las familias sepan que es real.',
@@ -438,7 +442,7 @@ const es = {
   'portal.admin.done.verify': 'Refugio verificado. Le avisamos por correo.',
   'portal.admin.done.reject': 'Le pedimos cambios al refugio.',
   'portal.admin.done.suspend': 'Refugio suspendido. Sus animales ya no se muestran.',
-  // ---------- Shelter listings (#/refugio/<id>/animales) ----------
+  // ---------- Shelter listings (/refugio/<id>/animales) ----------
   'listing.title': 'Tus animales',
   'listing.open': 'Tus animales',
   'listing.prepare': 'Prepara a tus animales',
@@ -531,7 +535,7 @@ const es = {
   'listing.err.invalid_image': 'Una de las fotos no se pudo usar. Quítala y prueba con otra.',
   'listing.err.duplicate_photo': 'Esa foto ya está en su perfil.',
   'listing.err.last_photo': 'Mientras esté publicado necesita al menos una foto. Añade otra antes de quitar esta.',
-  // ---------- Shelter inbox (#/refugio/<id>/solicitudes) ----------
+  // ---------- Shelter inbox (/refugio/<id>/solicitudes) ----------
   'inbox.open': 'Solicitudes',
   'inbox.title': 'Solicitudes',
   'inbox.lede': 'Escríbeles desde aquí por WhatsApp, llamada o correo. Cada paso que marques lo ve la familia en su lista. Te mandamos un resumen por correo cada mañana si llegan solicitudes nuevas.',

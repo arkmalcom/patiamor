@@ -18,9 +18,13 @@ type C = Context<AppContext>;
 
 export const appOrigin = (c: C) => c.env.APP_ORIGIN || new URL(c.req.url).origin;
 
-/** Only in-app hash routes are allowed after sign-in, so the redirect can't be pointed at another site. */
-const safeNext = (next: string | undefined) => (next && /^#\/[\w\-/%]*$/.test(next) ? next : '#/');
-const backToApp = (c: C, next: string) => c.redirect(`${appOrigin(c)}/${next}`, 302);
+/** Only in-app paths are allowed after sign-in (one leading slash, never "//"), so the redirect can't be
+ *  pointed at another site. Hash routes from before PAT-32 ("#/lista") still work. */
+export const safeNext = (next: string | undefined) => {
+  const path = (next ?? '').replace(/^#/, '');
+  return /^\/(?!\/)[\w\-/%]*(\?[\w\-=&%.]*)?$/.test(path) ? path : '/';
+};
+const backToApp = (c: C, next: string) => c.redirect(`${appOrigin(c)}${next}`, 302);
 
 export const auth = new Hono<AppContext>();
 
@@ -71,7 +75,7 @@ auth.post('/email/start', async (c) => {
   const next = safeNext(body.next);
   // The link opens the app, which posts the token back. Mail scanners (Outlook Safe Links and the like)
   // fetch links before the person taps them; a GET that signed in would burn the token on their visit.
-  const link = `${appOrigin(c)}/#/entrar?t=${linkToken}&next=${encodeURIComponent(next)}`;
+  const link = `${appOrigin(c)}/entrar?t=${linkToken}&next=${encodeURIComponent(next)}`;
   try {
     await sendSignInEmail(c.env, email, code, link);
   } catch (err) {
@@ -143,7 +147,7 @@ function google(c: C) {
 
 auth.get('/google/start', (c) => {
   const client = google(c);
-  if (!client) return backToApp(c, '#/cuenta?error=google_unavailable');
+  if (!client) return backToApp(c, '/cuenta?error=google_unavailable');
   const state = generateState();
   const verifier = generateCodeVerifier();
   setCookie(c, '__Host-g_state', state, OAUTH_COOKIE);
@@ -162,7 +166,7 @@ auth.get('/google/callback', async (c) => {
   for (const name of ['__Host-g_state', '__Host-g_verifier', '__Host-g_next']) deleteCookie(c, name, { path: '/', secure: true });
 
   const code = c.req.query('code');
-  if (!client || !code || !state || !verifier || c.req.query('state') !== state) return backToApp(c, '#/cuenta?error=google');
+  if (!client || !code || !state || !verifier || c.req.query('state') !== state) return backToApp(c, '/cuenta?error=google');
 
   let claims: { sub?: string; email?: string; email_verified?: boolean; name?: string };
   try {
@@ -170,14 +174,14 @@ auth.get('/google/callback', async (c) => {
     claims = decodeIdToken(tokens.idToken()) as typeof claims;
   } catch (err) {
     console.error('google token exchange failed', err);
-    return backToApp(c, '#/cuenta?error=google');
+    return backToApp(c, '/cuenta?error=google');
   }
   // The ID token came straight from Google's token endpoint over TLS, so its claims can be trusted as-is.
-  if (!claims.sub || !claims.email || claims.email_verified !== true) return backToApp(c, '#/cuenta?error=google_email');
+  if (!claims.sub || !claims.email || claims.email_verified !== true) return backToApp(c, '/cuenta?error=google_email');
 
   const user = await userForGoogle(c.env.DB, claims.sub, normalizeEmail(claims.email), claims.name ?? null);
   await startSession(c, user.id);
-  return backToApp(c, `${next}?signedin=1`);
+  return backToApp(c, `${next}${next.includes('?') ? '&' : '?'}signedin=1`);
 });
 
 // ---------- Session ----------

@@ -13,6 +13,7 @@ import { mountPips, pips } from './ui/save';
 import { closeSheet, initSheet, openSheet, sheetEl } from './ui/sheet';
 import { initToast, toast } from './ui/toast';
 import { api, ApiError } from './api';
+import { here, isAppPath, navigate, startNavigation, upgradeHashLink } from './nav';
 import { errorText } from './ui/auth';
 import { renderAccount } from './views/account';
 import { renderDeck } from './views/deck';
@@ -20,13 +21,16 @@ import { bindSlots, renderList, slots } from './views/list';
 import { renderPortal, type PortalView } from './views/portal';
 import { renderProfile } from './views/profile';
 
+upgradeHashLink();
+
 type Route = { name: 'deck' } | { name: 'profile'; id: string } | { name: 'list' } | { name: 'account' } | ({ name: 'portal' } & PortalView);
 
-function parse(hash: string): Route {
-  const [path, query = ''] = hash.replace(/^#/, '').split('?');
+/** The route for an in-app path (here()): "/mascota/luna", "/refugio/x/animales?ver=adoptados"… */
+function parse(where: string): Route {
+  const [path, query = ''] = where.split('?');
   const [, a, b, c, d] = path.split('/');
   if (a === 'mascota' && b) return { name: 'profile', id: decodeURIComponent(b) };
-  // The shelter portal: #/refugio, #/refugio/registro, #/refugio/<id>/editar, #/refugio/admin?estado=…
+  // The shelter portal: /refugio, /refugio/registro, /refugio/<id>/editar, /refugio/admin?estado=…
   if (a === 'refugio') {
     if (b === 'registro') return { name: 'portal', view: 'registro' };
     if (b === 'admin') {
@@ -34,7 +38,7 @@ function parse(hash: string): Route {
       return { name: 'portal', view: 'admin', status: (['pending', 'verified', 'rejected', 'suspended'] as const).find((s) => s === estado) ?? 'pending' };
     }
     if (b && c === 'editar') return { name: 'portal', view: 'editar', id: decodeURIComponent(b) };
-    // A shelter's animals: #/refugio/<id>/animales, …/animales/nuevo, …/animales/<petId>. Lists keep
+    // A shelter's animals: /refugio/<id>/animales, …/animales/nuevo, …/animales/<petId>. Lists keep
     // their tab in ?ver=…, so a re-render (any store update) stays on it.
     const ver = new URLSearchParams(query).get('ver');
     if (b && c === 'solicitudes') return { name: 'portal', view: 'solicitudes', id: decodeURIComponent(b), tab: ver };
@@ -47,9 +51,8 @@ function parse(hash: string): Route {
   return { name: 'deck' };
 }
 
-const go = (path: string) => (location.hash = path);
-const openProfile = (id: string) => go(`/mascota/${encodeURIComponent(id)}`);
-const explore = () => go('/');
+const openProfile = (id: string) => navigate(`/mascota/${encodeURIComponent(id)}`);
+const explore = () => navigate('/');
 
 const app = $('#app');
 mount(
@@ -59,11 +62,11 @@ mount(
     ${landscape}
     <a class="skip-link" href="#view">Saltar al contenido</a>
     <header class="topbar">
-      <a class="wordmark" href="#/" aria-label="${t('app.name')}, ${t('nav.explore')}">${t('app.name')}<span class="wordmark__demo">${t('app.demo')}</span></a>
+      <a class="wordmark" href="/" aria-label="${t('app.name')}, ${t('nav.explore')}">${t('app.name')}<span class="wordmark__demo">${t('app.demo')}</span></a>
       <nav class="topnav" aria-label="Principal">
-        <a href="#/" data-nav="deck">${t('nav.explore')}</a>
-        <a href="#/lista" data-nav="list">${t('nav.list')} <span data-pips data-pips-count>${pips(true)}</span></a>
-        <a href="#/cuenta" data-nav="account" data-account-top>${t('nav.account')}</a>
+        <a href="/" data-nav="deck">${t('nav.explore')}</a>
+        <a href="/lista" data-nav="list">${t('nav.list')} <span data-pips data-pips-count>${pips(true)}</span></a>
+        <a href="/cuenta" data-nav="account" data-account-top>${t('nav.account')}</a>
       </nav>
       <div class="topbar__tools">
         <button class="radius-chip" type="button" data-open-radius aria-label="${t('radius.open')}">${icon(MapPin, 18)}<span><span class="radius-chip__place" data-radius-place></span><span data-radius-label></span></span></button>
@@ -73,14 +76,14 @@ mount(
     <aside class="side side--filters" aria-label="${t('sheet.radius.title')}" data-side-filters></aside>
     <main class="view" id="view" tabindex="-1"></main>
     <aside class="side side--list" aria-labelledby="side-list-title">
-      <h2 class="panel-title" id="side-list-title"><a href="#/lista">${t('list.title')}</a> <span data-pips data-pips-count>${pips(true)}</span></h2>
+      <h2 class="panel-title" id="side-list-title"><a href="/lista">${t('list.title')}</a> <span data-pips data-pips-count>${pips(true)}</span></h2>
       <p class="muted">${t('list.body')}</p>
       <div data-side-slots></div>
     </aside>
     <nav class="tabbar" aria-label="Principal">
-      <a href="#/" data-nav="deck">${icon(Compass, 24)}<span>${t('nav.explore')}</span></a>
-      <a href="#/lista" data-nav="list"><span class="tabbar__pips" data-pips data-pips-count>${pips(true)}</span><span>${t('nav.list')}</span></a>
-      <a href="#/cuenta" data-nav="account" data-account-tab>${icon(User, 24)}<span>${t('nav.account')}</span></a>
+      <a href="/" data-nav="deck">${icon(Compass, 24)}<span>${t('nav.explore')}</span></a>
+      <a href="/lista" data-nav="list"><span class="tabbar__pips" data-pips data-pips-count>${pips(true)}</span><span>${t('nav.list')}</span></a>
+      <a href="/cuenta" data-nav="account" data-account-tab>${icon(User, 24)}<span>${t('nav.account')}</span></a>
     </nav>
   `,
 );
@@ -94,7 +97,7 @@ mount(inlinePanel, radiusPanel('inline'));
 const inline = bindRadiusPanel(inlinePanel, { mode: 'inline' });
 
 function openRadiusSheet() {
-  if (matchMedia('(min-width: 1100px)').matches && parse(location.hash).name === 'deck') {
+  if (matchMedia('(min-width: 1100px)').matches && parse(here()).name === 'deck') {
     $<HTMLInputElement>('[data-radius]', inlinePanel).focus();
     return;
   }
@@ -148,7 +151,7 @@ function chrome(route: Route) {
   bindSlots(side, { openProfile, explore });
 }
 
-function render(route = parse(location.hash)) {
+function render(route = parse(here())) {
   chrome(route);
   switch (route.name) {
     case 'deck':
@@ -164,18 +167,19 @@ function render(route = parse(location.hash)) {
   }
 }
 
-// A one-tap link from the sign-in email lands on #/entrar?t=…&next=…. Take the token off the URL before
+// A one-tap link from the sign-in email lands on /entrar?t=…&next=…. Take the token off the URL before
 // anything renders, then post it; the server only signs in on that POST, never on the link's GET.
-const linkParams = location.hash.startsWith('#/entrar?') ? new URLSearchParams(location.hash.split('?')[1]) : null;
+const linkParams = location.pathname === '/entrar' ? new URLSearchParams(location.search) : null;
 const linkToken = linkParams?.get('t') ?? null;
 if (linkParams) {
-  const next = linkParams.get('next') ?? '';
-  history.replaceState(null, '', location.pathname + (/^#\/[\w\-/%]*$/.test(next) ? next : '#/'));
+  // Links sent before PAT-32 carry a hash route ("#/lista") as next.
+  const next = (linkParams.get('next') ?? '').replace(/^#/, '');
+  history.replaceState(null, '', isAppPath(next) ? next : '/');
 }
 
-let current = parse(location.hash);
-window.addEventListener('hashchange', () => {
-  const next = parse(location.hash);
+let current = parse(here());
+startNavigation(() => {
+  const next = parse(here());
   const morph = (current.name === 'deck' && next.name === 'profile') || (current.name === 'profile' && next.name === 'deck');
   current = next;
   if (sheetEl().open) sheetEl().close();
@@ -191,20 +195,20 @@ window.addEventListener('hashchange', () => {
 });
 
 subscribe(() => {
-  // The URL as it is now: a list records its tab with replaceState, which fires no hashchange.
-  current = parse(location.hash);
+  // The URL as it is now: a list records its tab with replaceState, which doesn't navigate.
+  current = parse(here());
   render(current);
   inline.refresh();
 });
 
 render(current);
 
-// Sign-in state lives on the server; errors from a sign-in redirect arrive as ?error=… on the hash.
-const returnParams = new URLSearchParams(location.hash.split('?')[1] ?? '');
+// Sign-in state lives on the server; errors from a sign-in redirect arrive as ?error=… on the URL.
+const returnParams = new URLSearchParams(location.search);
 const authError = returnParams.get('error');
 const justSignedIn = returnParams.has('signedin');
 if (authError) toast(errorText(authError));
-if (authError || justSignedIn) history.replaceState(null, '', location.pathname + location.hash.split('?')[0]);
+if (authError || justSignedIn) history.replaceState(null, '', location.pathname);
 // Where to measure distances from: the saved area, or Cloudflare's coarse IP location (Gazcue outside the DR).
 if (state.location) void loadPets();
 else

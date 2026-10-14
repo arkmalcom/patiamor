@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, CircleHelp, Clock, Heart, HeartHandshake, House, Mail, Send, User, X } from 'lucide';
+import { ArrowLeft, Check, CircleHelp, Clock, Heart, HeartHandshake, House, Mail, Send, Share2, User, X } from 'lucide';
 import { api, ApiError, type GonePet } from '../api';
 import { companionKey, CONTACT_EMAIL, frameFor, type Companion, type PetDetail, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, reducedMotion, type Raw } from '../dom';
@@ -7,6 +7,7 @@ import { activeRequestFor, cachePets, petCache, placePet, state, takeChanged, up
 import { alertButton, bindAlerts, cautions, listerName, startRequest } from '../ui/request';
 import { age, canvas, companionLabel, photo } from '../ui/canvas';
 import { bindGallery } from '../ui/gallery';
+import { sharePet } from '../ui/share';
 import { toast } from '../ui/toast';
 
 interface ProfileDeps {
@@ -158,7 +159,7 @@ function renderGone(root: HTMLElement, pet: GonePet | PetSummary) {
       <span class="mini-frame profile-gone__frame" data-frame="${frameFor(pet.id)}">${photo({ id: pet.id, photo: pet.photo } as PetSummary, 'eager')}</span>
       <h1 class="page-title" tabindex="-1" data-focus>${t(adopted ? 'profile.gone.adopted' : 'profile.gone.withdrawn', { name: pet.name })}</h1>
       <p class="muted">${t(adopted ? 'profile.gone.adoptedBody' : 'profile.gone.withdrawnBody')}</p>
-      <a class="button button--primary" href="#/">${icon(adopted ? House : Heart, 18)}${t('profile.gone.explore')}</a>
+      <a class="button button--primary" href="/">${icon(adopted ? House : Heart, 18)}${t('profile.gone.explore')}</a>
     </section>`,
   );
 }
@@ -190,7 +191,7 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
   // commitment lives; once sent, it points to Mi lista.
   const bar = active
     ? html`<span class="saved-tag">${icon(Send, 18)}${t('request.status.sent')}</span>
-        <a class="button button--outline" href="#/lista">${t('request.inList')}</a>`
+        <a class="button button--outline" href="/lista">${t('request.inList')}</a>`
     : waiting
       ? html`<span class="wait-tag">${icon(HeartHandshake, 18)}${pet.status === 'reserved' ? t('request.reservedShort') : t('request.pausedShort')}</span>
           ${state.signedIn ? alertButton(pet) : ''}`
@@ -202,6 +203,7 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
       <article class="profile" aria-labelledby="pet-name">
         <div class="profile__media">
           <button class="icon-button icon-button--float profile__back" type="button" data-back aria-label="${t('profile.back')}">${icon(ArrowLeft, 22)}</button>
+          <button class="icon-button icon-button--float profile__share" type="button" data-share aria-label="${t('share.button', { name: pet.name })}">${icon(Share2, 22)}</button>
           ${canvas(p, { heading: 'h1', photoName: 'pet-photo', gallery: 'profile' })}
         </div>
         <div class="profile__body">
@@ -212,6 +214,7 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
   );
 
   $('[data-back]', root).addEventListener('click', deps.back);
+  $('[data-share]', root).addEventListener('click', () => void sharePet(pet));
   bindGallery($('.profile__media', root), pet, 'profile');
   root.querySelector('[data-to-ready]')?.addEventListener('click', () => {
     const end = root.querySelector<HTMLElement>('#ready');

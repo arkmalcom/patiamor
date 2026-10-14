@@ -7,7 +7,7 @@ import { photo } from '../ui/canvas';
 import { openOutcome } from '../ui/outcome';
 import { toast } from '../ui/toast';
 
-// A shelter's requests (#/refugio/<id>/solicitudes, PAT-5). Shelters reach adopters through their own
+// A shelter's requests (/refugio/<id>/solicitudes, PAT-5). Shelters reach adopters through their own
 // WhatsApp, phone or email from here, and mark each step; adopters see every step in their list.
 // Opening a new request marks it seen. New requests also arrive in a morning email (api/src/digest.ts).
 
@@ -44,13 +44,13 @@ export async function renderInbox(root: HTMLElement, shelterId: string, slug: st
     requests = list;
     shelterName = shelters.find((s) => s.id === shelterId)?.name ?? '';
   } catch {
-    return mount(root, html`<section class="portal"><p class="loading-note" role="alert">${t('portal.notFound')}</p><a class="button button--outline" href="#/refugio">${t('portal.back')}</a></section>`);
+    return mount(root, html`<section class="portal"><p class="loading-note" role="alert">${t('portal.notFound')}</p><a class="button button--outline" href="/refugio">${t('portal.back')}</a></section>`);
   }
   let current = tab;
   /** Shows a tab and records it in the URL (?ver=…), so a re-render stays on it. */
   const go = (k: Tab) => {
     current = k;
-    history.replaceState(null, '', `#/refugio/${encodeURIComponent(shelterId)}/solicitudes?ver=${k}`);
+    history.replaceState(null, '', `/refugio/${encodeURIComponent(shelterId)}/solicitudes?ver=${k}`);
   };
 
   const draw = () => {
@@ -61,7 +61,7 @@ export async function renderInbox(root: HTMLElement, shelterId: string, slug: st
       root,
       html`
         <section class="portal inbox" aria-labelledby="portal-title">
-          <a class="text-button portal__back" href="#/refugio">${t('portal.back')}</a>
+          <a class="text-button portal__back" href="/refugio">${t('portal.back')}</a>
           <div class="listings__head">
             <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('inbox.title')}</h1>
             <p class="portal__who">${shelterName}</p>
@@ -179,7 +179,7 @@ function card(r: InboxRequest, shelter: string, shelterId: string): Raw {
             ${fact('inbox.q.visit', r.about.visit && t(`request.visit.${r.about.visit as 'semana'}`))}
           </dl>
           ${open ? actions(r, first) : ''}
-          <a class="text-button request-card__pet" href="#/refugio/${encodeURIComponent(shelterId)}/animales/${encodeURIComponent(pet.id)}">${t(pet.status === 'available' || pet.status === 'reserved' ? 'inbox.petLink' : 'inbox.petLinkEnded', { pet: pet.name })}</a>
+          <a class="text-button request-card__pet" href="/refugio/${encodeURIComponent(shelterId)}/animales/${encodeURIComponent(pet.id)}">${t(pet.status === 'available' || pet.status === 'reserved' ? 'inbox.petLink' : 'inbox.petLinkEnded', { pet: pet.name })}</a>
         </div>
       </details>
     </li>`;

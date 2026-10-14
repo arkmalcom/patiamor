@@ -42,7 +42,7 @@ export async function runDigest(env: Env, origin = env.APP_ORIGIN ?? ''): Promis
         fresh: s.fresh,
         pets: JSON.parse(s.pets) as string[],
         unopened: s.unopened,
-        inboxUrl: `${origin}/#/refugio/${encodeURIComponent(s.id)}/solicitudes`,
+        inboxUrl: `${origin}/refugio/${encodeURIComponent(s.id)}/solicitudes`,
       }).catch((err) => console.error('digest email failed', s.id, err));
       result.digestEmails++;
     }
@@ -72,7 +72,7 @@ export async function runDigest(env: Env, origin = env.APP_ORIGIN ?? ''): Promis
         result.deferred = true;
         break;
       }
-      await sendAvailableEmail(env, entry.email, { pets: entry.pets.map((p) => ({ name: p.name, url: `${origin}/#/mascota/${encodeURIComponent(p.id)}` })) })
+      await sendAvailableEmail(env, entry.email, { pets: entry.pets.map((p) => ({ name: p.name, url: `${origin}/mascota/${encodeURIComponent(p.id)}` })) })
         .then(() =>
           // One notice per wish: the alert is done once it's been sent.
           db.batch(entry.pets.map((p) => db.prepare('DELETE FROM availability_alerts WHERE user_id = ? AND pet_id = ?').bind(userId, p.id))),
