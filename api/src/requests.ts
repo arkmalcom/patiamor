@@ -6,7 +6,7 @@ import type { AppContext } from './env';
 import { PET_JOINS, REQUEST_CAP, SUMMARY_COLUMNS, summary, VIEWABLE, type SummaryRow } from './pets';
 
 // Adoption requests. Mi lista's three slots are requests: liking a pet leads to its full profile, and
-// "Sí, quiero empezar el proceso" sends one deliberate request with the reflection answers, contact
+// "Enviar solicitud" sends one deliberate request with the reflection answers, contact
 // details the adopter consents to share, and anything else they want to tell the lister. There's no
 // lower-commitment "save". Withdrawing is always possible; the lister always sees that it happened.
 // Listers read and move requests in the portal (later); this file is the adopter's side.

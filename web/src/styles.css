@@ -1030,7 +1030,6 @@ html.sheet-open { overflow: hidden; }
 .ready:focus-visible { box-shadow: 0 0 0 3px var(--anil); }
 .ready .mind { background: var(--paper); }
 .ready__fee { font-weight: 700; }
-.ready__go { justify-self: stretch; margin-top: 4px; white-space: normal; text-align: center; }
 .ready__note { font-size: 0.9rem; text-align: center; }
 
 .alert-toggle[aria-pressed='true'] { background: var(--sky-tint); border-color: var(--rule-strong); }

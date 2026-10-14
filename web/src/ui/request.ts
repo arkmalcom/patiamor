@@ -26,8 +26,7 @@ import { closeSheet, openSheet } from './sheet';
 import { toast } from './toast';
 import { here, navigate } from '../nav';
 
-// Adoption requests. Liking a pet opens its full profile; the profile ends with "Sí, quiero empezar el
-// proceso", which opens this one form: the reflection questions, how to reach the adopter, consent, and
+// Adoption requests. Liking a pet opens its full profile; "Quiero adoptar" in its bar opens this one form: the reflection questions, how to reach the adopter, consent, and
 // optionally more for the lister. Each request takes one of Mi lista's 3 slots until it ends or is
 // withdrawn; withdrawing is always possible and the lister always sees it.
 
@@ -47,6 +46,17 @@ export function cautions(pet: PetSummary): string[] {
   if (pet.goodWith.dogs === false) out.push(t('reflect.notDogs'));
   if (pet.goodWith.kids === false) out.push(t('reflect.notKids'));
   return [...out, ...((pet as PetDetail).needs ?? [])];
+}
+
+/** "Ten en cuenta" and the adoption fee: shown at the end of the profile and again at the top of the
+ *  form, so everyone sees them however they got there. Empty when there's nothing to say. */
+export function beforeYouStart(pet: PetSummary): Raw {
+  const notes = cautions(pet);
+  const fee = (pet as PetDetail).adoptionFeeDop ?? null;
+  if (!notes.length && fee === null) return html``;
+  return html`
+    ${notes.length ? html`<div class="mind"><h3 class="mind__title">${t('reflect.mind')}</h3><ul class="mind__list">${notes.map((n) => html`<li>${n}</li>`)}</ul></div>` : ''}
+    ${fee !== null ? html`<p class="ready__fee">${t('profile.ready.fee', { fee: `RD$${fee.toLocaleString('es-DO')}` })}</p>` : ''}`;
 }
 
 function choice(name: string, legend: string, values: string[], label: (v: string) => string, opts: { type?: 'radio' | 'checkbox'; hint?: string; stack?: boolean } = {}): Raw {
@@ -157,6 +167,7 @@ function openForm(pet: PetSummary) {
           ${pet.requests === 'busy' ? html`<p class="request__busy">${t('request.busy', { lister })}</p>` : ''}
         </div>
       </div>
+      ${beforeYouStart(pet)}
       ${reflection(pet)}
       <p class="unsure-note" hidden data-unsure>${t('reflect.unsureNote', { lister })}</p>
       <fieldset class="question contact">

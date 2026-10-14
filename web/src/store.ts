@@ -26,7 +26,7 @@ export const isOpen = (r: AdoptionRequest | null | undefined) => !!r && ['sent',
 
 export type ContactPref = 'whatsapp' | 'llamada' | 'correo';
 
-/** What "Sí, quiero empezar el proceso" sends: reflection, contact, consent; the rest is optional. */
+/** What "Enviar solicitud" sends: reflection, contact, consent; the rest is optional. */
 export interface RequestForm {
   petId: string;
   answers: Answers;

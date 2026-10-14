@@ -1,10 +1,10 @@
 import { ArrowLeft, Check, CircleHelp, Clock, Heart, HeartHandshake, House, Mail, Send, Share2, User, X } from 'lucide';
 import { api, ApiError, type GonePet } from '../api';
 import { companionKey, CONTACT_EMAIL, frameFor, type Companion, type PetDetail, type PetSummary } from '../data';
-import { $, $$, html, icon, mount, reducedMotion, type Raw } from '../dom';
+import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, t, away } from '../i18n';
 import { activeRequestFor, cachePets, petCache, placePet, state, takeChanged, update } from '../store';
-import { alertButton, bindAlerts, cautions, listerName, startRequest } from '../ui/request';
+import { alertButton, beforeYouStart, bindAlerts, listerName, startRequest } from '../ui/request';
 import { age, canvas, companionLabel, photo } from '../ui/canvas';
 import { bindGallery } from '../ui/gallery';
 import { sharePet } from '../ui/share';
@@ -129,24 +129,19 @@ function body(pet: PetDetail, km: number): Raw {
 /** Whether this pet can take a new request from this person right now. */
 const canStart = (pet: PetSummary) => pet.status === 'available' && pet.requests !== 'paused' && !activeRequestFor(pet.id);
 
-/** The end of the profile, and the only place to commit: what to keep in mind, then "Sí, quiero empezar el proceso". */
+/** The end of the profile: what to know before starting. "Quiero adoptar", always in view in the bar, starts the process. */
 function ready(pet: PetDetail): Raw {
-  const notes = cautions(pet);
   return html`
     <section class="profile__section ready" id="ready" tabindex="-1" aria-labelledby="ready-title">
       <h2 class="section-title" id="ready-title">${t('profile.ready.title')}</h2>
       <p>${t('profile.ready.body', { lister: listerName(pet), name: pet.name })}</p>
-      ${notes.length
-        ? html`<div class="mind"><h3 class="mind__title">${t('reflect.mind')}</h3><ul class="mind__list">${notes.map((n) => html`<li>${n}</li>`)}</ul></div>`
-        : ''}
-      ${pet.adoptionFeeDop !== null ? html`<p class="ready__fee">${t('profile.ready.fee', { fee: `RD$${pet.adoptionFeeDop.toLocaleString('es-DO')}` })}</p>` : ''}
+      ${beforeYouStart(pet)}
       ${state.user?.requestsRestricted
         ? html`<div class="withdraw-warning">
             <p>${t('profile.ready.restricted')}</p>
             <a class="button button--ink button--small ready__write" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(t('request.restrictedSubject'))}">${icon(Mail, 18)}${t('full.manyCta')}</a>
           </div>`
-        : html`<button class="button button--primary ready__go" type="button" data-start>${icon(HeartHandshake, 20)}${t('profile.ready.go')}</button>
-            <p class="muted ready__note">${t('profile.ready.note')}</p>`}
+        : html`<p class="muted ready__note">${t('profile.ready.note')}</p>`}
     </section>`;
 }
 
@@ -196,7 +191,7 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
       ? html`<span class="wait-tag">${icon(HeartHandshake, 18)}${pet.status === 'reserved' ? t('request.reservedShort') : t('request.pausedShort')}</span>
           ${state.signedIn ? alertButton(pet) : ''}`
       : html`<button class="button button--outline" type="button" data-skip>${icon(Clock, 20)}${t('deck.skip')}</button>
-          ${canStart(pet) ? html`<button class="button button--primary" type="button" data-to-ready ${isDetail(pet) ? '' : 'disabled'}>${icon(Heart, 20)}${t('deck.save')}</button>` : ''}`;
+          ${canStart(pet) ? html`<button class="button button--primary" type="button" data-start ${isDetail(pet) ? '' : 'disabled'}>${icon(Heart, 20)}${t('deck.save')}</button>` : ''}`;
   mount(
     root,
     html`
@@ -216,11 +211,6 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
   $('[data-back]', root).addEventListener('click', deps.back);
   $('[data-share]', root).addEventListener('click', () => void sharePet(pet));
   bindGallery($('.profile__media', root), pet, 'profile');
-  root.querySelector('[data-to-ready]')?.addEventListener('click', () => {
-    const end = root.querySelector<HTMLElement>('#ready');
-    end?.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'center' });
-    end?.focus({ preventScroll: true });
-  });
   root.querySelector('[data-start]')?.addEventListener('click', () => startRequest(pet.id));
   bindAlerts(root);
   root.querySelector('[data-skip]')?.addEventListener('click', () => {
