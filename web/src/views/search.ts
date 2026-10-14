@@ -7,8 +7,9 @@ import { age, listerLabel, miniFrame } from '../ui/canvas';
 import { shareSite } from '../ui/share';
 
 // Buscar (/buscar?q=…): for someone who saw an animal elsewhere (an Instagram post, a flyer) and wants to
-// find it here by name, or by shelter or area. It searches every animal Patiamor holds, whatever the
-// person's filters, species switch or distance, and shows enough of each to tell similar ones apart. The
+// find it here by name, or by shelter or area. It searches the animals the app already holds (the nearest
+// 1,000 open to requests, nationwide: see search.ts), whatever the person's filters, species switch or
+// distance, and shows enough of each to tell similar ones apart. The
 // search lives in the address, so coming back from a profile finds the same results.
 
 interface SearchDeps {
