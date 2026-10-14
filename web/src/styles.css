@@ -171,6 +171,13 @@ html[data-route='deck'] #app { height: 100dvh; overflow: hidden; }
 }
 .radius-chip__place { display: none; }
 @media (min-width: 420px) { .radius-chip__place { display: inline; } }
+/* Small phones: the wordmark takes about half the bar, so the chip trims its padding, and the Demo tag
+   steps aside below 390 px, to keep the filter button on screen even for "150 km" or "Todo RD". */
+@media (max-width: 419px) {
+  .topbar__tools { gap: 6px; }
+  .radius-chip { gap: 5px; padding: 0 12px 0 10px; }
+}
+@media (max-width: 389px) { .wordmark__demo { display: none; } }
 
 .topnav { display: none; }
 

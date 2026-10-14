@@ -1,7 +1,7 @@
 import { Clock, Heart, SlidersHorizontal } from 'lucide';
 import { $, html, icon, mount, reducedMotion, type Raw } from '../dom';
 import { animals, away, t } from '../i18n';
-import { activeFilterCount, emptyFilters, loadPets, nextRadius, queue, state, update } from '../store';
+import { RADIUS_ANY, activeFilterCount, emptyFilters, loadPets, nextRadius, queue, state, update } from '../store';
 import { canvas } from '../ui/canvas';
 import { bindGallery } from '../ui/gallery';
 import { bindSpeciesSwitch, speciesSwitch } from '../ui/species';
@@ -29,7 +29,7 @@ function emptyState(): Raw {
       <h1 class="deck-empty__title" tabindex="-1" data-focus>${t('empty.title')}</h1>
       <p class="muted">${t('empty.body', { km: state.radiusKm, animals: animals(2, state.species) })}</p>
       <div class="deck-empty__actions">
-        ${wider ? html`<button class="button button--primary" type="button" data-widen="${wider}">${t('empty.widen', { km: wider })}</button>` : ''}
+        ${wider ? html`<button class="button button--primary" type="button" data-widen="${wider}">${wider >= RADIUS_ANY ? t('empty.widenAny') : t('empty.widen', { km: wider })}</button>` : ''}
         ${hasSkipped ? html`<button class="button button--outline" type="button" data-again>${t('empty.again')}</button>` : ''}
         ${activeFilterCount() ? html`<button class="button button--ghost" type="button" data-filters>${icon(SlidersHorizontal, 18)}${t('empty.filters')}</button>` : ''}
       </div>

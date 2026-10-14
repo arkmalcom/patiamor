@@ -1,5 +1,7 @@
 // All user-facing copy lives here so English can be added later as a sibling dictionary.
 
+import { RADIUS_ANY } from './data';
+
 const es = {
   'app.name': 'Patiamor',
   'app.demo': 'Demo',
@@ -10,6 +12,8 @@ const es = {
   'nav.account': 'Cuenta',
 
   'radius.chip': '{km} km',
+  'radius.any': 'Todo el país',
+  'radius.anyShort': 'Todo RD',
   'radius.open': 'Cambiar distancia y filtros',
   'filters.button': 'Filtros',
 
@@ -63,6 +67,7 @@ const es = {
   'empty.title': 'Ya los viste a todos',
   'empty.body': 'No hay más {animals} a {km} km con estos filtros. Puedes ir un poco más lejos o revisar los que dejaste para después.',
   'empty.widen': 'Ampliar a {km} km',
+  'empty.widenAny': 'Ver todo el país',
   'empty.again': 'Ver otra vez los de «ahora no»',
   'empty.filters': 'Quitar filtros',
 
@@ -701,6 +706,9 @@ export function formatKm(km: number): string {
 export function animals(n: number, species: 'perro' | 'gato' | 'todos'): string {
   return t(n === 1 ? (`animal.${species}.one` as Key) : (`animal.${species}.many` as Key));
 }
+
+/** A chosen distance as people read it: "25 km", or "Todo el país" at the slider's last stop ("Todo RD" where space is tight). */
+export const kmLabel = (km: number, short = false) => (km >= RADIUS_ANY ? t(short ? 'radius.anyShort' : 'radius.any') : t('radius.chip', { km }));
 
 /** "a 4.2 km", or "a menos de 1 km" for pets in your own area. */
 export function away(km: number): string {

@@ -1,5 +1,5 @@
 import { api, type Me } from './api';
-import { ageGroup, ageMonths, companionKey, type SpeciesFilter, type AgeGroup, type Companion, type PetDetail, type PetSummary, type Energy, type Place, type Sex, type Size } from './data';
+import { ageGroup, ageMonths, companionKey, RADIUS_ANY, type SpeciesFilter, type AgeGroup, type Companion, type PetDetail, type PetSummary, type Energy, type Place, type Sex, type Size } from './data';
 import { bearing, distanceKm } from './geo';
 
 export type Answer = 'si' | 'pensando';
@@ -76,7 +76,9 @@ export interface State {
 
 export const MAX_SLOTS = 3;
 export const RADIUS_MIN = 1;
+/** The numbered slider and the map end here; past it the slider's last stop is RADIUS_ANY ("Todo el país"). */
 export const RADIUS_MAX = 150;
+export { RADIUS_ANY };
 
 export const emptyFilters = (): Filters => ({ size: [], age: [], sex: [], energy: [], goodWith: [], from: null });
 
@@ -101,6 +103,8 @@ const local = typeof localStorage === 'undefined' ? undefined : localStorage;
 const session = typeof sessionStorage === 'undefined' ? undefined : sessionStorage;
 
 const persisted = read(local, 'patiamor', { species: 'todos' as SpeciesFilter, radiusKm: 25, filters: emptyFilters(), location: null as Place | null });
+// A distance past the numbered scale can only mean the whole country.
+if (persisted.radiusKm > RADIUS_MAX) persisted.radiusKm = RADIUS_ANY;
 const sessionState = read(session, 'patiamor-session', { skipped: [] as string[] });
 
 export const state: State = {
@@ -151,8 +155,8 @@ export let placedById = new Map<string, Placed>();
 export const petCache = new Map<string, PetSummary | PetDetail>();
 
 function recompute() {
-  // The list reaches a little past the furthest radius (it's shared by a whole area); trim to it.
-  placed = state.pets.map(place).filter((p) => p.km <= RADIUS_MAX);
+  // The list holds every animal nationwide (nearest first, up to a cap), so far-away ones can be shown too.
+  placed = state.pets.map(place);
   placedById = new Map(placed.map((p) => [p.pet.id, p]));
 }
 
@@ -233,10 +237,10 @@ export function activeFilterCount(f = state.filters): number {
   return f.size.length + f.age.length + f.sex.length + f.energy.length + f.goodWith.length + (f.from ? 1 : 0);
 }
 
-/** Nearest radius step that would bring at least one more pet into reach. */
+/** Nearest radius step that would bring at least one more pet into reach ("Todo el país" past the scale). */
 export function nextRadius(): number | null {
   const beyond = placed.filter((p) => p.km > state.radiusKm && matchesFilters(p.pet, state.filters)).sort((a, b) => a.km - b.km)[0];
-  return beyond ? Math.min(RADIUS_MAX, Math.ceil(beyond.km / 5) * 5) : null;
+  return beyond ? (beyond.km > RADIUS_MAX ? RADIUS_ANY : Math.ceil(beyond.km / 5) * 5) : null;
 }
 
 // ---------- Account and "Mi lista" ----------

@@ -16,12 +16,12 @@ export const REQUEST_CAP = 10;
 const BUSY_AT = 3;
 
 // The pet list is cached per area square, not per visitor: the visitor's point snaps to a square of
-// CELL degrees (~55 km), and everyone in that square shares one cached copy. The list holds every
-// visible pet within reach of anywhere in the square, nearest to its centre first.
+// CELL degrees (~55 km), and everyone in that square shares one cached copy. The list holds the visible
+// pets nearest to the square's centre, first to last, with no distance limit: while there are few shelters
+// the animals can be far from a visitor (Punta Cana to Santo Domingo is 160 km), and the app's "Todo el
+// país" shows them. The phone measures exact distances and filters locally.
 const CELL = 0.5;
-const RADIUS_MAX_KM = 150; // the app's furthest radius
-const CELL_MARGIN_KM = 40; // half a square's diagonal, so the list covers any point inside it
-/** Past this many the farthest pets drop first (the phone only shows up to 150 km anyway); see PAT-28. */
+/** Past this many the farthest pets drop first; see PAT-28. */
 const LIST_CAP = 1000;
 // Squares outside the Dominican Republic all snap to its edge, so made-up points can't mint new copies.
 const DR = { lat: [17.4, 20.0], lng: [-72.1, -68.2] } as const;
@@ -110,15 +110,8 @@ pets.get('/', async (c) => {
   return cachedJson(c, `/pets/area/${i}/${j}`, async () => {
     const lat = (i + 0.5) * CELL;
     const lng = (j + 0.5) * CELL;
-    const reach = RADIUS_MAX_KM + CELL_MARGIN_KM;
-    const { results } = await c.env.DB.prepare(
-      `SELECT ${SUMMARY_COLUMNS}, ${KM_SQL} AS km ${FROM}
-        WHERE ${VISIBLE}
-          AND p.lat BETWEEN ?1 - ?3 AND ?1 + ?3 AND p.lng BETWEEN ?2 - ?4 AND ?2 + ?4
-          AND km <= ?5
-        ORDER BY km LIMIT ?6`,
-    )
-      .bind(lat, lng, reach / 111, reach / (111 * Math.cos((lat * Math.PI) / 180)), reach, LIST_CAP + 1)
+    const { results } = await c.env.DB.prepare(`SELECT ${SUMMARY_COLUMNS}, ${KM_SQL} AS km ${FROM} WHERE ${VISIBLE} ORDER BY km LIMIT ?3`)
+      .bind(lat, lng, LIST_CAP + 1)
       .all<SummaryRow>();
     if (results.length > LIST_CAP) console.error(`pet list for area ${i}/${j} over the ${LIST_CAP} cap; the farthest are dropped (PAT-28)`);
     else if (results.length > LIST_CAP * 0.8) console.warn(`pet list for area ${i}/${j} at ${results.length} of ${LIST_CAP} (PAT-28)`);

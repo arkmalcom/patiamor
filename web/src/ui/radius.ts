@@ -2,17 +2,19 @@ import { Check, LocateFixed, MapPin, Minus, Plus, Search, X } from 'lucide';
 import { api } from '../api';
 import { frameFor, type AgeGroup, type Companion, type Energy, type Place, type Sex, type Size } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
-import { animals, t, type Key } from '../i18n';
+import { animals, away, kmLabel, t, type Key } from '../i18n';
 
 type PlaceKind = 'municipio' | 'distrito_municipal' | 'barrio' | 'paraje';
-import { emptyFilters, inReach, matchesFilters, placed, RADIUS_MAX, RADIUS_MIN, setLocation, state, update, type Filters, type Placed } from '../store';
+import { emptyFilters, inReach, matchesFilters, placed, RADIUS_ANY, RADIUS_MAX, RADIUS_MIN, setLocation, state, update, type Filters, type Placed } from '../store';
 import { rollTo } from './roll';
 import { toast } from './toast';
 import { navigate } from '../nav';
 
-// Slider position (0–100) maps to km on a square curve: fine control nearby, reach to the whole country.
-const toKm = (v: number) => Math.round(RADIUS_MIN + (RADIUS_MAX - RADIUS_MIN) * (v / 100) ** 2);
-const toSlider = (km: number) => Math.round(100 * Math.sqrt((km - RADIUS_MIN) / (RADIUS_MAX - RADIUS_MIN)));
+// Slider position (0–100) maps to km on a square curve: fine control nearby, up to RADIUS_MAX at 99. The
+// last stop, 100, is "Todo el país": the animals are few at first and may all be far from some visitors.
+const SLIDER_END = 100;
+const toKm = (v: number) => (v >= SLIDER_END ? RADIUS_ANY : Math.round(RADIUS_MIN + (RADIUS_MAX - RADIUS_MIN) * (v / (SLIDER_END - 1)) ** 2));
+const toSlider = (km: number) => (km >= RADIUS_ANY ? SLIDER_END : Math.round((SLIDER_END - 1) * Math.sqrt((Math.min(km, RADIUS_MAX) - RADIUS_MIN) / (RADIUS_MAX - RADIUS_MIN))));
 
 // Radar geometry: same square-root curve so the slider and the painted disk move together.
 const R = 138;
@@ -269,8 +271,8 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
     const km = draft.radiusKm;
     const n = inReach(km, draft.filters).length;
     slider.style.setProperty('--control-value', slider.value);
-    slider.setAttribute('aria-valuetext', `${km} km`);
-    out.textContent = `${km} km`;
+    slider.setAttribute('aria-valuetext', kmLabel(km));
+    out.textContent = kmLabel(km);
     disk.style.transform = `scale(${rOf(km) / R})`;
     const from = draft.filters.from;
     fromRow.hidden = !from;
@@ -292,7 +294,10 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
         $('[data-m-badge] rect', el).setAttribute('width', String(w));
         $('[data-m-badge] text', el).setAttribute('x', String(2 + w / 2));
       }
-      const label = `${m.kind === 'bubble' ? t('radar.near', { place: m.name }) : m.name} · ${matching} ${animals(matching, state.species)}`;
+      // The map ends at RADIUS_MAX: animals past it sit on the rim, in their direction, and say how far they are.
+      const nearest = Math.min(...m.members.map((q) => q.km));
+      const beyond = nearest > RADIUS_MAX ? ` · ${away(nearest)}` : '';
+      const label = `${m.kind === 'bubble' ? t('radar.near', { place: m.name }) : m.name} · ${matching} ${animals(matching, state.species)}${beyond}`;
       $('[data-m-title]', el).textContent = label;
       el.setAttribute('aria-label', label);
       const chosen = !!from && (m.kind === 'house' ? from.kind === 'shelter' && m.members[0].pet.lister.type === 'shelter' && m.members[0].pet.lister.id === from.id : from.kind === 'place' && onePlace(m) && m.members[0].pet.place.id === from.id);
@@ -401,7 +406,7 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
     // Choosing a shelter beyond the radius widens it just enough to include it.
     const far = Math.ceil(Math.max(...m.members.map((q) => q.km)));
     if (!same && far > draft.radiusKm) {
-      draft.radiusKm = Math.min(RADIUS_MAX, far);
+      draft.radiusKm = far > RADIUS_MAX ? RADIUS_ANY : far;
       slider.value = String(toSlider(draft.radiusKm));
     }
     paint();

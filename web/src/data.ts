@@ -63,6 +63,9 @@ export interface PetDetail extends PetSummary {
 }
 
 /** API compatibility keys for each companion filter. */
+/** The slider's last stop, "Todo el país": a distance no one in the Dominican Republic is beyond. */
+export const RADIUS_ANY = 1000;
+
 export const companionKey: Record<Companion, 'kids' | 'dogs' | 'cats'> = { ninos: 'kids', perros: 'dogs', gatos: 'cats' };
 
 const FRAMES: FrameColor[] = ['hoja', 'mango', 'anil', 'turquesa'];
