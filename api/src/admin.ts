@@ -31,6 +31,18 @@ admin.use('*', async (c, next) => {
   await next();
 });
 
+// What is waiting for an answer, for the console's front page and the counts on its tabs: one request, not
+// one per queue.
+admin.get('/summary', async (c) => {
+  const db = c.env.DB;
+  const [shelters, owners, bulk] = await db.batch<{ n: number }>([
+    db.prepare("SELECT count(*) AS n FROM shelters WHERE status = 'pending'"),
+    db.prepare("SELECT count(*) AS n FROM shelter_owner_requests WHERE status = 'pending'"),
+    db.prepare("SELECT count(*) AS n FROM bulk_requests WHERE status = 'pending'"),
+  ]);
+  return c.json({ shelters: shelters.results[0].n, owners: owners.results[0].n, bulk: bulk.results[0].n });
+});
+
 admin.get('/shelters', async (c) => {
   const status = STATUSES.includes(c.req.query('status') as never) ? c.req.query('status')! : 'pending';
   const { results } = await c.env.DB.prepare(

@@ -19,7 +19,8 @@ export type PortalView =
   | { view: 'home' }
   | { view: 'registro' }
   | { view: 'editar'; id: string }
-  | { view: 'admin'; status: ShelterStatus }
+  | { view: 'adminHub' }
+  | { view: 'adminShelters'; status: ShelterStatus }
   | { view: 'adminBulk'; status: BulkStatus }
   | { view: 'adminOwners'; status: BulkStatus }
   | { view: 'adminRegister'; owner: string | null; shelterName: string | null; phone: string | null }
@@ -45,7 +46,8 @@ export function renderPortal(root: HTMLElement, route: PortalView) {
   // Registering a shelter needs approval: everyone else sees where they stand, and can ask.
   if (route.view === 'registro') return state.user?.shelterOwner ? form(root, null) : void home(root);
   if (route.view === 'editar') return void edit(root, route.id);
-  if (route.view === 'admin') return void adminQueue(root, route.status);
+  if (route.view === 'adminHub') return void adminHub(root);
+  if (route.view === 'adminShelters') return void adminQueue(root, route.status);
   if (route.view === 'adminBulk') return void adminBulkQueue(root, route.status);
   if (route.view === 'adminOwners') return void adminOwnersQueue(root, route.status);
   if (route.view === 'adminRegister') return state.user?.isAdmin ? form(root, null, { email: route.owner ?? '', name: route.shelterName ?? '', phone: route.phone ?? '' }) : void home(root);
@@ -80,18 +82,10 @@ const steps = () => html`
 async function home(root: HTMLElement) {
   mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
   let shelters: PortalShelter[] = [];
-  let pending = 0;
-  let pendingBulk = 0;
-  let pendingOwners = 0;
+  let waiting = 0;
   try {
     shelters = await api.myShelters();
-    if (state.user?.isAdmin) {
-      [pending, pendingBulk, pendingOwners] = await Promise.all([
-        api.adminShelters('pending').then((l) => l.length),
-        api.adminBulk('pending').then((l) => l.length),
-        api.adminOwners('pending').then((l) => l.length),
-      ]);
-    }
+    if (state.user?.isAdmin) waiting = Object.values(await api.adminSummary()).reduce((a, n) => a + n, 0);
     // Where a request to be a shelter owner stands may have changed since the app opened (an admin decided).
     if (state.user && !state.user.shelterOwner) {
       const me = await api.me();
@@ -108,9 +102,7 @@ async function home(root: HTMLElement) {
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('portal.title')}</h1>
         <p class="portal__who">${t('portal.who', { who: state.user?.name ? `${state.user.name} · ${state.user.email}` : (state.user?.email ?? '') })}</p>
         ${state.user?.isAdmin
-          ? html`<a class="portal-admin-link" href="/refugio/admin">${icon(ShieldCheck, 20)}<span>${t('portal.admin.link')}</span>${pending ? html`<span class="list-tabs__count">${pending}</span>` : ''}</a>
-            <a class="portal-admin-link" href="/refugio/admin/duenos">${icon(UserCheck, 20)}<span>${t('owners.admin.link')}</span>${pendingOwners ? html`<span class="list-tabs__count">${pendingOwners}</span>` : ''}</a>
-            <a class="portal-admin-link" href="/refugio/admin/grandes">${icon(UsersRound, 20)}<span>${t('bulk.admin.link')}</span>${pendingBulk ? html`<span class="list-tabs__count">${pendingBulk}</span>` : ''}</a>`
+          ? html`<a class="portal-admin-link" href="/refugio/admin">${icon(ShieldCheck, 20)}<span>${t('admin.title')}</span>${waiting ? html`<span class="list-tabs__count">${waiting}</span>` : ''}</a>`
           : ''}
         ${shelters.length
           ? html`<ul class="portal-list">${shelters.map(shelterCard)}</ul>`
@@ -402,34 +394,58 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
   });
 }
 
-// ---------- Verification queue (admins) ----------
+// ---------- The admin console ----------
 
-const QUEUE: ShelterStatus[] = ['pending', 'verified', 'rejected', 'suspended'];
+type AdminCounts = { shelters: number; owners: number; bulk: number };
+type Queue = keyof AdminCounts;
+const ADMIN_PATH: Record<Queue, string> = { owners: '/refugio/admin/duenos', shelters: '/refugio/admin/refugios', bulk: '/refugio/admin/grandes' };
+const ADMIN_ICON = { owners: UserCheck, shelters: House, bulk: UsersRound } as const;
 
-async function adminQueue(root: HTMLElement, status: ShelterStatus) {
+/** The same tabs on every queue, each with how many are waiting, to move between them in one tap. */
+const adminNav = (current: Queue, counts: AdminCounts): Raw => html`
+  <nav class="list-tabs admin-nav" aria-label="${t('admin.title')}">
+    ${(['owners', 'shelters', 'bulk'] as Queue[]).map(
+      (k) => html`<a class="list-tabs__tab" href="${ADMIN_PATH[k]}" aria-current="${k === current ? 'page' : 'false'}">${t(`admin.nav.${k}`)}${counts[k] ? html` <span class="list-tabs__count">${counts[k]}</span>` : ''}</a>`,
+    )}
+  </nav>`;
+
+/** The front page: what is waiting for an answer, one card per queue, and the admin's tools. */
+async function adminHub(root: HTMLElement) {
   if (!state.user?.isAdmin) return mount(root, html`<section class="portal"><p class="loading-note">${t('portal.notFound')}</p></section>`);
   mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
-  let shelters: AdminShelter[];
+  let counts: AdminCounts;
   try {
-    shelters = await api.adminShelters(status);
+    counts = await api.adminSummary();
   } catch {
     return mount(root, html`<p class="loading-note" role="alert">${t('auth.err.network')}</p>`);
   }
+  const card = (k: Queue) => html`
+    <li>
+      <a class="admin-card" href="${ADMIN_PATH[k]}">
+        <span class="shelter__mark" aria-hidden="true">${icon(ADMIN_ICON[k], 22)}</span>
+        <span class="admin-card__text">
+          <strong class="admin-card__title">${t(`admin.card.${k}.title`)}</strong>
+          <span class="muted">${t(`admin.card.${k}`)}</span>
+        </span>
+        <span class="admin-card__count ${counts[k] ? 'admin-card__count--waiting' : ''}">${counts[k] ? t('admin.count.some', { n: counts[k] }) : t('admin.count.none')}</span>
+      </a>
+    </li>`;
   mount(
     root,
     html`
       <section class="portal portal--admin" aria-labelledby="portal-title">
         <a class="text-button portal__back" href="/refugio">${t('portal.back')}</a>
-        <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('portal.admin.title')}</h1>
-        <div class="portal-digest">
-          <button class="button button--outline button--small" type="button" data-digest>${t('portal.admin.digest')}</button>
-          <p class="muted">${t('portal.admin.digestNote')}</p>
+        <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('admin.title')}</h1>
+        <p class="portal__lede">${t('admin.lede')}</p>
+        <ul class="admin-cards">${(['owners', 'shelters', 'bulk'] as Queue[]).map(card)}</ul>
+        <h2 class="section-title">${t('admin.tools')}</h2>
+        <div class="admin-tools">
+          <a class="button button--outline button--small" href="/refugio/admin/registrar">${icon(Plus, 16)}${t('owners.admin.registerLink')}</a>
+          <div class="portal-digest">
+            <button class="button button--outline button--small" type="button" data-digest>${t('portal.admin.digest')}</button>
+            <p class="muted">${t('portal.admin.digestNote')}</p>
+          </div>
         </div>
-        <a class="text-button" href="/refugio/admin/grandes">${t('bulk.admin.link')}</a>
-        <nav class="list-tabs" aria-label="${t('portal.admin.title')}">
-          ${QUEUE.map((s) => html`<a class="list-tabs__tab" href="/refugio/admin?estado=${s}" aria-current="${s === status ? 'page' : 'false'}">${t(`portal.admin.tab.${s}`)}</a>`)}
-        </nav>
-        ${shelters.length ? html`<ul class="portal-list">${shelters.map(adminCard)}</ul>` : html`<p class="passed__empty">${t('portal.admin.empty')}</p>`}
       </section>`,
   );
   root.querySelector<HTMLButtonElement>('[data-digest]')?.addEventListener('click', async (e) => {
@@ -443,6 +459,35 @@ async function adminQueue(root: HTMLElement, status: ShelterStatus) {
     }
     b.disabled = false;
   });
+}
+
+// ---------- Verification queue (admins) ----------
+
+const QUEUE: ShelterStatus[] = ['pending', 'verified', 'rejected', 'suspended'];
+
+async function adminQueue(root: HTMLElement, status: ShelterStatus) {
+  if (!state.user?.isAdmin) return mount(root, html`<section class="portal"><p class="loading-note">${t('portal.notFound')}</p></section>`);
+  mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
+  let shelters: AdminShelter[];
+  let counts: AdminCounts;
+  try {
+    [shelters, counts] = await Promise.all([api.adminShelters(status), api.adminSummary()]);
+  } catch {
+    return mount(root, html`<p class="loading-note" role="alert">${t('auth.err.network')}</p>`);
+  }
+  mount(
+    root,
+    html`
+      <section class="portal portal--admin" aria-labelledby="portal-title">
+        <a class="text-button portal__back" href="/refugio/admin">${t('admin.title')}</a>
+        <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('portal.admin.title')}</h1>
+        ${adminNav('shelters', counts)}
+        <nav class="list-tabs list-tabs--sub" aria-label="${t('portal.admin.title')}">
+          ${QUEUE.map((s) => html`<a class="list-tabs__tab" href="/refugio/admin/refugios?estado=${s}" aria-current="${s === status ? 'page' : 'false'}">${t(`portal.admin.tab.${s}`)}</a>`)}
+        </nav>
+        ${shelters.length ? html`<ul class="portal-list">${shelters.map(adminCard)}</ul>` : html`<p class="passed__empty">${t('portal.admin.empty')}</p>`}
+      </section>`,
+  );
   $$<HTMLFormElement>('[data-decide]', root).forEach((f) =>
     f.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -474,8 +519,9 @@ async function adminOwnersQueue(root: HTMLElement, status: BulkStatus) {
   if (!state.user?.isAdmin) return mount(root, html`<section class="portal"><p class="loading-note">${t('portal.notFound')}</p></section>`);
   mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
   let list: AdminOwnerRequest[];
+  let counts: AdminCounts;
   try {
-    list = await api.adminOwners(status);
+    [list, counts] = await Promise.all([api.adminOwners(status), api.adminSummary()]);
   } catch {
     return mount(root, html`<p class="loading-note" role="alert">${t('auth.err.network')}</p>`);
   }
@@ -483,11 +529,12 @@ async function adminOwnersQueue(root: HTMLElement, status: BulkStatus) {
     root,
     html`
       <section class="portal portal--admin" aria-labelledby="portal-title">
-        <a class="text-button portal__back" href="/refugio">${t('portal.back')}</a>
+        <a class="text-button portal__back" href="/refugio/admin">${t('admin.title')}</a>
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('owners.admin.title')}</h1>
+        ${adminNav('owners', counts)}
         <p class="portal__lede">${t('owners.admin.lede')}</p>
         <a class="button button--outline button--small portal__new" href="/refugio/admin/registrar">${icon(Plus, 16)}${t('owners.admin.registerLink')}</a>
-        <nav class="list-tabs" aria-label="${t('owners.admin.title')}">
+        <nav class="list-tabs list-tabs--sub" aria-label="${t('owners.admin.title')}">
           ${BULK_QUEUE.map((s) => html`<a class="list-tabs__tab" href="/refugio/admin/duenos?estado=${s}" aria-current="${s === status ? 'page' : 'false'}">${t(`bulk.admin.tab.${s}`)}</a>`)}
         </nav>
         ${list.length ? html`<ul class="portal-list">${list.map(ownerRequestCard)}</ul>` : html`<p class="passed__empty">${t('bulk.admin.empty')}</p>`}
@@ -568,8 +615,9 @@ async function adminBulkQueue(root: HTMLElement, status: BulkStatus) {
   if (!state.user?.isAdmin) return mount(root, html`<section class="portal"><p class="loading-note">${t('portal.notFound')}</p></section>`);
   mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
   let list: AdminBulk[];
+  let counts: AdminCounts;
   try {
-    list = await api.adminBulk(status);
+    [list, counts] = await Promise.all([api.adminBulk(status), api.adminSummary()]);
   } catch {
     return mount(root, html`<p class="loading-note" role="alert">${t('auth.err.network')}</p>`);
   }
@@ -577,10 +625,11 @@ async function adminBulkQueue(root: HTMLElement, status: BulkStatus) {
     root,
     html`
       <section class="portal portal--admin" aria-labelledby="portal-title">
-        <a class="text-button portal__back" href="/refugio/admin">${t('portal.admin.title')}</a>
+        <a class="text-button portal__back" href="/refugio/admin">${t('admin.title')}</a>
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('bulk.admin.title')}</h1>
+        ${adminNav('bulk', counts)}
         <p class="portal__lede">${t('bulk.admin.lede')}</p>
-        <nav class="list-tabs" aria-label="${t('bulk.admin.title')}">
+        <nav class="list-tabs list-tabs--sub" aria-label="${t('bulk.admin.title')}">
           ${BULK_QUEUE.map((s) => html`<a class="list-tabs__tab" href="/refugio/admin/grandes?estado=${s}" aria-current="${s === status ? 'page' : 'false'}">${t(`bulk.admin.tab.${s}`)}</a>`)}
         </nav>
         ${list.length ? html`<ul class="portal-list">${list.map(bulkCard)}</ul>` : html`<p class="passed__empty">${t('bulk.admin.empty')}</p>`}

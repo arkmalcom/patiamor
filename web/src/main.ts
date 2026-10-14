@@ -31,7 +31,7 @@ function parse(where: string): Route {
   const [path, query = ''] = where.split('?');
   const [, a, b, c, d] = path.split('/');
   if (a === 'mascota' && b) return { name: 'profile', id: decodeURIComponent(b) };
-  // The shelter portal: /refugio, /refugio/registro, /refugio/<id>/editar, /refugio/admin?estado=…
+  // The shelter portal: /refugio, /refugio/registro, /refugio/<id>/editar, and the admin console under /refugio/admin
   if (a === 'refugio') {
     if (b === 'registro') return { name: 'portal', view: 'registro' };
     if (b === 'admin' && c === 'duenos') {
@@ -46,10 +46,12 @@ function parse(where: string): Route {
       const estado = new URLSearchParams(query).get('estado');
       return { name: 'portal', view: 'adminBulk', status: (['pending', 'approved', 'declined'] as const).find((s) => s === estado) ?? 'pending' };
     }
-    if (b === 'admin') {
+    if (b === 'admin' && (c === 'refugios' || new URLSearchParams(query).has('estado'))) {
+      // /refugio/admin?estado=… was the shelters queue before the console had a front page: old links still work.
       const estado = new URLSearchParams(query).get('estado');
-      return { name: 'portal', view: 'admin', status: (['pending', 'verified', 'rejected', 'suspended'] as const).find((s) => s === estado) ?? 'pending' };
+      return { name: 'portal', view: 'adminShelters', status: (['pending', 'verified', 'rejected', 'suspended'] as const).find((s) => s === estado) ?? 'pending' };
     }
+    if (b === 'admin' && !c) return { name: 'portal', view: 'adminHub' };
     if (b && c === 'editar') return { name: 'portal', view: 'editar', id: decodeURIComponent(b) };
     // A shelter's animals: /refugio/<id>/animales, …/animales/nuevo, …/animales/<petId>. Lists keep
     // their tab in ?ver=…, so a re-render (any store update) stays on it.

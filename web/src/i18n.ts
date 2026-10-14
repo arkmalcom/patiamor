@@ -354,6 +354,22 @@ const es = {
   'profile.ready.restricted': 'Retiraste varias solicitudes en poco tiempo, así que por ahora no puedes empezar procesos nuevos. Escríbenos y lo revisamos contigo.',
   'full.toList': 'Ver mis solicitudes',
 
+  // ---------- Admin console ----------
+  'admin.title': 'Administración',
+  'admin.lede': 'Lo que espera una respuesta tuya.',
+  'admin.nav.owners': 'Dueños',
+  'admin.nav.shelters': 'Refugios',
+  'admin.nav.bulk': 'Especiales',
+  'admin.card.owners.title': 'Dueños de refugios',
+  'admin.card.owners': 'Personas que piden registrar un refugio.',
+  'admin.card.shelters.title': 'Verificación de refugios',
+  'admin.card.shelters': 'Refugios registrados que esperan verificación, y los que ya están en Patiamor.',
+  'admin.card.bulk.title': 'Solicitudes especiales',
+  'admin.card.bulk': 'Personas que quieren adoptar a más de tres a la vez.',
+  'admin.count.some': '{n} por revisar',
+  'admin.count.none': 'Al día',
+  'admin.tools': 'Herramientas',
+
   // ---------- A request to be a shelter owner ----------
   'owner.title': 'Solicitar acceso como dueño de refugio',
   'owner.lede': 'Para publicar animales en Patiamor, primero necesitamos conocerte a ti y a tu refugio. Cuéntanos quién eres y de qué refugio o rescate se trata; te escribiremos por WhatsApp y, si todo está bien, te damos acceso para registrarlo.',
@@ -387,7 +403,6 @@ const es = {
   'owner.err.already_owner': 'Ya puedes registrar refugios.',
 
   // ---------- Admin: requests to be a shelter owner, and registering for someone ----------
-  'owners.admin.link': 'Dueños de refugios',
   'owners.admin.title': 'Dueños de refugios',
   'owners.admin.lede': 'Personas que piden registrar un refugio. Contáctalas, confirma quiénes son y de qué refugio se trata; después apruébalas para que lo registren, o regístralo tú con lo que te cuenten.',
   'owners.admin.wants': '{who} pide registrar «{shelter}»',
@@ -490,7 +505,6 @@ const es = {
   'bulk.err.restricted': 'Por ahora no puedes enviar solicitudes nuevas.',
 
   // ---------- Admin: special requests ----------
-  'bulk.admin.link': 'Solicitudes especiales (varios animales)',
   'bulk.admin.title': 'Solicitudes especiales',
   'bulk.admin.lede': 'Personas que quieren adoptar a más de tres. Revísalas junto con sus solicitudes en curso; si apruebas, ponlas en contacto con el refugio.',
   'bulk.admin.tab.pending': 'Pendientes',
@@ -606,7 +620,6 @@ const es = {
   'portal.err.rules_required': 'Confirma las reglas para enviar la solicitud.',
   'portal.err.too_many_shelters': 'Ya registraste el máximo de refugios para una cuenta.',
   'portal.err.not_editable': 'Esta solicitud ya no se puede cambiar desde aquí.',
-  'portal.admin.link': 'Verificaciones de refugios',
   'portal.admin.title': 'Verificaciones',
   'portal.admin.tab.pending': 'Pendientes',
   'portal.admin.tab.verified': 'Verificados',
