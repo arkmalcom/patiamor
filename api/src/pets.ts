@@ -119,6 +119,41 @@ pets.get('/', async (c) => {
   });
 });
 
+// Finding animals by name when the app's own list doesn't have them: the list is the nearest 1,000
+// nationwide (it can't hold a whole country forever), and some animals aren't in it ("en proceso"). Adopted
+// and withdrawn ones are never found. Names are looked up by their start, using two indexes (migration
+// 0016), so a search reads about as many rows as it returns: public and unlimited in kind, it still can't
+// scan the table, which would let a flood of searches spend the free plan's daily reads.
+const FIND_LIMIT = 30;
+const FIND_WORDS = 3;
+/** Lowercase, no accents or punctuation, single spaces: the same folding as the name_key column. */
+const fold = (s: string) => s.normalize('NFD').replace(/\p{Mn}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+/** The name lookups run first, then each animal is fetched by key (CROSS JOIN fixes that order: left to
+ *  the planner it would read every available animal). ?1 is the word, ?2 the first string past its prefix. */
+export const FIND_SQL = `SELECT ${SUMMARY_COLUMNS}
+  FROM (SELECT id FROM pets WHERE name_key >= ?1 AND name_key < ?2 UNION SELECT id FROM pets WHERE name_rest >= ?1 AND name_rest < ?2) AS m
+  CROSS JOIN pets d ON d.id = m.id ${PET_JOINS}
+  WHERE ${VIEWABLE}
+  ORDER BY d.name_key LIMIT ${FIND_LIMIT}`;
+
+// ?q=pancho gazcue: up to three words of at least three letters each are looked up by name; the app then
+// keeps the animals matching every word (shelter and area words match nothing here, and are matched on
+// the phone). Nearest-first ordering is the phone's job: it knows where the person is.
+pets.get('/find', async (c) => {
+  const words = [...new Set(fold(c.req.query('q') ?? '').split(' '))].filter((w) => w.length >= 3).slice(0, FIND_WORDS);
+  if (!words.length) return c.json({ error: 'too_short' }, 400);
+  if (c.env.WRITE_LIMIT) {
+    // The same limiter as writes (per visitor, 30 a minute), under its own key: plenty for typing a name.
+    const { success } = await c.env.WRITE_LIMIT.limit({ key: `find:${c.req.header('cf-connecting-ip') ?? 'local'}` });
+    if (!success) return c.json({ error: 'rate_limited' }, 429);
+  }
+  const batches = await c.env.DB.batch<SummaryRow>(words.map((w) => c.env.DB.prepare(FIND_SQL).bind(w, `${w}\u{10FFFF}`)));
+  const byId = new Map<string, SummaryRow>();
+  for (const { results } of batches) for (const r of results) byId.set(r.id, r);
+  c.header('Cache-Control', 'public, max-age=30');
+  return c.json({ pets: [...byId.values()].map(summary) });
+});
+
 // A pet's profile, the same for everyone (the phone adds the distance), cached like the list.
 pets.get('/:id', (c) => {
   const id = c.req.param('id');

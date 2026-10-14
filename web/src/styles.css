@@ -1145,6 +1145,15 @@ html.sheet-open { overflow: hidden; }
 .search__none-title { font-family: var(--font-display); font-weight: 400; font-size: 1.4rem; line-height: 1.15; overflow-wrap: anywhere; }
 .search__none p { margin: 0; }
 .search__none .recruit { box-shadow: none; background: var(--sky-tint); margin-top: 4px; }
+.search__looking { display: flex; align-items: center; gap: 12px; margin: 4px 0 0; font-weight: 700; color: var(--ink-2); }
+.spinner {
+  flex: none; width: 22px; height: 22px; border-radius: 50%;
+  border: 3px solid var(--rule-strong); border-top-color: var(--ink);
+  animation: spin 800ms linear infinite;
+}
+@keyframes spin { to { rotate: 360deg; } }
+.search__failed { display: grid; gap: 8px; justify-items: start; padding: 12px 14px; border-radius: 14px; background: var(--mango-tint); }
+.search__failed p { margin: 0; font-weight: 700; }
 .results { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .result {
   display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start; width: 100%;
@@ -1162,7 +1171,7 @@ html.sheet-open { overflow: hidden; }
 .result__tags { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .result__tags li { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; background: var(--sky-tint); font-size: 0.82rem; font-weight: 700; }
 .result__tags .icon { color: var(--hoja-deep); }
-.result__tags .result__tag--list { background: var(--mango-tint); }
+.result__tags .result__tag--list, .result__tags .result__tag--process { background: var(--mango-tint); }
 
 /* Adopting more than three: the form's explanation, and where the request stands in Mi lista. */
 .bulk { display: grid; gap: 16px; }

@@ -26,11 +26,17 @@ const animals = [
 ];
 const names = (list: { pet: { name: string; lister: { name?: string } } }[]) => list.map((x) => `${x.pet.name}@${x.pet.lister.name ?? 'particular'}`);
 const find = (q: string) => {
-  const r = searchPets(animals as { pet: never; km: number }[] as never[], q) as unknown as { matches: Parameters<typeof names>[0]; similar: Parameters<typeof names>[0] };
-  return { matches: names(r.matches), similar: names(r.similar) };
+  const r = searchPets(animals as { pet: never; km: number }[] as never[], q) as unknown as { matches: Parameters<typeof names>[0]; named: Parameters<typeof names>[0]; similar: Parameters<typeof names>[0] };
+  return { matches: names(r.matches), named: names(r.named), similar: names(r.similar) };
 };
 
 describe('searching by name', () => {
+  it('says which matches are named so (the app asks the database when none are)', () => {
+    expect(find('pancho').named).toEqual(['Pancho@Patitas de Gazcue', 'Pancho@Huellas del Este', 'Luna Pancho@Hogar Sur']);
+    expect(find('gazcue').matches).not.toEqual([]); // found by shelter and area...
+    expect(find('gazcue').named).toEqual([]); // ...but no animal is named that
+  });
+
   it('ignores capitals, accents and extra spaces', () => {
     expect(fold('  PanchÓ   Gazcue ')).toBe('pancho gazcue');
     expect(find('PANCHÓ').matches).toEqual(find('pancho').matches);
@@ -42,8 +48,8 @@ describe('searching by name', () => {
 
   it('offers close names when they might have spelled it differently', () => {
     expect(find('pancho').similar).toEqual(['Pancha@Amigos de Boca Chica', 'Panchito@Patitas de Gazcue']);
-    expect(find('canela')).toEqual({ matches: [], similar: ['Canelo@particular'] });
-    expect(find('zzzzz')).toEqual({ matches: [], similar: [] });
+    expect(find('canela')).toEqual({ matches: [], named: [], similar: ['Canelo@particular'] });
+    expect(find('zzzzz')).toEqual({ matches: [], named: [], similar: [] });
   });
 
   it('narrows with more words, and also finds by shelter or area', () => {
@@ -55,6 +61,6 @@ describe('searching by name', () => {
 
   it('never matches private listers on the word "particular", and an empty search finds nothing', () => {
     expect(find('particular').matches).toEqual([]);
-    expect(find('   ')).toEqual({ matches: [], similar: [] });
+    expect(find('   ')).toEqual({ matches: [], named: [], similar: [] });
   });
 });

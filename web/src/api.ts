@@ -222,7 +222,9 @@ export const api = {
 
   // Coordinates are rounded to ~1 km before they leave the device. The server snaps them to a ~55 km
   // square and everyone in that square shares one cached list; the phone works out exact distances.
-  pets: (from: LatLng, fresh = false) => call<{ pets: PetSummary[] }>(`/api/pets?${point(from)}`, 'GET', undefined, fresh).then((r) => r.pets),
+  pets: (from: LatLng, fresh = false) => call<{ pets: PetSummary[]; truncated: boolean }>(`/api/pets?${point(from)}`, 'GET', undefined, fresh),
+  /** Animals whose name starts with a typed word, from the database (the app's own list may not have them). */
+  findPets: (q: string) => call<{ pets: PetSummary[] }>(`/api/pets/find?q=${encodeURIComponent(q)}`).then((r) => r.pets),
   // Profiles are the same for everyone (and cached at Cloudflare's edge); the phone adds the distance.
   pet: (id: string, fresh = false) => call<{ pet: PetDetail }>(`/api/pets/${encodeURIComponent(id)}`, 'GET', undefined, fresh).then((r) => r.pet),
   searchPlaces: (q: string) => call<{ places: Place[] }>(`/api/places?q=${encodeURIComponent(q)}`).then((r) => r.places),

@@ -360,7 +360,10 @@ const es = {
   'search.label': 'Nombre del animal, del refugio o de la zona',
   'search.placeholder': 'Por ejemplo, Pancho',
   'search.clear': 'Borrar búsqueda',
-  'search.hint': 'Busca entre los {n} {animals} de Patiamor, sin importar tus filtros ni la distancia.',
+  'search.hint': 'Escribe un nombre y lo buscamos en todo Patiamor, sin importar tus filtros ni la distancia.',
+  'search.looking': 'Buscando «{q}» en todo Patiamor…',
+  'search.lookFailed': 'No pudimos buscar en todo Patiamor. Revisa tu conexión e inténtalo de nuevo.',
+  'search.inProcess': 'En proceso con otra familia',
   'search.loading': 'Cargando los animales…',
   'search.count.one': '1 resultado',
   'search.count.many': '{n} resultados',
@@ -371,7 +374,7 @@ const es = {
   'search.goodWith': 'Bien con {who}',
   'search.inList': 'En tu lista',
   'search.none.title': 'No encontramos «{q}»',
-  'search.none.body': 'Puede que ya lo hayan adoptado, que esté en proceso con otra familia, o que su refugio todavía no lo haya publicado aquí.',
+  'search.none.body': 'Puede que ya lo hayan adoptado o retirado, o que su refugio todavía no lo haya publicado aquí.',
   'search.none.recruit': '¿Lo viste en Instagram? Pídele al refugio que lo publique en Patiamor.',
 
   // ---------- Adopting more than three: a special request ----------

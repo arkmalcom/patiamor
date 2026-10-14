@@ -33,13 +33,15 @@ type Item = { pet: PetSummary; km: number };
 export interface Found<T extends Item> {
   /** Every word typed appears in the name, the shelter or the area; the ones named so come first. */
   matches: T[];
+  /** Those among the matches whose own name has every word: what a search for an animal is after. */
+  named: T[];
   /** No match, but a name that is close: "Pancha" for "Pancho", "Panchito" for "Pancho". */
   similar: T[];
 }
 
 export function searchPets<T extends Item>(all: T[], query: string): Found<T> {
   const words = fold(query).split(' ').filter(Boolean);
-  if (!words.length) return { matches: [], similar: [] };
+  if (!words.length) return { matches: [], named: [], similar: [] };
   const whole = words.join(' ');
 
   const matches: { item: T; rank: number }[] = [];
@@ -60,8 +62,10 @@ export function searchPets<T extends Item>(all: T[], query: string): Found<T> {
     }
   }
   const byDistance = (a: Item, b: Item) => a.km - b.km;
+  const sorted = matches.sort((a, b) => a.rank - b.rank || byDistance(a.item, b.item));
   return {
-    matches: matches.sort((a, b) => a.rank - b.rank || byDistance(a.item, b.item)).map((m) => m.item),
+    matches: sorted.map((m) => m.item),
+    named: sorted.filter((m) => m.rank < 3).map((m) => m.item),
     similar: similar.sort((a, b) => a.off - b.off || byDistance(a.item, b.item)).map((m) => m.item),
   };
 }

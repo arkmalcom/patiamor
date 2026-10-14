@@ -69,6 +69,8 @@ export interface State {
   /** The area distances are measured from: a place centroid, never a precise position. */
   location: Place | null;
   pets: PetSummary[];
+  /** The server cut the list at its cap (the farthest animals are missing): searches must ask the database too. */
+  petsTruncated: boolean;
   petsStatus: LoadStatus;
   /** Mirrors the server session (from /api/me); never persisted locally. */
   signedIn: boolean;
@@ -125,6 +127,7 @@ export const state: State = {
   filters: { ...emptyFilters(), ...persisted.filters },
   location: persisted.location,
   pets: [],
+  petsTruncated: false,
   petsStatus: 'idle',
   signedIn: false,
   user: null,
@@ -200,10 +203,10 @@ export async function loadPets(fresh = false) {
   const id = ++petsRequest;
   update((s) => (s.petsStatus = 'loading'));
   try {
-    const pets = await api.pets(state.location, fresh);
+    const { pets, truncated } = await api.pets(state.location, fresh);
     if (id !== petsRequest) return; // a newer location won the race
     cachePets(pets);
-    update((s) => ((s.pets = pets), (s.petsStatus = 'ready')));
+    update((s) => ((s.pets = pets), (s.petsTruncated = truncated), (s.petsStatus = 'ready')));
   } catch {
     if (id === petsRequest) update((s) => (s.petsStatus = 'error'));
   }
