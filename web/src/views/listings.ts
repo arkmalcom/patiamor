@@ -22,7 +22,10 @@ const STATUS_ICON: Record<PetStatus, IconNode> = {
   adopted: HeartHandshake,
   withdrawn: EyeOff,
 };
-const petChip = (s: PetStatus) => html`<span class="status-chip status-chip--pet-${s}">${icon(STATUS_ICON[s], 16)}${t(`listing.status.${s}`)}</span>`;
+/** Labels that change with the animal's sex; the others (Borrador, En proceso…) read the same. */
+const FEMININE: Partial<Record<PetStatus, Key>> = { available: 'listing.statusF.available', adopted: 'listing.statusF.adopted', withdrawn: 'listing.statusF.withdrawn' };
+const petChip = (p: { status: PetStatus; sex: string }) =>
+  html`<span class="status-chip status-chip--pet-${p.status}">${icon(STATUS_ICON[p.status], 16)}${t((p.sex === 'hembra' && FEMININE[p.status]) || `listing.status.${p.status}`)}</span>`;
 
 const notFound = (root: HTMLElement) =>
   mount(root, html`<section class="portal"><p class="loading-note" role="alert">${t('listing.notFound')}</p><a class="button button--outline" href="#/refugio">${t('portal.back')}</a></section>`);
@@ -102,7 +105,7 @@ function row(p: ListingSummary, base: string, canChange: boolean): Raw {
           <span class="listing-row__meta">${bits.join(' · ')}</span>
           ${p.openRequests ? html`<span class="listing-row__meta">${t(p.openRequests === 1 ? 'listing.requests1' : 'listing.requestsN', { n: p.openRequests })}</span>` : ''}
         </span>
-        ${petChip(p.status)}
+        ${petChip(p)}
       </a>
       ${ends ? html`<div class="listing-item__actions">${outcomeButton(p, true)}</div>` : ''}
     </li>`;
@@ -528,7 +531,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
 }
 
 const statusLine = (p: Listing): Raw =>
-  html`${petChip(p.status)}${['available', 'reserved'].includes(p.status) ? html`<a class="text-button" href="#/mascota/${encodeURIComponent(p.id)}">${t('listing.viewLive')}</a>` : ''}`;
+  html`${petChip(p)}${['available', 'reserved'].includes(p.status) ? html`<a class="text-button" href="#/mascota/${encodeURIComponent(p.id)}">${t('listing.viewLive')}</a>` : ''}`;
 
 /** "En proceso" and the pause switch: they apply at once (not on save), so a shelter can flip them
  *  from the inbox's link without touching the rest of the form. */

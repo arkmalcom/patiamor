@@ -1551,9 +1551,10 @@ html[data-route='profile'] .tabbar { display: none; }
   border-radius: 16px; padding: 20px;
 }
 .account__shelter .shelter__mark { background: var(--paper); color: var(--anil); }
-.account__shelter > div { display: grid; gap: 10px; justify-items: start; }
+.account__shelter > div { display: grid; gap: 10px; justify-items: start; min-width: 0; }
 .account__shelter-title { font-family: var(--font-display); font-weight: 400; font-size: 1.4rem; line-height: 1.1; }
-.account__shelter .button { background: var(--paper); color: var(--ink); }
+/* Wraps on narrow phones instead of pushing the page past its gutter. */
+.account__shelter .button { background: var(--paper); color: var(--ink); white-space: normal; text-align: center; max-width: 100%; }
 
 /* ---------- Toast ---------- */
 

@@ -6,7 +6,7 @@ import { Compass, MapPin, SlidersHorizontal, User } from 'lucide';
 import { backdrop, landscape } from './art';
 import { $, $$, html, icon, mount, transition } from './dom';
 import { t } from './i18n';
-import { activeFilterCount, loadPets, setLocation, setUser, state, subscribe, takePendingRequest, update } from './store';
+import { activeFilterCount, loadPets, loadRequests, setLocation, setUser, state, subscribe, takePendingRequest, update } from './store';
 import { applyFooter, bindRadiusPanel, radiusPanel } from './ui/radius';
 import { resumePendingRequest } from './ui/request';
 import { mountPips, pips } from './ui/save';
@@ -179,6 +179,8 @@ window.addEventListener('hashchange', () => {
   const morph = (current.name === 'deck' && next.name === 'profile') || (current.name === 'profile' && next.name === 'deck');
   current = next;
   if (sheetEl().open) sheetEl().close();
+  // Shelters move requests along while the app is open: opening Mi lista fetches where they stand now.
+  if (next.name === 'list' && state.signedIn) void loadRequests().catch(() => {});
   const run = () => {
     render(next);
     window.scrollTo(0, 0);
