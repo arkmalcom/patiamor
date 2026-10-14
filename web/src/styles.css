@@ -1520,7 +1520,9 @@ html[data-route='profile'] .tabbar { display: none; }
 .list-view__count { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .list-view__count .pip { width: 12px; height: 18px; }
 .list-view__lede { font-size: 1.1rem; max-width: 52ch; text-wrap: pretty; }
-.list-view > .button { justify-self: start; }
+/* "Seguir explorando": the width of the screen on a phone, centered (not stranded at the left) on wide ones. */
+.list-view > .button { justify-self: stretch; }
+@media (min-width: 700px) { .list-view > .button { justify-self: center; min-width: 320px; } }
 
 /* "Tu casa" at the top of Mi lista. */
 .casa { display: grid; justify-items: center; width: 100%; min-width: 0; max-width: 420px; justify-self: center; filter: drop-shadow(0 12px 14px rgba(29, 35, 64, 0.2)); }

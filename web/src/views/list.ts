@@ -1,16 +1,15 @@
-import { Compass, Eye, Undo2 } from 'lucide';
+import { Compass, Eye } from 'lucide';
 import { frameFor } from '../data';
 import { $$, html, icon, mount, type Raw } from '../dom';
 import { away, formatDate, sentence, t } from '../i18n';
-import { activeRequests, isOpen, MAX_SLOTS, petCache, placePet, state, update, type Answer, type MyRequest } from '../store';
+import { activeRequests, isOpen, MAX_SLOTS, petCache, placePet, state, type Answer, type MyRequest } from '../store';
 import { listerLabel, miniFrame, photo } from '../ui/canvas';
 import { listerName, openWithdraw, requestStatus, statusKey } from '../ui/request';
 import { bulkWhat, openBulk } from '../ui/bulk';
 import { pips } from '../ui/save';
-import { toast } from '../ui/toast';
 
 // Mi lista: three slots, each an adoption request in progress, plus the ones that ended recently and,
-// in a second view, the pets passed on this session ("Dejaste pasar"), shown as a list.
+// in a second view, the pets passed on this session ("Vistos antes"), shown as a list.
 
 interface ListDeps {
   openProfile: (id: string) => void;
@@ -101,7 +100,7 @@ function ended(): Raw {
     </section>`;
 }
 
-/** "Dejaste pasar": this session's skipped pets. They return to Explorar next visit, and leave this list then. */
+/** "Vistos antes": this session's skipped pets. They return to Explorar next visit, and leave this list then. */
 function passed(): Raw {
   const pets = state.skipped.map((id) => petCache.get(id)).filter((p) => !!p);
   if (!pets.length) return html`<p class="passed__empty">${t('list.passedEmpty')}</p>`;
@@ -118,7 +117,6 @@ function passed(): Raw {
           </div>
           <div class="passed__actions">
             <button class="button button--outline button--small" type="button" data-open="${pet.id}">${icon(Eye, 16)}${t('deck.profile')}</button>
-            <button class="button button--ghost button--small" type="button" data-unskip="${pet.id}">${icon(Undo2, 16)}${t('list.showAgain')}</button>
           </div>
         </li>`;
       })}
@@ -131,13 +129,6 @@ export function bindSlots(root: HTMLElement, deps: ListDeps) {
     b.addEventListener('click', () => {
       const item = state.requests.find((x) => x.request.id === b.dataset.withdraw);
       if (item) openWithdraw(item);
-    }),
-  );
-  $$<HTMLButtonElement>('[data-unskip]', root).forEach((b) =>
-    b.addEventListener('click', () => {
-      const id = b.dataset.unskip!;
-      update((s) => (s.skipped = s.skipped.filter((x) => x !== id)));
-      toast(t('list.shownAgain', { name: petCache.get(id)?.name ?? '' }));
     }),
   );
 }
