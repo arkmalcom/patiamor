@@ -3,6 +3,7 @@ import { api, ApiError, type Me } from '../api';
 import { $, html, icon, mount, raw } from '../dom';
 import { t, type Key } from '../i18n';
 import { setUser } from '../store';
+import { humanCheck } from './human';
 
 // Sign-in: Google, or one email carrying a 6-digit code plus a one-tap link. Then the name, if we lack it.
 
@@ -36,6 +37,10 @@ export function errorText(code: string, data: Record<string, unknown> = {}): str
 export function renderAuth(root: HTMLElement, opts: AuthOpts) {
   let email = '';
   let timer = 0;
+  // Steps swap inside `step`; the bot check sits below them and survives the swaps (moving its iframe would reload it).
+  mount(root, html`<div data-step></div><div class="auth__check" data-check></div>`);
+  const step = $('[data-step]', root);
+  const check = humanCheck($('[data-check]', root));
 
   const showError = (el: HTMLElement, err: unknown) => {
     el.textContent = err instanceof ApiError ? errorText(err.code, err.data) : t('auth.err.network');
@@ -44,7 +49,7 @@ export function renderAuth(root: HTMLElement, opts: AuthOpts) {
 
   const stepEmail = () => {
     mount(
-      root,
+      step,
       html`
         <div class="auth">
           <a class="button button--outline button--block button--google" href="${api.googleUrl(opts.next)}" data-google>${GOOGLE_G}<span>${t('auth.google')}</span></a>
@@ -74,7 +79,7 @@ export function renderAuth(root: HTMLElement, opts: AuthOpts) {
       $('span', btn).textContent = t('auth.sending');
       try {
         opts.beforeRedirect?.(); // the email link may be opened later, in this tab
-        await api.startEmail(email, opts.next);
+        await api.startEmail(email, opts.next, await check.token());
         stepCode();
       } catch (e2) {
         showError(err, e2);
@@ -86,7 +91,7 @@ export function renderAuth(root: HTMLElement, opts: AuthOpts) {
 
   const stepCode = () => {
     mount(
-      root,
+      step,
       html`
         <form class="auth auth__form" data-code-form novalidate>
           <p>${t('auth.codeSent', { email })}</p>
@@ -143,7 +148,7 @@ export function renderAuth(root: HTMLElement, opts: AuthOpts) {
     $('[data-other]', form).addEventListener('click', () => (clearInterval(timer), stepEmail()));
     resend.addEventListener('click', async () => {
       try {
-        await api.startEmail(email, opts.next);
+        await api.startEmail(email, opts.next, await check.token());
         stepCode();
       } catch (e2) {
         showError(err, e2);
@@ -152,6 +157,7 @@ export function renderAuth(root: HTMLElement, opts: AuthOpts) {
   };
 
   const finish = (user: Me) => {
+    check.remove();
     if (user.name) {
       setUser(user);
       return opts.onSignedIn(user);
@@ -161,7 +167,7 @@ export function renderAuth(root: HTMLElement, opts: AuthOpts) {
 
   const stepName = (user: Me) => {
     mount(
-      root,
+      step,
       html`
         <form class="auth auth__form" data-name-form novalidate>
           <h3 class="auth__title">${t('auth.nameTitle')}</h3>

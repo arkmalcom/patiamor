@@ -187,6 +187,8 @@ const es = {
   'auth.err.too_many': 'Pediste demasiados códigos. Inténtalo de nuevo en una hora.',
   'auth.err.email_failed': 'No pudimos enviar el correo. Inténtalo de nuevo en un momento.',
   'auth.err.email_quota': 'Hoy ya enviamos todos los correos que podemos. Entra con Google o inténtalo mañana.',
+  'auth.err.human_check': 'No pudimos comprobar que eres una persona. Recarga la página e inténtalo de nuevo, o entra con Google.',
+  'auth.err.human_check_unavailable': 'Entrar con tu correo no está disponible en este momento. Entra con Google o inténtalo más tarde.',
   'auth.err.wrong_code': 'Ese código no es correcto. Te quedan {n} intentos.',
   'auth.err.expired': 'El código venció o ya se usó. Pide uno nuevo.',
   'auth.err.invalid_code': 'Escribe los 6 dígitos del código.',

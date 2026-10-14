@@ -168,7 +168,8 @@ async function call<T>(path: string, method = 'GET', body?: unknown, fresh = fal
 export const api = {
   me: () => call<{ user: Me | null }>('/api/me').then((r) => r.user),
   setName: (name: string) => call<{ user: Me }>('/api/me', 'PATCH', { name }).then((r) => r.user),
-  startEmail: (email: string, next: string) => call<{ ok: true }>('/api/auth/email/start', 'POST', { email, next }),
+  authConfig: () => call<{ turnstile: string | null }>('/api/auth/config'),
+  startEmail: (email: string, next: string, turnstile?: string) => call<{ ok: true }>('/api/auth/email/start', 'POST', { email, next, turnstile }),
   verifyEmail: (email: string, code: string) => call<{ user: Me }>('/api/auth/email/verify', 'POST', { email, code }).then((r) => r.user),
   emailLink: (token: string) => call<{ user: Me }>('/api/auth/email/link', 'POST', { token }).then((r) => r.user),
   logout: () => call<{ ok: true }>('/api/auth/logout', 'POST', {}),

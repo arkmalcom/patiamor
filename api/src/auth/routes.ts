@@ -5,6 +5,7 @@ import type { AppContext } from '../env';
 import { isoIn, nowIso, randomToken, sha256, sixDigitCode, timingSafeEqual } from './crypto';
 import { EmailQuotaError, hasEmailBudget, sendSignInEmail } from './email';
 import { endSession, startSession } from './session';
+import { checkHuman } from './turnstile';
 import { isEmail, normalizeEmail, userForEmail, userForGoogle } from './users';
 
 const CODE_TTL = 15 * 60 * 1000;
@@ -25,10 +26,18 @@ export const auth = new Hono<AppContext>();
 
 // ---------- Email: one message carries a 6-digit code and a one-tap link ----------
 
+/** What the sign-in screen needs before it renders: the Turnstile site key, or null when the check is off. */
+auth.get('/config', (c) => c.json({ turnstile: c.env.TURNSTILE_SITE_KEY || null }));
+
 auth.post('/email/start', async (c) => {
-  const body = await c.req.json<{ email?: string; next?: string }>().catch(() => ({}) as { email?: string; next?: string });
+  type Body = { email?: string; next?: string; turnstile?: string };
+  const body = await c.req.json<Body>().catch(() => ({}) as Body);
   const email = normalizeEmail(body.email ?? '');
   if (!isEmail(email)) return c.json({ error: 'invalid_email' }, 400);
+  // Before any database work, so a flood without tokens costs nothing.
+  const human = await checkHuman(c.env, body.turnstile, c.req.header('cf-connecting-ip'));
+  if (human === 'failed') return c.json({ error: 'human_check' }, 400);
+  if (human === 'unavailable') return c.json({ error: 'human_check_unavailable' }, 503);
 
   const db = c.env.DB;
   const hourAgo = isoIn(-60 * 60 * 1000);

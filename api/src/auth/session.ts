@@ -4,8 +4,10 @@ import type { AppContext, AppUser } from '../env';
 import { isoIn, nowIso, randomToken, sha256 } from './crypto';
 
 export const SESSION_COOKIE = '__Host-patiamor_session';
-const SESSION_DAYS = 30;
+// Rolling: any visit pushes the end out again (at most once a day), so only 90 days away signs you out.
+const SESSION_DAYS = 90;
 const DAY = 24 * 60 * 60 * 1000;
+const COOKIE = { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: SESSION_DAYS * 24 * 60 * 60 } as const;
 
 type C = Context<AppContext>;
 
@@ -14,16 +16,10 @@ export async function startSession(c: C, userId: string) {
   await c.env.DB.prepare('INSERT INTO sessions (id_hash, user_id, expires_at, user_agent) VALUES (?, ?, ?, ?)')
     .bind(await sha256(token), userId, isoIn(SESSION_DAYS * DAY), c.req.header('user-agent')?.slice(0, 200) ?? null)
     .run();
-  setCookie(c, SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'Lax',
-    path: '/',
-    maxAge: SESSION_DAYS * 24 * 60 * 60,
-  });
+  setCookie(c, SESSION_COOKIE, token, COOKIE);
 }
 
-/** Resolves the signed-in user, extending the session at most once a day (rolling 30 days). */
+/** Resolves the signed-in user, extending the session at most once a day (rolling 90 days). */
 export async function currentUser(c: C): Promise<AppUser | null> {
   const token = getCookie(c, SESSION_COOKIE);
   if (!token) return null;
@@ -43,6 +39,8 @@ export async function currentUser(c: C): Promise<AppUser | null> {
     await c.env.DB.prepare('UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE id_hash = ?')
       .bind(nowIso(), isoIn(SESSION_DAYS * DAY), idHash)
       .run();
+    // The browser keeps the cookie only until its own max-age, so renew that too.
+    setCookie(c, SESSION_COOKIE, token, COOKIE);
   }
   return { id: row.id, email: row.email, name: row.name, is_admin: row.is_admin };
 }

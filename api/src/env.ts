@@ -14,6 +14,10 @@ export type Env = {
   GOOGLE_CLIENT_SECRET?: string;
   /** Without it, non-production environments log sign-in codes instead of emailing them. */
   RESEND_API_KEY?: string;
+  /** Turnstile widget's public site key (wrangler vars). Unset: no bot check on email sign-in. */
+  TURNSTILE_SITE_KEY?: string;
+  /** Turnstile widget's secret key (a secret). Required once TURNSTILE_SITE_KEY is set. */
+  TURNSTILE_SECRET?: string;
   /** Sentry project DSN (a secret, so the public repo can't be used to flood the quota). Unset locally: no reporting. */
   SENTRY_DSN?: string;
 };

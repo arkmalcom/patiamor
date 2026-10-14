@@ -9,3 +9,7 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 # Sentry DSN for the Worker. Leave empty locally so development errors aren't reported.
 SENTRY_DSN=
+# Turnstile bot check on email sign-in. Locally, Cloudflare's test keys: the widget always passes.
+# Leave both empty to switch the check off.
+TURNSTILE_SITE_KEY=1x00000000000000000000AA
+TURNSTILE_SECRET=1x0000000000000000000000000000000AA

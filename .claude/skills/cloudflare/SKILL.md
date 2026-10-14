@@ -29,6 +29,12 @@ Writes are rate limited by the Workers Rate Limiting binding `WRITE_LIMIT`: 30 p
 - "Avísame" alerts: 20 per person;
 - photo and email budgets.
 
+Email sign-in (`/api/auth/email/start`) requires a Turnstile token (`api/src/auth/turnstile.ts`, `web/src/ui/human.ts`). Two settings per environment:
+- `TURNSTILE_SITE_KEY`, public, in that environment's `vars` in `wrangler.jsonc`. Unset, the check is off.
+- `TURNSTILE_SECRET`, a secret, so ask first. Set it before adding the site key: with the key and no secret, email sign-in refuses everyone (fail closed, never skipped).
+
+Widgets are made in the dashboard (Turnstile → Add widget, mode Managed). Each lists the hostnames it works on. Locally and in tests, use Cloudflare's test keys (site `1x00000000000000000000AA`, secret `1x0000000000000000000000000000000AA`); they're in `.dev.vars.example` and `vitest.config.ts`.
+
 The edge rule (PAT-30) is the layer that stops floods before they count against the request quota, and it needs patiamor.com.
 
 Pet photos live in R2, bound as `PHOTOS`. Staging uses `patiamor-photos-staging`, created 2026-10-13. Production uses `patiamor-photos`, which doesn't exist yet: creating it is a production resource, so ask first, and do it before the first production deploy. Both CI tokens have R2 read/write. Upload safeguards are documented in `api/src/photos.ts`.

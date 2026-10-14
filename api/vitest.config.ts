@@ -9,7 +9,16 @@ export default defineConfig(async () => {
     plugins: [
       cloudflareTest({
         wrangler: { configPath: './wrangler.jsonc', environment: 'staging' },
-        miniflare: { bindings: { TEST_MIGRATIONS: migrations, ENVIRONMENT: 'test', APP_ORIGIN: 'http://example.test' } },
+        miniflare: {
+          bindings: {
+            TEST_MIGRATIONS: migrations,
+            ENVIRONMENT: 'test',
+            APP_ORIGIN: 'http://example.test',
+            // Cloudflare's published Turnstile test keys; tests stub the siteverify call itself.
+            TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
+            TURNSTILE_SECRET: '1x0000000000000000000000000000000AA',
+          },
+        },
       }),
     ],
     test: { setupFiles: ['./test/setup.ts'] },

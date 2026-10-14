@@ -1047,6 +1047,8 @@ html.sheet-open { overflow: hidden; }
   color: var(--ink-2); font-size: 0.9rem; font-weight: 700;
 }
 .auth__or::before, .auth__or::after { content: ''; flex: 1; border-top: 1px solid var(--rule); }
+.auth__check { display: flex; justify-content: center; margin-top: 12px; }
+.auth__check:empty { display: none; }
 .auth__links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .text-button:disabled { color: var(--ink-2); text-decoration: none; cursor: default; }
 
