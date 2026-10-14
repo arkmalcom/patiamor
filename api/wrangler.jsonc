@@ -32,7 +32,13 @@
       ],
       "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "patiamor-photos-staging" }],
       // APP_ORIGIN: where links in emails sent outside a request (the morning job) point.
-      "vars": { "ENVIRONMENT": "staging", "APP_ORIGIN": "https://patiamor-staging.patiamor-api.workers.dev", "EMAIL_FROM": "Patiamor <hola@patiamor.com>" },
+      // TURNSTILE_SITE_KEY: the public key of the "patiamor-staging" Turnstile widget (its secret is TURNSTILE_SECRET).
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "APP_ORIGIN": "https://patiamor-staging.patiamor-api.workers.dev",
+        "EMAIL_FROM": "Patiamor <hola@patiamor.com>",
+        "TURNSTILE_SITE_KEY": "0x4AAAAAAFWI2gObPDXi9PRR"
+      },
       // Bindings and triggers are repeated per environment. 12:00 UTC = 8:00 in the Dominican Republic.
       "triggers": { "crons": ["0 12 * * *"] },
       "ratelimits": [{ "name": "WRITE_LIMIT", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } }],
