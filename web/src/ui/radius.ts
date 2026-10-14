@@ -5,7 +5,7 @@ import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { animals, away, kmLabel, t, type Key } from '../i18n';
 
 type PlaceKind = 'municipio' | 'distrito_municipal' | 'barrio' | 'paraje';
-import { emptyFilters, inReach, matchesFilters, placed, RADIUS_ANY, RADIUS_MAX, RADIUS_MIN, setLocation, state, update, type Filters, type Placed } from '../store';
+import { emptyFilters, inReach, matchesFilters, placed, radius, RADIUS_ANY, RADIUS_MAX, RADIUS_MIN, setLocation, state, update, type Filters, type Placed } from '../store';
 import { rollTo } from './roll';
 import { toast } from './toast';
 import { navigate } from '../nav';
@@ -244,7 +244,14 @@ interface BindOpts {
 
 /** Wires a radius panel. Sheet mode edits a draft until applied; inline mode commits live. */
 export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) {
-  const draft = { radiusKm: state.radiusKm, filters: structuredClone(state.filters) as Filters };
+  // Starts from the distance in effect (which may be wider than the default, see radius() in the store).
+  const draft = { radiusKm: radius(), filters: structuredClone(state.filters) as Filters };
+  // Only moving the slider chooses a distance; filter taps and "Ver N" leave an automatic one alone.
+  let moved = false;
+  const save = (s: typeof state) => {
+    s.filters = structuredClone(draft.filters);
+    if (moved) (s.radiusKm = draft.radiusKm), (s.radiusChosen = true);
+  };
   const slider = $<HTMLInputElement>('[data-radius]', root);
   const out = $('[data-km-out]', root);
   const roll = $('[data-roll]', root);
@@ -264,7 +271,7 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
   let shown: Marker[] = [];
 
   const commit = () => {
-    if (mode === 'inline') update((s) => ((s.radiusKm = draft.radiusKm), (s.filters = structuredClone(draft.filters))));
+    if (mode === 'inline') update(save);
   };
 
   const paint = () => {
@@ -406,6 +413,7 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
     // Choosing a shelter beyond the radius widens it just enough to include it.
     const far = Math.ceil(Math.max(...m.members.map((q) => q.km)));
     if (!same && far > draft.radiusKm) {
+      moved = true;
       draft.radiusKm = far > RADIUS_MAX ? RADIUS_ANY : far;
       slider.value = String(toSlider(draft.radiusKm));
     }
@@ -458,6 +466,7 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
 
   let commitTimer = 0;
   slider.addEventListener('input', () => {
+    moved = true;
     draft.radiusKm = toKm(Number(slider.value));
     paint();
     clearTimeout(commitTimer);
@@ -482,7 +491,7 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
   });
 
   apply?.addEventListener('click', () => {
-    update((s) => ((s.radiusKm = draft.radiusKm), (s.filters = structuredClone(draft.filters))));
+    update(save);
     onApply?.();
   });
 
@@ -590,7 +599,7 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
   return {
     refresh() {
       if (document.activeElement === slider) return;
-      draft.radiusKm = state.radiusKm;
+      draft.radiusKm = radius();
       draft.filters = structuredClone(state.filters);
       slider.value = String(toSlider(draft.radiusKm));
       redraw();

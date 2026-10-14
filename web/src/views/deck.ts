@@ -1,7 +1,7 @@
-import { Clock, Heart, SlidersHorizontal } from 'lucide';
+import { Clock, Heart, MapPin, SlidersHorizontal } from 'lucide';
 import { $, html, icon, mount, reducedMotion, type Raw } from '../dom';
-import { animals, away, t } from '../i18n';
-import { RADIUS_ANY, activeFilterCount, emptyFilters, loadPets, nextRadius, queue, state, update } from '../store';
+import { animals, away, formatKm, t } from '../i18n';
+import { RADIUS_ANY, activeFilterCount, emptyFilters, loadPets, nextRadius, queue, state, update, widenedFrom } from '../store';
 import { canvas } from '../ui/canvas';
 import { bindGallery } from '../ui/gallery';
 import { bindSpeciesSwitch, speciesSwitch } from '../ui/species';
@@ -18,6 +18,14 @@ function stamps(): Raw {
   return html`
     <span class="stamp stamp--skip" aria-hidden="true">${icon(Clock, 18)}${t('deck.dragSkip')}</span>
     <span class="stamp stamp--save" aria-hidden="true">${icon(Heart, 18)}${t('deck.dragSave')}</span>`;
+}
+
+/** Shown when nothing matched within the default distance and the deck starts from the nearest animals. */
+function widenedNote(): Raw {
+  const w = widenedFrom();
+  if (!w) return html``;
+  const text = t('deck.widened', { animals: animals(2, state.species), km: w.km, place: state.location?.name ?? '', near: formatKm(w.nearestKm) });
+  return html`<p class="deck__note" role="status">${icon(MapPin, 18)}<span>${text}</span></p>`;
 }
 
 function emptyState(): Raw {
@@ -61,7 +69,7 @@ export function renderDeck(root: HTMLElement, deps: DeckDeps) {
     bindSpeciesSwitch(root);
     root.querySelector<HTMLButtonElement>('[data-widen]')?.addEventListener('click', (e) => {
       const km = Number((e.currentTarget as HTMLElement).dataset.widen);
-      update((s) => (s.radiusKm = km));
+      update((s) => ((s.radiusKm = km), (s.radiusChosen = true)));
     });
     root.querySelector('[data-again]')?.addEventListener('click', () => update((s) => (s.skipped = [])));
     root.querySelector('[data-filters]')?.addEventListener('click', () => update((s) => (s.filters = emptyFilters())));
@@ -76,7 +84,7 @@ export function renderDeck(root: HTMLElement, deps: DeckDeps) {
     root,
     html`
       <section class="deck" aria-labelledby="deck-title">
-        ${speciesSwitch()}
+        <div class="deck__top">${speciesSwitch()}${widenedNote()}</div>
         <h1 class="sr-only" id="deck-title" tabindex="-1" data-focus>${t('nav.explore')}</h1>
         <div class="deck__stack">
           <article class="card card--top" tabindex="0" data-card

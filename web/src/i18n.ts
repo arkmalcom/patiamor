@@ -23,6 +23,7 @@ const es = {
   'deck.save': 'Quiero adoptar',
   'deck.away': 'a {km} km',
   'deck.near': 'a menos de 1 km',
+  'deck.widened': 'Todavía no hay {animals} a menos de {km} km de {place}. Te mostramos los más cercanos: el primero está a {near} km.',
   'deck.dragSkip': 'Ahora no',
   'deck.dragSave': 'Quiero adoptar',
   'deck.position': '{n} de {total} cerca de ti',

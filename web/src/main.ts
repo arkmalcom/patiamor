@@ -6,7 +6,7 @@ import { Compass, MapPin, SlidersHorizontal, User } from 'lucide';
 import { backdrop, landscape } from './art';
 import { $, $$, html, icon, mount, transition } from './dom';
 import { kmLabel, t } from './i18n';
-import { activeFilterCount, loadPets, loadRequests, setLocation, setUser, state, subscribe, takePendingRequest, update } from './store';
+import { activeFilterCount, loadPets, loadRequests, radius, setLocation, setUser, state, subscribe, takePendingRequest, update } from './store';
 import { applyFooter, bindRadiusPanel, radiusPanel } from './ui/radius';
 import { resumePendingRequest } from './ui/request';
 import { mountPips, pips } from './ui/save';
@@ -134,7 +134,7 @@ function chrome(route: Route) {
   // The background's motifs follow the species switch: paws and bones, yarn and fish, or both.
   document.documentElement.dataset.species = state.species;
   $('[data-radius-place]').textContent = state.location ? `${state.location.name} · ` : '';
-  $('[data-radius-label]').textContent = kmLabel(state.radiusKm, true);
+  $('[data-radius-label]').textContent = kmLabel(radius(), true);
   const n = activeFilterCount();
   const badge = $('[data-filter-badge]');
   badge.hidden = n === 0;

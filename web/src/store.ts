@@ -57,7 +57,10 @@ export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 export interface State {
   /** Dogs, cats, or both. Applies everywhere: deck, radar counts, empty states. */
   species: SpeciesFilter;
+  /** The distance the person set with the slider (25 until they do). See radius() for the one in effect. */
   radiusKm: number;
+  /** Whether the person has chosen a distance themselves. Until then the app widens it rather than show nothing. */
+  radiusChosen: boolean;
   filters: Filters;
   /** The area distances are measured from: a place centroid, never a precise position. */
   location: Place | null;
@@ -102,7 +105,8 @@ function write(storage: Storage | undefined, key: string, value: unknown) {
 const local = typeof localStorage === 'undefined' ? undefined : localStorage;
 const session = typeof sessionStorage === 'undefined' ? undefined : sessionStorage;
 
-const persisted = read(local, 'patiamor', { species: 'todos' as SpeciesFilter, radiusKm: 25, filters: emptyFilters(), location: null as Place | null });
+const DEFAULT_RADIUS = 25;
+const persisted = read(local, 'patiamor', { species: 'todos' as SpeciesFilter, radiusKm: DEFAULT_RADIUS, radiusChosen: null as boolean | null, filters: emptyFilters(), location: null as Place | null });
 // A distance past the numbered scale can only mean the whole country.
 if (persisted.radiusKm > RADIUS_MAX) persisted.radiusKm = RADIUS_ANY;
 const sessionState = read(session, 'patiamor-session', { skipped: [] as string[] });
@@ -110,6 +114,8 @@ const sessionState = read(session, 'patiamor-session', { skipped: [] as string[]
 export const state: State = {
   species: persisted.species,
   radiusKm: persisted.radiusKm,
+  // Saved before this existed: anything but the default was chosen.
+  radiusChosen: persisted.radiusChosen ?? persisted.radiusKm !== DEFAULT_RADIUS,
   filters: { ...emptyFilters(), ...persisted.filters },
   location: persisted.location,
   pets: [],
@@ -130,7 +136,7 @@ export function subscribe(fn: Listener) {
 
 export function update(mutator: (s: State) => void) {
   mutator(state);
-  write(local, 'patiamor', { species: state.species, radiusKm: state.radiusKm, filters: state.filters, location: state.location });
+  write(local, 'patiamor', { species: state.species, radiusKm: state.radiusKm, radiusChosen: state.radiusChosen, filters: state.filters, location: state.location });
   write(session, 'patiamor-session', { skipped: state.skipped });
   recompute();
   listeners.forEach((fn) => fn());
@@ -216,7 +222,24 @@ export function matchesFilters(pet: PetSummary, f: Filters, species: SpeciesFilt
   return true;
 }
 
-export function inReach(radiusKm = state.radiusKm, filters = state.filters): Placed[] {
+/** The distance in effect. Once the person has chosen one, that's it. Until then the app won't leave them
+ *  with an empty screen for want of a few kilometres: if nothing matches within the default, it shows the
+ *  nearest animals wherever they are (nearest first), which is what a visitor in Punta Cana needs while
+ *  the first shelters are all in Santo Domingo. */
+export function radius(): number {
+  if (state.radiusChosen) return state.radiusKm;
+  const matching = placed.filter((p) => matchesFilters(p.pet, state.filters));
+  return matching.length && !matching.some((p) => p.km <= state.radiusKm) ? RADIUS_ANY : state.radiusKm;
+}
+
+/** Set when the app is showing more than the default distance because nothing matched within it. */
+export function widenedFrom(): { km: number; nearestKm: number } | null {
+  if (state.radiusChosen || radius() <= state.radiusKm) return null;
+  const nearest = inReach()[0];
+  return nearest ? { km: state.radiusKm, nearestKm: nearest.km } : null;
+}
+
+export function inReach(radiusKm = radius(), filters = state.filters): Placed[] {
   return placed.filter((p) => p.km <= radiusKm && matchesFilters(p.pet, filters)).sort((a, b) => a.km - b.km);
 }
 
@@ -227,7 +250,7 @@ export function queue(): Placed[] {
 }
 
 /** In-radius counts per species (ignoring the species switch), shown on the switch itself. */
-export function speciesCounts(radiusKm = state.radiusKm, filters = state.filters): Record<SpeciesFilter, number> {
+export function speciesCounts(radiusKm = radius(), filters = state.filters): Record<SpeciesFilter, number> {
   const c = { perro: 0, gato: 0, todos: 0 };
   for (const p of placed) if (p.km <= radiusKm && matchesFilters(p.pet, filters, 'todos')) c[p.pet.species]++, c.todos++;
   return c;
@@ -239,7 +262,7 @@ export function activeFilterCount(f = state.filters): number {
 
 /** Nearest radius step that would bring at least one more pet into reach ("Todo el país" past the scale). */
 export function nextRadius(): number | null {
-  const beyond = placed.filter((p) => p.km > state.radiusKm && matchesFilters(p.pet, state.filters)).sort((a, b) => a.km - b.km)[0];
+  const beyond = placed.filter((p) => p.km > radius() && matchesFilters(p.pet, state.filters)).sort((a, b) => a.km - b.km)[0];
   return beyond ? (beyond.km > RADIUS_MAX ? RADIUS_ANY : Math.ceil(beyond.km / 5) * 5) : null;
 }
 
