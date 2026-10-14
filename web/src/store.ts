@@ -260,9 +260,14 @@ export function activeFilterCount(f = state.filters): number {
   return f.size.length + f.age.length + f.sex.length + f.energy.length + f.goodWith.length + (f.from ? 1 : 0);
 }
 
+/** The nearest animal matching the filters beyond the distance in effect. */
+export function nearestBeyond(): Placed | null {
+  return placed.filter((p) => p.km > radius() && matchesFilters(p.pet, state.filters)).sort((a, b) => a.km - b.km)[0] ?? null;
+}
+
 /** Nearest radius step that would bring at least one more pet into reach ("Todo el país" past the scale). */
 export function nextRadius(): number | null {
-  const beyond = placed.filter((p) => p.km > radius() && matchesFilters(p.pet, state.filters)).sort((a, b) => a.km - b.km)[0];
+  const beyond = nearestBeyond();
   return beyond ? (beyond.km > RADIUS_MAX ? RADIUS_ANY : Math.ceil(beyond.km / 5) * 5) : null;
 }
 

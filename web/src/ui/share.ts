@@ -4,9 +4,13 @@ import { toast } from './toast';
 // "Compartir" on a pet's profile (PAT-32): the phone's share sheet where there is one, otherwise the
 // link is copied. The link is the pet's own path, so WhatsApp and Facebook preview it with its photo.
 
-export async function sharePet(pet: { id: string; name: string }) {
-  const url = `${location.origin}/mascota/${encodeURIComponent(pet.id)}`;
-  const data = { title: pet.name, text: t('share.text', { name: pet.name }), url };
+export const sharePet = (pet: { id: string; name: string }) =>
+  shareLink({ title: pet.name, text: t('share.text', { name: pet.name }), url: `${location.origin}/mascota/${encodeURIComponent(pet.id)}` });
+
+/** Patiamor itself, for telling a shelter or rescuer about it (the empty states ask people to). */
+export const shareSite = () => shareLink({ title: t('app.name'), text: t('share.siteText'), url: location.origin });
+
+async function shareLink(data: { title: string; text: string; url: string }) {
   if (navigator.share && (!navigator.canShare || navigator.canShare(data))) {
     try {
       await navigator.share(data);
@@ -16,9 +20,9 @@ export async function sharePet(pet: { id: string; name: string }) {
     }
   }
   try {
-    await navigator.clipboard.writeText(url);
+    await navigator.clipboard.writeText(data.url);
     toast(t('share.copied'));
   } catch {
-    toast(t('share.failed', { url }));
+    toast(t('share.failed', { url: data.url }));
   }
 }

@@ -2,7 +2,7 @@ import { Check, LocateFixed, MapPin, Minus, Plus, Search, X } from 'lucide';
 import { api } from '../api';
 import { frameFor, type AgeGroup, type Companion, type Energy, type Place, type Sex, type Size } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
-import { animals, away, kmLabel, t, type Key } from '../i18n';
+import { animals, away, formatKm, kmLabel, t, type Key } from '../i18n';
 
 type PlaceKind = 'municipio' | 'distrito_municipal' | 'barrio' | 'paraje';
 import { emptyFilters, inReach, matchesFilters, placed, radius, RADIUS_ANY, RADIUS_MAX, RADIUS_MIN, setLocation, state, update, type Filters, type Placed } from '../store';
@@ -207,6 +207,7 @@ export function radiusPanel(mode: 'sheet' | 'inline'): Raw {
       <div class="radar-wrap">
         <div data-radar>${radar()}</div>
         <p class="radar__count"><span class="roll" data-roll data-label=""></span><span class="radar__count-label" data-count-label></span></p>
+        <p class="radar__hint" data-hint hidden><span data-hint-text></span> <button class="text-button" type="button" data-hint-go></button></p>
       </div>
       <div class="radius-control">
         <label class="radius-control__label" for="radius-${mode}">${t('sheet.radius.label')}</label>
@@ -256,6 +257,7 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
   const out = $('[data-km-out]', root);
   const roll = $('[data-roll]', root);
   const countLabel = $('[data-count-label]', root);
+  const hint = $('[data-hint]', root);
   const disk = $('.radar__disk', root) as unknown as SVGCircleElement;
   const chips = $$<HTMLButtonElement>('.chip', root);
   const apply = root.closest('dialog')?.querySelector<HTMLButtonElement>('[data-apply]') ?? null;
@@ -310,6 +312,15 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
       const chosen = !!from && (m.kind === 'house' ? from.kind === 'shelter' && m.members[0].pet.lister.type === 'shelter' && m.members[0].pet.lister.id === from.id : from.kind === 'place' && onePlace(m) && m.members[0].pet.place.id === from.id);
       el.classList.toggle('is-chosen', chosen);
       if (m.kind === 'house' || onePlace(m)) el.setAttribute('aria-pressed', String(chosen));
+    }
+    // Nothing within the distance: say where the nearest animal is, and offer to go that far.
+    const beyond = n === 0 ? placed.filter((q) => q.km > km && matchesFilters(q.pet, draft.filters)).sort((a, b) => a.km - b.km)[0] : undefined;
+    hint.hidden = !beyond;
+    if (beyond) {
+      const target = beyond.km > RADIUS_MAX ? RADIUS_ANY : Math.ceil(beyond.km / 5) * 5;
+      hint.dataset.go = String(target);
+      $('[data-hint-text]', hint).textContent = t('sheet.radius.nearest', { km: formatKm(beyond.km) });
+      $('[data-hint-go]', hint).textContent = target >= RADIUS_ANY ? t('sheet.radius.goAny') : t('sheet.radius.goTo', { km: target });
     }
     const label = t('sheet.radius.count', { animals: animals(n, state.species) });
     roll.dataset.label = label;
@@ -471,6 +482,14 @@ export function bindRadiusPanel(root: HTMLElement, { mode, onApply }: BindOpts) 
     paint();
     clearTimeout(commitTimer);
     commitTimer = window.setTimeout(commit, 160);
+  });
+
+  $('[data-hint-go]', root).addEventListener('click', () => {
+    moved = true;
+    draft.radiusKm = Number(hint.dataset.go);
+    slider.value = String(toSlider(draft.radiusKm));
+    paint();
+    commit();
   });
 
   chips.forEach((c) =>

@@ -1,10 +1,11 @@
-import { Clock, Heart, MapPin, SlidersHorizontal } from 'lucide';
+import { Clock, Heart, MapPin, Share2, SlidersHorizontal } from 'lucide';
 import { $, html, icon, mount, reducedMotion, type Raw } from '../dom';
 import { animals, away, formatKm, t } from '../i18n';
-import { RADIUS_ANY, activeFilterCount, emptyFilters, loadPets, nextRadius, queue, state, update, widenedFrom } from '../store';
+import { RADIUS_ANY, activeFilterCount, emptyFilters, inReach, loadPets, nearestBeyond, nextRadius, placed, queue, radius, state, update, widenedFrom } from '../store';
 import { canvas } from '../ui/canvas';
 import { bindGallery } from '../ui/gallery';
 import { bindSpeciesSwitch, speciesSwitch } from '../ui/species';
+import { shareSite } from '../ui/share';
 import { toast } from '../ui/toast';
 
 interface DeckDeps {
@@ -28,19 +29,56 @@ function widenedNote(): Raw {
   return html`<p class="deck__note" role="status">${icon(MapPin, 18)}<span>${text}</span></p>`;
 }
 
+/** Why the deck is empty, said honestly: seen them all, none near (the nearest are far), none yet, or none
+ *  with these filters. The first launch months will mostly be "none near": see the recruiting card. */
 function emptyState(): Raw {
+  const species = animals(2, state.species);
+  const place = state.location?.name ?? '';
+  const km = radius();
   const wider = nextRadius();
+  const nearest = nearestBeyond();
+  const seen = inReach().length > 0; // there are animals in reach; they've all been skipped or are in Mi lista
   const hasSkipped = state.skipped.length > 0;
+  const filtered = activeFilterCount() > 0;
+  const none = !placed.length; // nobody has published an animal yet
+
+  let title: string, body: string;
+  if (seen) {
+    title = t('empty.title');
+    body = km >= RADIUS_ANY ? t('empty.bodyAny', { animals: species }) : t('empty.body', { km, animals: species });
+  } else if (nearest) {
+    title = t('empty.near.title', { animals: species });
+    body = t('empty.near.body', { animals: species, km, place, near: formatKm(nearest.km) });
+  } else if (none) {
+    title = t('empty.none.title');
+    body = t('empty.none.body', { animals: species });
+  } else {
+    title = t('empty.filtered.title');
+    body = t('empty.filtered.body');
+  }
+  // Nobody to show here yet: ask the person to bring in a shelter or rescuer from their area.
+  const recruit = !seen && !(placed.length && !nearest);
+
   return html`
     <div class="deck-empty">
       ${emptyFrame()}
-      <h1 class="deck-empty__title" tabindex="-1" data-focus>${t('empty.title')}</h1>
-      <p class="muted">${t('empty.body', { km: state.radiusKm, animals: animals(2, state.species) })}</p>
+      <h1 class="deck-empty__title" tabindex="-1" data-focus>${title}</h1>
+      <p class="muted">${body}</p>
       <div class="deck-empty__actions">
-        ${wider ? html`<button class="button button--primary" type="button" data-widen="${wider}">${wider >= RADIUS_ANY ? t('empty.widenAny') : t('empty.widen', { km: wider })}</button>` : ''}
+        ${wider ? html`<button class="button button--primary" type="button" data-widen="${wider}">${t(nearest && !seen ? 'empty.seeNearest' : wider >= RADIUS_ANY ? 'empty.widenAny' : 'empty.widen', { km: wider })}</button>` : ''}
         ${hasSkipped ? html`<button class="button button--outline" type="button" data-again>${t('empty.again')}</button>` : ''}
-        ${activeFilterCount() ? html`<button class="button button--ghost" type="button" data-filters>${icon(SlidersHorizontal, 18)}${t('empty.filters')}</button>` : ''}
+        ${filtered ? html`<button class="button button--ghost" type="button" data-filters>${icon(SlidersHorizontal, 18)}${t('empty.filters')}</button>` : ''}
       </div>
+      ${recruit
+        ? html`<aside class="recruit" aria-labelledby="recruit-title">
+            <h2 class="recruit__title" id="recruit-title">${t('empty.recruit.title', { place })}</h2>
+            <p>${t('empty.recruit.body')}</p>
+            <div class="recruit__actions">
+              <button class="button button--outline button--small" type="button" data-share-site>${icon(Share2, 16)}${t('empty.recruit.share')}</button>
+              <a class="button button--ghost button--small" href="/refugio/registro">${t('empty.recruit.register')}</a>
+            </div>
+          </aside>`
+        : ''}
     </div>`;
 }
 
@@ -72,6 +110,7 @@ export function renderDeck(root: HTMLElement, deps: DeckDeps) {
       update((s) => ((s.radiusKm = km), (s.radiusChosen = true)));
     });
     root.querySelector('[data-again]')?.addEventListener('click', () => update((s) => (s.skipped = [])));
+    root.querySelector('[data-share-site]')?.addEventListener('click', () => void shareSite());
     root.querySelector('[data-filters]')?.addEventListener('click', () => update((s) => (s.filters = emptyFilters())));
     return;
   }

@@ -637,6 +637,19 @@ html[data-route='deck'] .view { min-height: 0; }
 @keyframes frame-breathe { 50% { scale: 0.96; } }
 .deck-empty__title { font-family: var(--font-display); font-weight: 400; font-size: 2rem; line-height: 1.1; outline: none; }
 .deck-empty__actions { display: grid; gap: 10px; width: 100%; margin-top: 6px; }
+.deck-empty__actions:empty { display: none; }
+/* With the recruiting card below, the frame steps back so everything fits one phone screen. */
+.deck-empty:has(.recruit) .empty-frame { scale: 0.7; margin: -28px 0; }
+/* Asks the visitor to bring a shelter or rescuer from their area (the first months have few). */
+.recruit {
+  display: grid; gap: 8px; width: 100%; margin-top: 10px; padding: 14px 16px;
+  background: var(--paper); border-radius: 16px; box-shadow: var(--shadow-soft); text-align: left;
+}
+.recruit__title { font-family: var(--font-display); font-weight: 400; font-size: 1.15rem; line-height: 1.15; }
+.recruit p { margin: 0; font-size: 0.95rem; color: var(--ink-2); }
+.radar__hint { margin: 4px 0 0; text-align: center; font-size: 0.95rem; color: var(--ink-2); }
+.radar__hint[hidden] { display: none; }
+.recruit__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
 
 /* ---------- Sheet ---------- */
 
