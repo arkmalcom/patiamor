@@ -228,7 +228,7 @@ html[data-route='deck'] .view { min-height: 0; }
 .side { display: none; }
 
 .tabbar {
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   background: var(--paper);
   border-top: 1px solid var(--rule);
   padding-bottom: env(safe-area-inset-bottom);
@@ -1124,6 +1124,46 @@ html.sheet-open { overflow: hidden; }
 .full__slots { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .full__slot { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
 .full__slot-text { flex: 1; display: grid; min-width: 0; }
+/* Buscar: the field, and each result with enough to tell one animal from another. */
+.search__lede { margin: 0; max-width: 52ch; color: var(--ink-2); text-wrap: pretty; }
+.search__form { margin: 0; }
+.search__field {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 56px; padding: 0 8px 0 18px;
+  background: var(--paper); border: 1.5px solid var(--rule-strong); border-radius: 999px;
+  box-shadow: var(--shadow-soft);
+}
+.search__field:focus-within { border-color: var(--ink); outline: 3px solid var(--anil); outline-offset: 2px; }
+.search__input { flex: 1; min-width: 0; border: 0; background: none; font: inherit; font-size: 1.1rem; font-weight: 700; color: var(--ink); padding: 12px 0; outline: none; }
+.search__input::placeholder { color: var(--ink-2); font-weight: 600; opacity: 0.7; }
+.search__input::-webkit-search-cancel-button { display: none; }
+.search__clear { width: 40px; height: 40px; flex: none; }
+.search__hint { margin: 4px 0 0; }
+.search__count { margin: 4px 0 0; font-weight: 800; }
+.search__similar { font-family: var(--font-display); font-weight: 400; font-size: 1.3rem; margin-top: 10px; }
+.search__none { display: grid; gap: 10px; padding: 18px; background: var(--paper); border-radius: 16px; box-shadow: var(--shadow-soft); }
+.search__none-title { font-family: var(--font-display); font-weight: 400; font-size: 1.4rem; line-height: 1.15; overflow-wrap: anywhere; }
+.search__none p { margin: 0; }
+.search__none .recruit { box-shadow: none; background: var(--sky-tint); margin-top: 4px; }
+.results { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.result {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start; width: 100%;
+  padding: 14px 16px 14px 14px; border: 0; border-radius: 16px; background: var(--paper); box-shadow: var(--shadow-soft);
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+  transition: transform 160ms var(--ease-out), box-shadow 160ms;
+}
+.result:hover { transform: translateY(-1px); box-shadow: 0 14px 26px -18px rgba(29, 35, 64, 0.55); }
+.result:focus-visible { outline: 3px solid var(--anil); outline-offset: 3px; }
+.result__text { display: grid; gap: 3px; min-width: 0; }
+.result__name { font-family: var(--font-display); font-weight: 400; font-size: 1.35rem; line-height: 1.1; overflow-wrap: anywhere; }
+.result__bits { font-size: 0.95rem; color: var(--ink-2); }
+.result__where { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; font-size: 0.92rem; color: var(--ink-2); }
+.result__where .lister { font-weight: 800; color: var(--ink); }
+.result__tags { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.result__tags li { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; background: var(--sky-tint); font-size: 0.82rem; font-weight: 700; }
+.result__tags .icon { color: var(--hoja-deep); }
+.result__tags .result__tag--list { background: var(--mango-tint); }
+
 /* Adopting more than three: the form's explanation, and where the request stands in Mi lista. */
 .bulk { display: grid; gap: 16px; }
 .bulk__lede { margin: 0; font-size: 1.05rem; line-height: 1.5; }
@@ -1509,7 +1549,7 @@ html[data-route='profile'] .tabbar { display: none; }
 
 /* ---------- List ---------- */
 
-.list-view, .account {
+.list-view, .account, .search {
   width: 100%; max-width: 720px;
   margin: 0 auto;
   padding: 12px 20px 40px;

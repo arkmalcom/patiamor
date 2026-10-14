@@ -8,6 +8,7 @@ const es = {
   'app.sampleNote': 'Datos de ejemplo: los animales y refugios de esta demostración son ficticios.',
 
   'nav.explore': 'Explorar',
+  'nav.search': 'Buscar',
   'nav.list': 'Mi lista',
   'nav.account': 'Cuenta',
 
@@ -352,6 +353,26 @@ const es = {
   'profile.ready.note': 'Al enviar tu solicitud, ocupa uno de tus 3 espacios hasta que el proceso termine. Envíala solo si estás decidido.',
   'profile.ready.restricted': 'Retiraste varias solicitudes en poco tiempo, así que por ahora no puedes empezar procesos nuevos. Escríbenos y lo revisamos contigo.',
   'full.toList': 'Ver mis solicitudes',
+
+  // ---------- Buscar ----------
+  'search.title': 'Buscar',
+  'search.lede': '¿Viste a un animal en Instagram o en otro lugar? Escribe su nombre, o el del refugio, y lo buscamos entre todos los de Patiamor.',
+  'search.label': 'Nombre del animal, del refugio o de la zona',
+  'search.placeholder': 'Por ejemplo, Pancho',
+  'search.clear': 'Borrar búsqueda',
+  'search.hint': 'Busca entre los {n} {animals} de Patiamor, sin importar tus filtros ni la distancia.',
+  'search.loading': 'Cargando los animales…',
+  'search.count.one': '1 resultado',
+  'search.count.many': '{n} resultados',
+  'search.noExact': 'No hay nadie llamado «{q}».',
+  'search.similar': 'Nombres parecidos',
+  'search.similarNote': 'Por si lo escribieron distinto.',
+  'search.energy': 'energía {level}',
+  'search.goodWith': 'Bien con {who}',
+  'search.inList': 'En tu lista',
+  'search.none.title': 'No encontramos «{q}»',
+  'search.none.body': 'Puede que ya lo hayan adoptado, que esté en proceso con otra familia, o que su refugio todavía no lo haya publicado aquí.',
+  'search.none.recruit': '¿Lo viste en Instagram? Pídele al refugio que lo publique en Patiamor.',
 
   // ---------- Adopting more than three: a special request ----------
   'bulk.promptTitle': '¿Quieres adoptar a más de tres?',

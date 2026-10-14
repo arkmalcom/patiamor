@@ -2,7 +2,7 @@ import '@fontsource/shrikhand/latin-400.css';
 import '@fontsource-variable/atkinson-hyperlegible-next/wght.css';
 import './styles.css';
 
-import { Compass, MapPin, SlidersHorizontal, User } from 'lucide';
+import { Compass, MapPin, Search, SlidersHorizontal, User } from 'lucide';
 import { backdrop, landscape } from './art';
 import { $, $$, html, icon, mount, transition } from './dom';
 import { kmLabel, t } from './i18n';
@@ -20,10 +20,11 @@ import { renderDeck } from './views/deck';
 import { bindSlots, renderList, slots } from './views/list';
 import { renderPortal, type PortalView } from './views/portal';
 import { renderProfile } from './views/profile';
+import { renderSearch } from './views/search';
 
 upgradeHashLink();
 
-type Route = { name: 'deck' } | { name: 'profile'; id: string } | { name: 'list' } | { name: 'account' } | ({ name: 'portal' } & PortalView);
+type Route = { name: 'deck' } | { name: 'profile'; id: string } | { name: 'search'; q: string } | { name: 'list' } | { name: 'account' } | ({ name: 'portal' } & PortalView);
 
 /** The route for an in-app path (here()): "/mascota/luna", "/refugio/x/animales?ver=adoptados"… */
 function parse(where: string): Route {
@@ -50,6 +51,7 @@ function parse(where: string): Route {
       return d ? { name: 'portal', view: 'animal', id: decodeURIComponent(b), petId: d === 'nuevo' ? null : decodeURIComponent(d) } : { name: 'portal', view: 'animales', id: decodeURIComponent(b), tab: ver };
     return { name: 'portal', view: 'home' };
   }
+  if (a === 'buscar') return { name: 'search', q: new URLSearchParams(query).get('q') ?? '' };
   if (a === 'lista') return { name: 'list' };
   if (a === 'cuenta') return { name: 'account' };
   return { name: 'deck' };
@@ -69,6 +71,7 @@ mount(
       <a class="wordmark" href="/" aria-label="${t('app.name')}, ${t('nav.explore')}">${t('app.name')}<span class="wordmark__demo">${t('app.demo')}</span></a>
       <nav class="topnav" aria-label="Principal">
         <a href="/" data-nav="deck">${t('nav.explore')}</a>
+        <a href="/buscar" data-nav="search">${t('nav.search')}</a>
         <a href="/lista" data-nav="list">${t('nav.list')} <span data-pips data-pips-count>${pips(true)}</span></a>
         <a href="/cuenta" data-nav="account" data-account-top>${t('nav.account')}</a>
       </nav>
@@ -86,6 +89,7 @@ mount(
     </aside>
     <nav class="tabbar" aria-label="Principal">
       <a href="/" data-nav="deck">${icon(Compass, 24)}<span>${t('nav.explore')}</span></a>
+      <a href="/buscar" data-nav="search">${icon(Search, 24)}<span>${t('nav.search')}</span></a>
       <a href="/lista" data-nav="list"><span class="tabbar__pips" data-pips data-pips-count>${pips(true)}</span><span>${t('nav.list')}</span></a>
       <a href="/cuenta" data-nav="account" data-account-tab>${icon(User, 24)}<span>${t('nav.account')}</span></a>
     </nav>
@@ -162,6 +166,8 @@ function render(route = parse(here())) {
       return renderDeck(view, { openProfile });
     case 'profile':
       return renderProfile(view, route.id, { back: () => (history.length > 1 ? history.back() : explore()), openProfile });
+    case 'search':
+      return renderSearch(view, route.q, { openProfile });
     case 'list':
       return renderList(view, { openProfile, explore });
     case 'account':
@@ -194,7 +200,7 @@ startNavigation(() => {
     window.scrollTo(0, 0);
   };
   (morph ? transition(run) : (run(), Promise.resolve())).then(() => {
-    view.querySelector<HTMLElement>('[data-focus], h1')?.focus({ preventScroll: true });
+    (view.querySelector<HTMLElement>('[data-autofocus]') ?? view.querySelector<HTMLElement>('[data-focus], h1'))?.focus({ preventScroll: true });
   });
 });
 
