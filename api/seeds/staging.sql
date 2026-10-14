@@ -145,3 +145,6 @@ INSERT OR IGNORE INTO pet_photos (id, pet_id, r2_key, position, focus) VALUES
 UPDATE pet_photos SET focus = '78% 40%' WHERE id = 'seed-photo-pinto';
 -- Shelters seeded as verified (verified_at set) get the matching status (migration 0009 added it).
 UPDATE shelters SET status = 'verified' WHERE verified_at IS NOT NULL AND status = 'pending';
+
+-- Shelter owners are approved to register shelters (migration 0017 did this for owners that existed then).
+UPDATE users SET shelter_owner_at = coalesce(shelter_owner_at, '2026-10-01T00:00:00Z') WHERE id IN (SELECT user_id FROM shelter_members WHERE role = 'owner');

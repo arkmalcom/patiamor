@@ -13,6 +13,7 @@ import { inbox } from './inbox';
 import { lifecycle, trimAdoptedPhotos } from './lifecycle';
 import { listings } from './listings';
 import { photoRoutes, servePhoto } from './photos';
+import { owners, isShelterOwner, latestOwnerRequest } from './owners';
 import { portal } from './portal';
 import { alerts, requests, requestsRestricted } from './requests';
 
@@ -72,6 +73,7 @@ app.route('/api/pets', pets);
 app.route('/api/requests', requests);
 app.route('/api/alerts', alerts);
 app.route('/api/portal', portal);
+app.route('/api/portal', owners);
 app.route('/api/portal', listings);
 app.route('/api/portal', photoRoutes);
 app.route('/api/portal', inbox);
@@ -121,7 +123,8 @@ app.get('/api/me', async (c) => {
     .all<{ id: string; name: string; status: string; role: 'owner' | 'maintainer' }>();
   const contact = await c.env.DB.prepare('SELECT phone, contact_pref FROM users WHERE id = ?').bind(user.id).first<{ phone: string | null; contact_pref: string | null }>();
   const restricted = await requestsRestricted(c.env.DB, user.id);
-  return c.json({ user: { ...publicUser(user), phone: contact?.phone ?? null, contactPref: contact?.contact_pref ?? null, requestsRestricted: restricted, shelters } });
+  const ownerRequest = isShelterOwner(user) ? null : await latestOwnerRequest(c.env.DB, user.id);
+  return c.json({ user: { ...publicUser(user), phone: contact?.phone ?? null, contactPref: contact?.contact_pref ?? null, requestsRestricted: restricted, shelters, shelterOwner: isShelterOwner(user), ownerRequest } });
 });
 
 app.patch('/api/me', async (c) => {

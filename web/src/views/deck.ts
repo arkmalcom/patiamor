@@ -75,7 +75,7 @@ function emptyState(): Raw {
             <p>${t('empty.recruit.body')}</p>
             <div class="recruit__actions">
               <button class="button button--outline button--small" type="button" data-share-site>${icon(Share2, 16)}${t('empty.recruit.share')}</button>
-              <a class="button button--ghost button--small" href="/refugio/registro">${t('empty.recruit.register')}</a>
+              <a class="button button--ghost button--small" href="/refugio">${t('empty.recruit.register')}</a>
             </div>
           </aside>`
         : ''}

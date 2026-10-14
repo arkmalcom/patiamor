@@ -46,7 +46,7 @@ describe('write rate limit', () => {
 
 describe('shelter registration', () => {
   it('two a day per account', async () => {
-    const u = await signIn();
+    const u = await signIn({ owner: true });
     expect((await api('/api/portal/shelters', { method: 'POST', cookie: u.cookie, body: application() })).status).toBe(201);
     expect((await api('/api/portal/shelters', { method: 'POST', cookie: u.cookie, body: application() })).status).toBe(201);
     expect((await api('/api/portal/shelters', { method: 'POST', cookie: u.cookie, body: application() })).json.error).toBe('too_many_today');
@@ -57,7 +57,7 @@ describe('shelter registration', () => {
       const id = `queue-${i}-${crypto.randomUUID().slice(0, 6)}`;
       await env.DB.prepare("INSERT INTO shelters (id, slug, name, place_id, status) VALUES (?, ?, 'En cola', 'gazcue-distrito-nacional', 'pending')").bind(id, id).run();
     }
-    const u = await signIn();
+    const u = await signIn({ owner: true });
     expect((await api('/api/portal/shelters', { method: 'POST', cookie: u.cookie, body: application() })).json.error).toBe('queue_full');
   });
 });

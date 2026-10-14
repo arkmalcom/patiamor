@@ -7,10 +7,13 @@ export const ORIGIN = 'http://example.test';
 
 let n = 0;
 /** A user with a live session; returns the cookie to send. */
-export async function signIn(opts: { admin?: boolean; name?: string } = {}) {
+export async function signIn(opts: { admin?: boolean; name?: string; owner?: boolean } = {}) {
   const id = `user-${++n}-${Date.now()}`;
   const email = `${id}@example.test`;
-  await env.DB.prepare('INSERT INTO users (id, email, name, is_admin) VALUES (?, ?, ?, ?)').bind(id, email, opts.name ?? 'Prueba', opts.admin ? 1 : 0).run();
+  // `owner`: approved to register shelters (admins don't need it).
+  await env.DB.prepare("INSERT INTO users (id, email, name, is_admin, shelter_owner_at) VALUES (?, ?, ?, ?, ?)")
+    .bind(id, email, opts.name ?? 'Prueba', opts.admin ? 1 : 0, opts.owner ? '2026-01-01T00:00:00Z' : null)
+    .run();
   const token = randomToken();
   await env.DB.prepare("INSERT INTO sessions (id_hash, user_id, expires_at) VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '+1 day'))")
     .bind(await sha256(token), id)

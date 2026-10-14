@@ -1,12 +1,15 @@
 import { Hono } from 'hono';
 import { isoIn, nowIso } from './auth/crypto';
-import { hasEmailBudget, sendBulkDecisionEmail, sendShelterDecisionEmail, type BulkDecision, type ShelterDecision } from './auth/email';
+import { hasEmailBudget, sendBulkDecisionEmail, sendOwnerDecisionEmail, sendShelterDecisionEmail, type BulkDecision, type ShelterDecision } from './auth/email';
 import { appOrigin } from './auth/routes';
+import { isEmail, normalizeEmail, userForEmail } from './auth/users';
 import type { BulkRow } from './bulk';
 import { forgetCatalogVersion } from './cache';
 import { runDigest } from './digest';
 import type { AppContext } from './env';
 import { placeById } from './places';
+import { loadKnown, lookAlikes } from './owners';
+import { insertShelter, MAX_OWNED, readApplication } from './portal';
 import { OPEN_STATUSES } from './requests';
 
 // Admin tools. For now: the shelter verification queue (PAT-13). Every decision is written to
@@ -105,6 +108,103 @@ admin.post('/shelters/:id/decision', async (c) => {
     );
   }
   return c.json({ shelter: { id, status: rule.to } });
+});
+
+// ---------- Requests to be a shelter owner ----------
+
+type OwnerQueueRow = {
+  id: string; user_id: string; shelter_name: string; zone: string; phone: string; link: string | null; about: string; status: string;
+  decision_note: string | null; created_at: string; decided_at: string | null; name: string | null; email: string;
+};
+
+// The queue, each with the shelters and other requests it might duplicate (same or overlapping name, same
+// phone) so an admin can spot a repeat before approving.
+admin.get('/owners', async (c) => {
+  const status = BULK_STATUSES.includes(c.req.query('status') as never) ? c.req.query('status')! : 'pending';
+  const db = c.env.DB;
+  const { results } = await db
+    .prepare(
+      `SELECT r.id, r.user_id, r.shelter_name, r.zone, r.phone, r.link, r.about, r.status, r.decision_note, r.created_at, r.decided_at, u.name, u.email
+         FROM shelter_owner_requests r JOIN users u ON u.id = r.user_id WHERE r.status = ?
+        ORDER BY r.created_at ${status === 'pending' ? 'ASC' : 'DESC'} LIMIT 100`,
+    )
+    .bind(status)
+    .all<OwnerQueueRow>();
+  const known = await loadKnown(db);
+  return c.json({
+    requests: results.map((r) => ({
+      id: r.id,
+      status: r.status,
+      shelterName: r.shelter_name,
+      zone: r.zone,
+      link: r.link,
+      about: r.about,
+      createdAt: r.created_at,
+      decidedAt: r.decided_at,
+      note: r.decision_note,
+      who: { name: r.name, email: r.email, phone: r.phone },
+      lookAlikes: lookAlikes(known, { id: r.id, shelterName: r.shelter_name, phone: r.phone }),
+    })),
+  });
+});
+
+// Approve (they can then register the shelter themselves) or decline (with the reason they will read).
+admin.post('/owners/:id/decision', async (c) => {
+  const id = c.req.param('id');
+  const adminUser = c.get('user')!;
+  const b = await c.req.json<{ action?: string; note?: string }>().catch(() => ({}) as { action?: string; note?: string });
+  const decision: BulkDecision | null = b.action === 'approve' ? 'approved' : b.action === 'decline' ? 'declined' : null;
+  if (!decision) return c.json({ error: 'invalid_action' }, 400);
+  const note = (b.note ?? '').trim().slice(0, 500) || null;
+  if (decision === 'declined' && !note) return c.json({ error: 'reason_required' }, 400);
+
+  const db = c.env.DB;
+  const row = await db
+    .prepare('SELECT r.status, r.user_id, u.email FROM shelter_owner_requests r JOIN users u ON u.id = r.user_id WHERE r.id = ?')
+    .bind(id)
+    .first<{ status: string; user_id: string; email: string }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+  if (row.status !== 'pending') return c.json({ error: 'invalid_transition' }, 409);
+
+  const now = nowIso();
+  await db.batch([
+    db.prepare("UPDATE shelter_owner_requests SET status = ?, decision_note = ?, decided_by = ?, decided_at = ? WHERE id = ? AND status = 'pending'").bind(decision, note, adminUser.id, now, id),
+    ...(decision === 'approved' ? [db.prepare('UPDATE users SET shelter_owner_at = coalesce(shelter_owner_at, ?) WHERE id = ?').bind(now, row.user_id)] : []),
+    db.prepare("INSERT INTO admin_actions (id, admin_id, action, subject_type, subject_id, note) VALUES (?, ?, ?, 'owner_request', ?, ?)").bind(crypto.randomUUID(), adminUser.id, `owner.${b.action}`, id, note),
+  ]);
+  if (await hasEmailBudget(db, 'owner_decision')) {
+    await sendOwnerDecisionEmail(c.env, row.email, { decision, note, portalUrl: `${appOrigin(c)}/refugio` }).catch((err) => console.error('owner decision email failed', err));
+  }
+  return c.json({ request: { id, status: decision } });
+});
+
+// Register a shelter for someone, from what they told the admin: it needs the owner's email besides the
+// usual form, and starts verified, since an admin has already got to know them. They sign in with that
+// email and find the shelter. (A request of theirs that was waiting is closed as approved.)
+admin.post('/shelters', async (c) => {
+  const adminUser = c.get('user')!;
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
+  const ownerEmail = normalizeEmail(typeof body.ownerEmail === 'string' ? body.ownerEmail : '');
+  if (!isEmail(ownerEmail)) return c.json({ error: 'invalid_owner_email' }, 400);
+  const { app, error } = readApplication(body);
+  if (error) return c.json({ error }, 400);
+
+  const db = c.env.DB;
+  const owner = await userForEmail(db, ownerEmail, app.contactName);
+  const owned = await db.prepare("SELECT count(*) AS n FROM shelter_members WHERE user_id = ? AND role = 'owner'").bind(owner.id).first<{ n: number }>();
+  if ((owned?.n ?? 0) >= MAX_OWNED) return c.json({ error: 'too_many_shelters' }, 409);
+
+  const now = nowIso();
+  await db.prepare('UPDATE users SET shelter_owner_at = coalesce(shelter_owner_at, ?) WHERE id = ?').bind(now, owner.id).run();
+  const { id, slug } = await insertShelter(db, app, owner.id, { status: 'verified', adminId: adminUser.id });
+  await db.batch([
+    db.prepare("UPDATE shelter_owner_requests SET status = 'approved', decision_note = 'Registrado por Patiamor.', decided_by = ?, decided_at = ? WHERE user_id = ? AND status = 'pending'").bind(adminUser.id, now, owner.id),
+    db.prepare("INSERT INTO admin_actions (id, admin_id, action, subject_type, subject_id, note) VALUES (?, ?, 'shelter.register_for', 'shelter', ?, ?)").bind(crypto.randomUUID(), adminUser.id, id, `owner=${ownerEmail}`),
+  ]);
+  if (await hasEmailBudget(db, 'shelter_decision')) {
+    await sendShelterDecisionEmail(c.env, ownerEmail, { shelter: app.name, decision: 'verified', reason: null, portalUrl: `${appOrigin(c)}/refugio` }).catch((err) => console.error('shelter registered email failed', err));
+  }
+  return c.json({ shelter: { id, slug, name: app.name, status: 'verified' } }, 201);
 });
 
 // ---------- Special requests to adopt more than three ----------

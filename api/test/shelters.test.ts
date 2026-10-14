@@ -50,7 +50,7 @@ describe('registering a shelter', () => {
   });
 
   it('checks the essentials and names the first problem', async () => {
-    const u = await signIn();
+    const u = await signIn({ owner: true });
     expect((await register(u.cookie, { rules: false })).json.error).toBe('rules_required');
     expect((await register(u.cookie, { contactPhone: '555-0101' })).json.error).toBe('invalid_phone');
     expect((await register(u.cookie, { placeId: 'nowhere' })).json.error).toBe('invalid_place');
@@ -59,7 +59,7 @@ describe('registering a shelter', () => {
   });
 
   it('starts pending, makes the person its owner, and gives a unique slug', async () => {
-    const u = await signIn();
+    const u = await signIn({ owner: true });
     const first = await register(u.cookie);
     expect(first.status).toBe(201);
     expect(first.json.shelter.status).toBe('pending');
@@ -70,7 +70,7 @@ describe('registering a shelter', () => {
   });
 
   it('takes up to three references; extra ones must be complete', async () => {
-    const u = await signIn();
+    const u = await signIn({ owner: true });
     const vet = { name: 'Clínica Vet Centro', contact: '809-555-0202', kind: 'veterinaria' };
     const other = { name: 'Refugio Amigo', contact: '829-555-0303', kind: 'refugio' };
     expect((await register(u.cookie, { references: [vet, { name: 'Ana', contact: '', kind: 'otro' }] })).json.error).toBe('invalid_more_reference');
@@ -80,7 +80,7 @@ describe('registering a shelter', () => {
   });
 
   it('caps how many shelters one person can own', async () => {
-    const u = await signIn();
+    const u = await signIn({ owner: true });
     // Registered over several days (two a day is its own limit, in limits.test.ts).
     for (let i = 0; i < 3; i++) {
       expect((await register(u.cookie, { name: `Refugio ${i}` })).status).toBe(201);
@@ -90,7 +90,7 @@ describe('registering a shelter', () => {
   });
 
   it('keeps the application private to its owners', async () => {
-    const owner = await signIn();
+    const owner = await signIn({ owner: true });
     const other = await signIn();
     const { json } = await register(owner.cookie);
     const id = json.shelter.id;
@@ -108,13 +108,13 @@ describe('registering a shelter', () => {
 
 describe('verifying a shelter', () => {
   it('is for admins only, and the admin area does not announce itself', async () => {
-    const u = await signIn();
+    const u = await signIn({ owner: true });
     expect((await api('/api/admin/shelters', { cookie: u.cookie })).status).toBe(404);
     expect((await api('/api/admin/shelters')).status).toBe(404);
   });
 
   it('hides a pending shelter\'s animals, shows them once verified, hides them again when suspended', async () => {
-    const owner = await signIn();
+    const owner = await signIn({ owner: true });
     const adminUser = await signIn({ admin: true });
     const id = (await register(owner.cookie)).json.shelter.id;
     const pet = await petFor(id, owner.id);
@@ -135,7 +135,7 @@ describe('verifying a shelter', () => {
   });
 
   it('lets a rejected shelter fix its application and resend it', async () => {
-    const owner = await signIn();
+    const owner = await signIn({ owner: true });
     const adminUser = await signIn({ admin: true });
     const id = (await register(owner.cookie)).json.shelter.id;
     expect((await api(`/api/admin/shelters/${id}/decision`, { method: 'POST', body: { action: 'reject' }, cookie: adminUser.cookie })).json.error).toBe('reason_required');
@@ -151,7 +151,7 @@ describe('verifying a shelter', () => {
   });
 
   it('does not allow decisions that skip a step', async () => {
-    const owner = await signIn();
+    const owner = await signIn({ owner: true });
     const adminUser = await signIn({ admin: true });
     const id = (await register(owner.cookie)).json.shelter.id;
     // A pending shelter can't be suspended; it hasn't been verified yet.

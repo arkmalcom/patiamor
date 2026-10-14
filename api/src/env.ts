@@ -27,6 +27,8 @@ export type AppUser = {
   email: string;
   name: string | null;
   is_admin: number;
+  /** When an admin approved them as a shelter owner (admins don't need it). */
+  shelter_owner_at: string | null;
 };
 
 export type AppContext = { Bindings: Env; Variables: { user: AppUser | null } };

@@ -1,6 +1,6 @@
 import type { AppUser } from '../env';
 
-const SELECT_USER = 'SELECT id, email, name, is_admin FROM users';
+const SELECT_USER = 'SELECT id, email, name, is_admin, shelter_owner_at FROM users';
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 export const isEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
@@ -11,7 +11,7 @@ export async function userForEmail(db: D1Database, email: string, name: string |
   if (existing) return existing;
   const id = crypto.randomUUID();
   await db.prepare('INSERT INTO users (id, email, name) VALUES (?, ?, ?)').bind(id, email, name).run();
-  return { id, email, name, is_admin: 0 };
+  return { id, email, name, is_admin: 0, shelter_owner_at: null };
 }
 
 /**

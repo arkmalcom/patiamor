@@ -29,6 +29,10 @@ Writes are rate limited by the Workers Rate Limiting binding `WRITE_LIMIT`: 30 p
 - "Avísame" alerts: 20 per person;
 - photo and email budgets.
 
+The pet name lookup (`GET /api/pets/find`, public, for search when the app's own list lacks an animal) shares the limiter under its own key (`find:<ip>`), and reads about as many rows as it returns because it uses indexes (D1 reads are the free plan's other daily quota). Adopted and withdrawn animals are never returned.
+
+Registering a shelter needs `users.shelter_owner_at` (set when an admin approves a request in `shelter_owner_requests`, or registers the shelter for the person; admins don't need it). `POST /api/portal/shelters` answers 403 `owner_approval_required` otherwise, so new tests that register shelters sign in with `signIn({ owner: true })`. Migration 0017 approved everyone who already owned a shelter, and `api/seeds/staging.sql` does the same for the sample owners.
+
 Email sign-in (`/api/auth/email/start`) requires a Turnstile token (`api/src/auth/turnstile.ts`, `web/src/ui/human.ts`). Two settings per environment:
 - `TURNSTILE_SITE_KEY`, public, in that environment's `vars` in `wrangler.jsonc`. Unset, the check is off.
 - `TURNSTILE_SECRET`, a secret, so ask first. Set it before adding the site key: with the key and no secret, email sign-in refuses everyone (fail closed, never skipped).

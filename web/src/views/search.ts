@@ -139,7 +139,7 @@ function none(q: string): Raw {
         <p class="recruit__title">${t('search.none.recruit')}</p>
         <div class="recruit__actions">
           <button class="button button--outline button--small" type="button" data-share-site>${icon(Share2, 16)}${t('empty.recruit.share')}</button>
-          <a class="button button--ghost button--small" href="/refugio/registro">${t('empty.recruit.register')}</a>
+          <a class="button button--ghost button--small" href="/refugio">${t('empty.recruit.register')}</a>
         </div>
       </div>
     </div>`;

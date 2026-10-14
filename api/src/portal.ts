@@ -11,8 +11,8 @@ import { drPhone } from './requests';
 type C = Context<AppContext>;
 export type Role = 'owner' | 'maintainer';
 
-/** Owners can register this many shelters; enough for a real network, too few for a mill of fronts. */
-const MAX_OWNED = 3;
+/** Owners can have this many shelters; enough for a real network, too few for a mill of fronts. */
+export const MAX_OWNED = 3;
 /** Registrations per account per day, and how long the review queue may grow before new ones wait.
  *  Real shelters register once; these only bite on someone scripting accounts. */
 const MAX_REGISTRATIONS_PER_DAY = 2;
@@ -37,17 +37,17 @@ const slugify = (name: string) =>
     .replace(/^-|-$/g, '')
     .slice(0, 60) || 'refugio';
 
-const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, max) : '');
+export const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, max) : '');
 const longText = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 /** Links people paste: Instagram, Facebook, a website. Kept only if they're http(s) URLs. */
-const links = (v: unknown) =>
+export const links = (v: unknown) =>
   (Array.isArray(v) ? v : [])
     .map((l) => text(l, 200))
     .filter((l) => /^https?:\/\/[^\s]+\.[^\s]+$/i.test(l))
     .slice(0, 5);
 
 /** The fields of a registration, validated; `error` names the first problem. */
-function readApplication(b: Record<string, unknown>) {
+export function readApplication(b: Record<string, unknown>) {
   const name = text(b.name, 80);
   const placeId = text(b.placeId, 80);
   const contactName = text(b.contactName, 80);
@@ -131,6 +131,9 @@ portal.get('/shelters', async (c) => {
 // Register a shelter: it starts pending, with the person as its owner.
 portal.post('/shelters', async (c) => {
   const user = c.get('user')!;
+  // Only approved shelter owners (and admins) register shelters: others ask first (owners.ts), so the
+  // review inbox isn't open to everyone and one shelter doesn't arrive in a hundred spellings.
+  if (!user.is_admin && !user.shelter_owner_at) return c.json({ error: 'owner_approval_required' }, 403);
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}));
   const { app, error } = readApplication(body);
   if (error) return c.json({ error }, 400);
@@ -148,6 +151,13 @@ portal.post('/shelters', async (c) => {
     return c.json({ error: 'queue_full' }, 503);
   }
 
+  const { id, slug } = await insertShelter(db, app, user.id, { status: 'pending' });
+  return c.json({ shelter: { id, slug, name: app.name, status: 'pending' } }, 201);
+});
+
+/** Creates the shelter with its private application and the person as its owner. A registration starts
+ *  pending; one an admin makes for someone, from details gathered by talking to them, is verified at once. */
+export async function insertShelter(db: D1Database, app: ReturnType<typeof readApplication>['app'], ownerId: string, opts: { status: 'pending' | 'verified'; adminId?: string }) {
   // A readable, unique slug: "patitas-de-gazcue", then "patitas-de-gazcue-2", and so on.
   const base = slugify(app.name);
   const { results: taken } = await db.prepare("SELECT slug FROM shelters WHERE slug = ? OR slug LIKE ? || '-%'").bind(base, base).all<{ slug: string }>();
@@ -156,20 +166,22 @@ portal.post('/shelters', async (c) => {
   for (let i = 2; used.has(slug); i++) slug = `${base}-${i}`;
 
   const id = crypto.randomUUID();
+  const now = nowIso();
+  const verified = opts.status === 'verified';
   await db.batch([
     db
-      .prepare('INSERT INTO shelters (id, slug, name, description, place_id, phone, email, website, visit_hours, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(id, slug, app.name, app.description, app.placeId, app.publicPhone, app.email, app.website, app.visitHours, 'pending'),
+      .prepare('INSERT INTO shelters (id, slug, name, description, place_id, phone, email, website, visit_hours, status, verified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(id, slug, app.name, app.description, app.placeId, app.publicPhone, app.email, app.website, app.visitHours, opts.status, verified ? now : null),
     db
       .prepare(
-        `INSERT INTO shelter_applications (shelter_id, contact_name, contact_phone, rnc, address, social, history, reference_name, reference_contact, reference_kind, more_references)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO shelter_applications (shelter_id, contact_name, contact_phone, rnc, address, social, history, reference_name, reference_contact, reference_kind, more_references, reviewed_at, reviewed_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(id, app.contactName, app.contactPhone, app.rnc, app.address, JSON.stringify(app.social), app.history, app.referenceName, app.referenceContact, app.referenceKind, JSON.stringify(app.moreReferences)),
-    db.prepare("INSERT INTO shelter_members (shelter_id, user_id, role) VALUES (?, ?, 'owner')").bind(id, user.id),
+      .bind(id, app.contactName, app.contactPhone, app.rnc, app.address, JSON.stringify(app.social), app.history, app.referenceName, app.referenceContact, app.referenceKind, JSON.stringify(app.moreReferences), verified ? now : null, verified ? (opts.adminId ?? null) : null),
+    db.prepare("INSERT INTO shelter_members (shelter_id, user_id, role) VALUES (?, ?, 'owner')").bind(id, ownerId),
   ]);
-  return c.json({ shelter: { id, slug, name: app.name, status: 'pending' } }, 201);
-});
+  return { id, slug };
+}
 
 // One shelter, for its members. The private application is for owners only.
 portal.get('/shelters/:id', async (c) => {

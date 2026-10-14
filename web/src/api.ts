@@ -12,6 +12,43 @@ export interface Me {
   requestsRestricted?: boolean;
   isAdmin: boolean;
   shelters?: { id: string; name: string; status?: ShelterStatus; role: 'owner' | 'maintainer' }[];
+  /** Approved to register shelters (admins are): everyone else asks first. */
+  shelterOwner?: boolean;
+  /** Their request to be a shelter owner: the one waiting, or decided in the last 30 days. */
+  ownerRequest?: OwnerRequest | null;
+}
+
+/** A request to be allowed to register a shelter. An admin gets to know the person and approves. */
+export interface OwnerRequest {
+  id: string;
+  shelterName: string;
+  zone: string;
+  status: 'pending' | 'approved' | 'declined';
+  createdAt: string;
+  decidedAt: string | null;
+  note: string | null;
+}
+export interface OwnerForm {
+  shelterName: string;
+  zone: string;
+  phone: string;
+  link: string;
+  about: string;
+  consent: boolean;
+}
+/** A shelter or another request that may be the same one, for the admin to check before approving. */
+export interface LookAlike {
+  kind: 'shelter' | 'request';
+  why: 'same_name' | 'shared_word' | 'same_phone';
+  name: string;
+  status: string;
+  who?: string;
+}
+export interface AdminOwnerRequest extends OwnerRequest {
+  link: string | null;
+  about: string;
+  who: { name: string | null; email: string; phone: string };
+  lookAlikes: LookAlike[];
 }
 
 export type ShelterStatus = 'pending' | 'verified' | 'rejected' | 'suspended';
@@ -266,6 +303,13 @@ export const api = {
   adminBulk: (status: BulkStatus) => call<{ requests: AdminBulk[] }>(`/api/admin/bulk?status=${status}`).then((r) => r.requests),
   adminBulkDecision: (id: string, action: 'approve' | 'decline', note?: string) =>
     call<{ bulk: { id: string; status: BulkStatus } }>(`/api/admin/bulk/${encodeURIComponent(id)}/decision`, 'POST', { action, note }),
+  sendOwnerRequest: (form: OwnerForm) => call<{ request: OwnerRequest }>('/api/portal/owner-request', 'POST', form).then((r) => r.request),
+  adminOwners: (status: BulkStatus) => call<{ requests: AdminOwnerRequest[] }>(`/api/admin/owners?status=${status}`).then((r) => r.requests),
+  adminOwnerDecision: (id: string, action: 'approve' | 'decline', note?: string) =>
+    call<{ request: { id: string; status: BulkStatus } }>(`/api/admin/owners/${encodeURIComponent(id)}/decision`, 'POST', { action, note }),
+  /** Registers a shelter for someone (it starts verified): the usual form plus the owner's email. */
+  adminRegisterShelter: (ownerEmail: string, form: ShelterForm) =>
+    call<{ shelter: { id: string; slug: string; status: ShelterStatus } }>('/api/admin/shelters', 'POST', { ...form, ownerEmail }).then((r) => r.shelter),
   adminDecision: (id: string, action: 'verify' | 'reject' | 'suspend', reason?: string) =>
     call<{ shelter: { id: string; status: ShelterStatus } }>(`/api/admin/shelters/${encodeURIComponent(id)}/decision`, 'POST', { action, reason }),
 };

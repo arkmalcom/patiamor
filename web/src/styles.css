@@ -649,6 +649,10 @@ html[data-route='deck'] .view { min-height: 0; }
 .recruit p { margin: 0; font-size: 0.95rem; color: var(--ink-2); }
 .radar__hint { margin: 4px 0 0; text-align: center; font-size: 0.95rem; color: var(--ink-2); }
 .radar__hint[hidden] { display: none; }
+.alikes { margin-top: 4px; padding: 12px 14px; border-radius: 14px; background: var(--sky-tint); }
+.alikes--found { background: var(--mango-tint); }
+.alikes__list { margin: 6px 0 0; padding-left: 1.1em; display: grid; gap: 4px; }
+.alike--same_phone, .alike--same_name { font-weight: 700; }
 .recruit__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
 
 /* ---------- Sheet ---------- */

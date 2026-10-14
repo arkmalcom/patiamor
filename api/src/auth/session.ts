@@ -25,7 +25,7 @@ export async function currentUser(c: C): Promise<AppUser | null> {
   if (!token) return null;
   const idHash = await sha256(token);
   const row = await c.env.DB.prepare(
-    `SELECT u.id, u.email, u.name, u.is_admin, s.expires_at, s.last_seen_at
+    `SELECT u.id, u.email, u.name, u.is_admin, u.shelter_owner_at, s.expires_at, s.last_seen_at
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.id_hash = ?`,
   )
@@ -42,7 +42,7 @@ export async function currentUser(c: C): Promise<AppUser | null> {
     // The browser keeps the cookie only until its own max-age, so renew that too.
     setCookie(c, SESSION_COOKIE, token, COOKIE);
   }
-  return { id: row.id, email: row.email, name: row.name, is_admin: row.is_admin };
+  return { id: row.id, email: row.email, name: row.name, is_admin: row.is_admin, shelter_owner_at: row.shelter_owner_at };
 }
 
 export async function endSession(c: C) {

@@ -1,10 +1,11 @@
-import { BadgeCheck, CircleAlert, Clock, House, Mail, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, Users, UsersRound } from 'lucide';
-import { api, ApiError, type AdminBulk, type AdminShelter, type BulkStatus, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
+import { BadgeCheck, CircleAlert, Clock, House, Mail, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, UserCheck, Users, UsersRound } from 'lucide';
+import { api, ApiError, type AdminBulk, type AdminOwnerRequest, type AdminShelter, type BulkStatus, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
 import { CONTACT_EMAIL, type Place } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, failText, t, type Key } from '../i18n';
 import { bulkWhat } from '../ui/bulk';
-import { state } from '../store';
+import { setUser, state } from '../store';
+import { openOwnerRequest } from '../ui/owner';
 import { renderAuth } from '../ui/auth';
 import { renderInbox } from './inbox';
 import { renderListingForm, renderListings } from './listings';
@@ -20,6 +21,8 @@ export type PortalView =
   | { view: 'editar'; id: string }
   | { view: 'admin'; status: ShelterStatus }
   | { view: 'adminBulk'; status: BulkStatus }
+  | { view: 'adminOwners'; status: BulkStatus }
+  | { view: 'adminRegister'; owner: string | null; shelterName: string | null; phone: string | null }
   | { view: 'animales'; id: string; tab: string | null }
   | { view: 'animal'; id: string; petId: string | null }
   | { view: 'solicitudes'; id: string; tab: string | null };
@@ -39,10 +42,13 @@ const waLink = (p: string | null | undefined) => `https://wa.me/${(p ?? '').repl
 
 export function renderPortal(root: HTMLElement, route: PortalView) {
   if (!state.signedIn) return signedOut(root);
-  if (route.view === 'registro') return form(root, null);
+  // Registering a shelter needs approval: everyone else sees where they stand, and can ask.
+  if (route.view === 'registro') return state.user?.shelterOwner ? form(root, null) : void home(root);
   if (route.view === 'editar') return void edit(root, route.id);
   if (route.view === 'admin') return void adminQueue(root, route.status);
   if (route.view === 'adminBulk') return void adminBulkQueue(root, route.status);
+  if (route.view === 'adminOwners') return void adminOwnersQueue(root, route.status);
+  if (route.view === 'adminRegister') return state.user?.isAdmin ? form(root, null, { email: route.owner ?? '', name: route.shelterName ?? '', phone: route.phone ?? '' }) : void home(root);
   if (route.view === 'animales') return void renderListings(root, route.id, route.tab);
   if (route.view === 'animal') return void renderListingForm(root, route.id, route.petId);
   if (route.view === 'solicitudes') return void renderInbox(root, route.id, route.tab);
@@ -76,9 +82,21 @@ async function home(root: HTMLElement) {
   let shelters: PortalShelter[] = [];
   let pending = 0;
   let pendingBulk = 0;
+  let pendingOwners = 0;
   try {
     shelters = await api.myShelters();
-    if (state.user?.isAdmin) [pending, pendingBulk] = await Promise.all([api.adminShelters('pending').then((l) => l.length), api.adminBulk('pending').then((l) => l.length)]);
+    if (state.user?.isAdmin) {
+      [pending, pendingBulk, pendingOwners] = await Promise.all([
+        api.adminShelters('pending').then((l) => l.length),
+        api.adminBulk('pending').then((l) => l.length),
+        api.adminOwners('pending').then((l) => l.length),
+      ]);
+    }
+    // Where a request to be a shelter owner stands may have changed since the app opened (an admin decided).
+    if (state.user && !state.user.shelterOwner) {
+      const me = await api.me();
+      if (me && JSON.stringify([me.shelterOwner, me.ownerRequest]) !== JSON.stringify([state.user.shelterOwner, state.user.ownerRequest])) return setUser(me); // redraws
+    }
   } catch {
     return mount(root, html`<p class="loading-note" role="alert">${t('auth.err.network')}</p>`);
   }
@@ -91,14 +109,41 @@ async function home(root: HTMLElement) {
         <p class="portal__who">${t('portal.who', { who: state.user?.name ? `${state.user.name} · ${state.user.email}` : (state.user?.email ?? '') })}</p>
         ${state.user?.isAdmin
           ? html`<a class="portal-admin-link" href="/refugio/admin">${icon(ShieldCheck, 20)}<span>${t('portal.admin.link')}</span>${pending ? html`<span class="list-tabs__count">${pending}</span>` : ''}</a>
+            <a class="portal-admin-link" href="/refugio/admin/duenos">${icon(UserCheck, 20)}<span>${t('owners.admin.link')}</span>${pendingOwners ? html`<span class="list-tabs__count">${pendingOwners}</span>` : ''}</a>
             <a class="portal-admin-link" href="/refugio/admin/grandes">${icon(UsersRound, 20)}<span>${t('bulk.admin.link')}</span>${pendingBulk ? html`<span class="list-tabs__count">${pendingBulk}</span>` : ''}</a>`
           : ''}
         ${shelters.length
           ? html`<ul class="portal-list">${shelters.map(shelterCard)}</ul>`
           : html`<p class="portal__lede">${t('portal.lede')}</p>${steps()}`}
-        ${owned < 3 ? html`<a class="button ${shelters.length ? 'button--outline' : 'button--primary'} portal__new" href="/refugio/registro">${icon(Plus, 20)}${t('portal.register')}</a>` : ''}
+        ${state.user?.shelterOwner
+          ? owned < 3
+            ? html`<a class="button ${shelters.length ? 'button--outline' : 'button--primary'} portal__new" href="/refugio/registro">${icon(Plus, 20)}${t('portal.register')}</a>`
+            : ''
+          : ownerCard()}
       </section>`,
   );
+  root.querySelector('[data-owner]')?.addEventListener('click', openOwnerRequest);
+}
+
+/** For someone not yet approved: ask for access, or where the request stands. */
+function ownerCard(): Raw {
+  const r = state.user?.ownerRequest;
+  if (!r) {
+    return html`
+      <section class="many bulk-prompt" aria-labelledby="owner-card-title">
+        <h2 class="many__title" id="owner-card-title">${t('owner.card.title')}</h2>
+        <p>${t('owner.card.body')}</p>
+        <button class="button button--primary" type="button" data-owner>${t('owner.card.cta')}</button>
+      </section>`;
+  }
+  return html`
+    <section class="bulk-card bulk-card--${r.status}" aria-labelledby="owner-card-title" role="status">
+      <h2 class="bulk-card__title" id="owner-card-title">${t(`owner.status.${r.status as 'pending'}`)}</h2>
+      <p>${t(`owner.status.${r.status as 'pending'}.body`, { shelter: r.shelterName })}</p>
+      ${r.note ? html`<p class="bulk-card__note"><strong>${t('bulk.status.reason')}:</strong> ${r.note}</p>` : ''}
+      <p class="bulk-card__date">${t('request.sentOn', { date: formatDate(r.createdAt.slice(0, 10)) })}</p>
+      ${r.status === 'declined' ? html`<button class="text-button" type="button" data-owner>${t('owner.again')}</button>` : ''}
+    </section>`;
 }
 
 function shelterCard(s: PortalShelter): Raw {
@@ -149,7 +194,8 @@ async function edit(root: HTMLElement, id: string) {
   }
 }
 
-function form(root: HTMLElement, existing: { shelter: PortalShelter; application: ShelterApplication } | null) {
+/** `behalf`: an admin registering a shelter for its owner, with what the owner told them (prefills the form). */
+function form(root: HTMLElement, existing: { shelter: PortalShelter; application: ShelterApplication } | null, behalf?: { email: string; name: string; phone: string }) {
   const s = existing?.shelter;
   const a = existing?.application;
   let place: Place | null = s?.place ?? null;
@@ -165,14 +211,25 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
     root,
     html`
       <section class="portal" aria-labelledby="portal-title">
-        <a class="text-button portal__back" href="/refugio">${t('portal.back')}</a>
-        <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${existing ? t('portal.fixTitle', { name: s!.name }) : t('portal.registerTitle')}</h1>
+        <a class="text-button portal__back" href="${behalf ? '/refugio/admin/duenos' : '/refugio'}">${t('portal.back')}</a>
+        <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${behalf ? t('owners.register.title') : existing ? t('portal.fixTitle', { name: s!.name }) : t('portal.registerTitle')}</h1>
+        ${behalf ? html`<p class="portal__lede">${t('owners.register.lede')}</p>` : ''}
         ${s?.statusReason ? html`<p class="withdraw-warning"><strong>${t('portal.reason')}:</strong> ${s.statusReason}</p>` : ''}
         <form class="portal-form" id="shelter-form" novalidate>
+          ${behalf
+            ? html`<fieldset class="form-section">
+                <legend class="section-title">${t('owners.register.owner')}</legend>
+                <label class="field">
+                  <span class="field__label">${t('owners.register.email')}</span>
+                  <input class="field__input" name="ownerEmail" type="email" maxlength="254" value="${behalf.email}" autocomplete="off" required />
+                  <span class="field__hint">${t('owners.register.emailHint')}</span>
+                </label>
+              </fieldset>`
+            : ''}
           <fieldset class="form-section">
             <legend class="section-title">${t('portal.form.public')}</legend>
             <p class="muted">${t('portal.form.publicNote')}</p>
-            ${field('name', 'portal.form.name', { value: s?.name, required: true, max: 80, auto: 'organization' })}
+            ${field('name', 'portal.form.name', { value: s?.name ?? behalf?.name, required: true, max: 80, auto: 'organization' })}
             <div class="field">
               <span class="field__label" id="place-label">${t('portal.form.place')}</span>
               <div class="place-pick" data-place-pick>
@@ -191,7 +248,7 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
             <legend class="section-title">${t('portal.form.private')}</legend>
             <p class="muted">${t('portal.form.privateNote')}</p>
             ${field('contactName', 'portal.form.contactName', { value: a?.contactName, required: true, max: 80, auto: 'name' })}
-            ${field('contactPhone', 'portal.form.contactPhone', { value: showPhone(a?.contactPhone), required: true, type: 'tel', inputmode: 'tel', auto: 'tel-national', hint: 'portal.form.contactPhoneHint' })}
+            ${field('contactPhone', 'portal.form.contactPhone', { value: showPhone(a?.contactPhone) || showPhone(behalf?.phone), required: true, type: 'tel', inputmode: 'tel', auto: 'tel-national', hint: 'portal.form.contactPhoneHint' })}
             ${field('address', 'portal.form.address', { value: a?.address, required: true, max: 300, hint: 'portal.form.addressHint' })}
             ${field('rnc', 'portal.form.rnc', { value: a?.rnc, max: 40 })}
             ${field('social', 'portal.form.social', { value: a?.social.join('\n'), area: true, max: 1000, hint: 'portal.form.socialHint' })}
@@ -205,10 +262,10 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
           </fieldset>
           <label class="consent">
             <input type="checkbox" name="rules" />
-            <span>${t('portal.form.rules')}</span>
+            <span>${t(behalf ? 'owners.register.rules' : 'portal.form.rules')}</span>
           </label>
           <p class="form-error" role="alert" hidden data-error></p>
-          <button class="button button--primary portal-form__send" type="submit" data-send>${existing ? t('portal.form.resend') : t('portal.form.send')}</button>
+          <button class="button button--primary portal-form__send" type="submit" data-send>${behalf ? t('owners.register.send') : existing ? t('portal.form.resend') : t('portal.form.send')}</button>
         </form>
       </section>`,
   );
@@ -325,13 +382,18 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
     send.disabled = true;
     error.hidden = true;
     try {
+      if (behalf) {
+        await api.adminRegisterShelter(v('ownerEmail'), body);
+        toast(t('owners.register.done', { email: v('ownerEmail') }));
+        return navigate('/refugio/admin/duenos');
+      }
       if (existing) await api.resubmitShelter(existing.shelter.id, body);
       else await api.registerShelter(body);
       toast(existing ? t('portal.resent') : t('portal.sent'));
       navigate('/refugio');
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'network';
-      const known = ['invalid_more_reference', 'invalid_name', 'invalid_place', 'invalid_contact', 'invalid_phone', 'invalid_public_phone', 'invalid_email', 'invalid_address', 'history_too_short', 'invalid_reference', 'rules_required', 'too_many_shelters', 'not_editable', 'too_many_today', 'queue_full'];
+      const known = ['invalid_more_reference', 'invalid_name', 'invalid_place', 'invalid_contact', 'invalid_phone', 'invalid_public_phone', 'invalid_email', 'invalid_address', 'history_too_short', 'invalid_reference', 'rules_required', 'too_many_shelters', 'not_editable', 'too_many_today', 'queue_full', 'owner_approval_required', 'invalid_owner_email'];
       error.textContent = known.includes(code) ? t(`portal.err.${code as 'invalid_name'}`) : failText(code);
       error.hidden = false;
       error.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -404,6 +466,98 @@ async function adminQueue(root: HTMLElement, status: ShelterStatus) {
       }
     }),
   );
+}
+
+// ---------- Requests to be a shelter owner (admins) ----------
+
+async function adminOwnersQueue(root: HTMLElement, status: BulkStatus) {
+  if (!state.user?.isAdmin) return mount(root, html`<section class="portal"><p class="loading-note">${t('portal.notFound')}</p></section>`);
+  mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
+  let list: AdminOwnerRequest[];
+  try {
+    list = await api.adminOwners(status);
+  } catch {
+    return mount(root, html`<p class="loading-note" role="alert">${t('auth.err.network')}</p>`);
+  }
+  mount(
+    root,
+    html`
+      <section class="portal portal--admin" aria-labelledby="portal-title">
+        <a class="text-button portal__back" href="/refugio">${t('portal.back')}</a>
+        <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('owners.admin.title')}</h1>
+        <p class="portal__lede">${t('owners.admin.lede')}</p>
+        <a class="button button--outline button--small portal__new" href="/refugio/admin/registrar">${icon(Plus, 16)}${t('owners.admin.registerLink')}</a>
+        <nav class="list-tabs" aria-label="${t('owners.admin.title')}">
+          ${BULK_QUEUE.map((s) => html`<a class="list-tabs__tab" href="/refugio/admin/duenos?estado=${s}" aria-current="${s === status ? 'page' : 'false'}">${t(`bulk.admin.tab.${s}`)}</a>`)}
+        </nav>
+        ${list.length ? html`<ul class="portal-list">${list.map(ownerRequestCard)}</ul>` : html`<p class="passed__empty">${t('bulk.admin.empty')}</p>`}
+      </section>`,
+  );
+  $$<HTMLFormElement>('[data-owner-decide]', root).forEach((f) =>
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const action = ((e as SubmitEvent).submitter as HTMLButtonElement | null)?.value as 'approve' | 'decline';
+      const note = String(new FormData(f).get('note') ?? '').trim();
+      if (action === 'decline' && !note) {
+        $<HTMLTextAreaElement>('textarea[name=note]', f).focus();
+        return toast(t('bulk.admin.needNote'));
+      }
+      $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = true));
+      try {
+        await api.adminOwnerDecision(f.dataset.ownerDecide!, action, note || undefined);
+        toast(t(`owners.admin.done.${action}`));
+        void adminOwnersQueue(root, status);
+      } catch (err) {
+        $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = false));
+        toast(failText(err));
+      }
+    }),
+  );
+}
+
+function ownerRequestCard(r: AdminOwnerRequest): Raw {
+  const row = (label: Key, value: Raw | string | null | undefined) => (value ? html`<div><dt>${t(label)}</dt><dd>${value}</dd></div>` : '');
+  const who = r.who.name ?? r.who.email;
+  const register = `/refugio/admin/registrar?dueno=${encodeURIComponent(r.who.email)}&nombre=${encodeURIComponent(r.shelterName)}&tel=${encodeURIComponent(r.who.phone)}`;
+  return html`
+    <li class="portal-card">
+      <div class="portal-card__head">
+        <span class="shelter__mark" aria-hidden="true">${icon(UserCheck, 22)}</span>
+        <div>
+          <h2 class="portal-card__name">${t('owners.admin.wants', { who, shelter: r.shelterName })}</h2>
+          <span class="portal-card__place">${t('bulk.admin.sent')} ${formatDate(r.createdAt.slice(0, 10))}</span>
+        </div>
+      </div>
+      <p class="bulk-admin__about">${r.about}</p>
+      <dl class="portal-facts">
+        ${row('owners.admin.contact', html`${emailParts(r.who.email)}<br /><a href="${waLink(r.who.phone)}" target="_blank" rel="noopener">${icon(MessageCircle, 15)} ${showPhone(r.who.phone)}</a>`)}
+        ${row('owners.admin.zone', r.zone)}
+        ${row('owners.admin.link2', r.link ? html`<a href="${r.link}" target="_blank" rel="noopener noreferrer">${r.link.replace(/^https?:\/\//, '')}</a>` : null)}
+      </dl>
+      <div class="alikes ${r.lookAlikes.length ? 'alikes--found' : ''}">
+        <h3 class="form-subsection__title">${t('owners.admin.alikes')}</h3>
+        ${r.lookAlikes.length
+          ? html`<ul class="alikes__list">${r.lookAlikes.map(
+              (a) => html`<li class="alike alike--${a.why}"><strong>${t(`owners.admin.kind.${a.kind}`)}:</strong> ${a.name} <span class="muted">(${t(`owners.admin.why.${a.why}`)}${a.who ? ` · ${a.who}` : ''} · ${a.kind === 'shelter' ? t(`portal.status.${a.status as 'pending'}`) : t(`owners.admin.req.${a.status as 'pending'}`)})</span></li>`,
+            )}</ul>`
+          : html`<p class="muted">${t('owners.admin.noAlikes')}</p>`}
+      </div>
+      ${r.status === 'pending'
+        ? html`<form class="portal-decide" data-owner-decide="${r.id}">
+            <label class="field">
+              <span class="field__label">${t('bulk.admin.noteLabel')}</span>
+              <textarea class="field__input field__input--area" name="note" rows="2" maxlength="500" placeholder="${t('bulk.admin.notePlaceholder')}"></textarea>
+            </label>
+            <div class="portal-decide__actions">
+              <button class="button button--primary button--small" type="submit" value="approve">${icon(BadgeCheck, 16)}${t('bulk.admin.approve')}</button>
+              <button class="button button--outline button--small" type="submit" value="decline">${t('bulk.admin.decline')}</button>
+              <a class="button button--ghost button--small" href="${register}">${t('owners.admin.register')}</a>
+            </div>
+          </form>`
+        : r.note
+          ? html`<p class="portal-card__reason"><strong>${t('portal.reason')}:</strong> ${r.note}</p>`
+          : ''}
+    </li>`;
 }
 
 // ---------- Special requests to adopt more than three ----------
