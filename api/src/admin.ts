@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { isoIn, nowIso } from './auth/crypto';
-import { hasEmailBudget, sendBulkDecisionEmail, sendOwnerDecisionEmail, sendShelterDecisionEmail, type BulkDecision, type ShelterDecision } from './auth/email';
+import { hasEmailBudget, sendBulkDecisionEmail, sendOwnerDecisionEmail, sendPauseClearedEmail, sendShelterDecisionEmail, type BulkDecision, type ShelterDecision } from './auth/email';
 import { appOrigin } from './auth/routes';
 import { isEmail, normalizeEmail, userForEmail } from './auth/users';
 import type { BulkRow } from './bulk';
@@ -10,7 +10,7 @@ import type { AppContext } from './env';
 import { placeById } from './places';
 import { loadKnown, lookAlikes } from './owners';
 import { insertShelter, MAX_OWNED, readApplication } from './portal';
-import { OPEN_STATUSES } from './requests';
+import { OPEN_STATUSES, PAUSED_SQL, requestsRestricted, WITHDRAW_WINDOW_DAYS } from './requests';
 
 // Admin tools. For now: the shelter verification queue (PAT-13). Every decision is written to
 // admin_actions; the full console (PAT-14) builds on this.
@@ -35,12 +35,13 @@ admin.use('*', async (c, next) => {
 // one per queue.
 admin.get('/summary', async (c) => {
   const db = c.env.DB;
-  const [shelters, owners, bulk] = await db.batch<{ n: number }>([
+  const [shelters, owners, bulk, paused] = await db.batch<{ n: number }>([
     db.prepare("SELECT count(*) AS n FROM shelters WHERE status = 'pending'"),
     db.prepare("SELECT count(*) AS n FROM shelter_owner_requests WHERE status = 'pending'"),
     db.prepare("SELECT count(*) AS n FROM bulk_requests WHERE status = 'pending'"),
+    db.prepare(`SELECT count(*) AS n FROM (${PAUSED_SQL})`),
   ]);
-  return c.json({ shelters: shelters.results[0].n, owners: owners.results[0].n, bulk: bulk.results[0].n });
+  return c.json({ shelters: shelters.results[0].n, owners: owners.results[0].n, bulk: bulk.results[0].n, paused: paused.results[0].n });
 });
 
 admin.get('/shelters', async (c) => {
@@ -120,6 +121,65 @@ admin.post('/shelters/:id/decision', async (c) => {
     );
   }
   return c.json({ shelter: { id, status: rule.to } });
+});
+
+// ---------- Adopters whose new requests are paused ----------
+
+// Who is paused now (withdrew three requests within 90 days, since any clearing), with what they withdrew
+// and why, to judge whether to lift it.
+admin.get('/paused', async (c) => {
+  const db = c.env.DB;
+  const { results } = await db.prepare(`${PAUSED_SQL} ORDER BY last DESC LIMIT 100`).all<{ id: string; name: string | null; email: string; phone: string | null; withdrawals: number; last: string }>();
+  const ids = JSON.stringify(results.map((r) => r.id));
+  const [{ results: withdrawn }, { results: history }] = await Promise.all([
+    db
+      .prepare(
+        `SELECT r.user_id, r.closed_reason, r.updated_at, d.name AS pet, s.name AS shelter
+           FROM adoption_requests r JOIN users u ON u.id = r.user_id JOIN pets d ON d.id = r.pet_id LEFT JOIN shelters s ON s.id = d.shelter_id
+          WHERE r.user_id IN (SELECT value FROM json_each(?)) AND r.status = 'withdrawn'
+            AND r.updated_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-${WITHDRAW_WINDOW_DAYS} days')
+            AND (u.requests_cleared_at IS NULL OR r.updated_at > u.requests_cleared_at)
+          ORDER BY r.updated_at DESC`,
+      )
+      .bind(ids)
+      .all<{ user_id: string; closed_reason: string | null; updated_at: string; pet: string; shelter: string | null }>(),
+    db
+      .prepare(`SELECT user_id, sum(status IN ${OPEN_STATUSES}) AS open, sum(status = 'adopted') AS adopted FROM adoption_requests WHERE user_id IN (SELECT value FROM json_each(?)) GROUP BY user_id`)
+      .bind(ids)
+      .all<{ user_id: string; open: number; adopted: number }>(),
+  ]);
+  return c.json({
+    paused: results.map((r) => ({
+      id: r.id,
+      who: { name: r.name, email: r.email, phone: r.phone },
+      since: r.last,
+      withdrawals: withdrawn.filter((w) => w.user_id === r.id).map((w) => ({ pet: w.pet, shelter: w.shelter, reason: w.closed_reason, at: w.updated_at })),
+      open: history.find((h) => h.user_id === r.id)?.open ?? 0,
+      adopted: history.find((h) => h.user_id === r.id)?.adopted ?? 0,
+    })),
+  });
+});
+
+// Lift the pause: withdrawals before now stop counting, so new requests work again. They'd be paused again
+// by three more withdrawals. The person is emailed.
+admin.post('/paused/:userId/clear', async (c) => {
+  const userId = c.req.param('userId');
+  const adminUser = c.get('user')!;
+  const b = await c.req.json<{ note?: string }>().catch(() => ({}) as { note?: string });
+  const note = (b.note ?? '').trim().slice(0, 500) || null;
+  const db = c.env.DB;
+  const user = await db.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first<{ email: string }>();
+  if (!user) return c.json({ error: 'not_found' }, 404);
+  if (!(await requestsRestricted(db, userId))) return c.json({ error: 'not_paused' }, 409);
+
+  await db.batch([
+    db.prepare('UPDATE users SET requests_cleared_at = ? WHERE id = ?').bind(nowIso(), userId),
+    db.prepare("INSERT INTO admin_actions (id, admin_id, action, subject_type, subject_id, note) VALUES (?, ?, 'pause.clear', 'user', ?, ?)").bind(crypto.randomUUID(), adminUser.id, userId, note),
+  ]);
+  if (await hasEmailBudget(db, 'pause_cleared')) {
+    await sendPauseClearedEmail(c.env, user.email, { note, exploreUrl: appOrigin(c) }).catch((err) => console.error('pause cleared email failed', err));
+  }
+  return c.json({ cleared: { id: userId } });
 });
 
 // ---------- Requests to be a shelter owner ----------

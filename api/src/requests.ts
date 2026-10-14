@@ -31,7 +31,16 @@ const WITHDRAW_REASONS = ['situacion', 'vivienda', 'otra_mascota', 'refugio', 'o
 
 /** This many withdrawals within the window pause new requests until an admin clears the account. */
 const WITHDRAW_LIMIT = 3;
-const WITHDRAW_WINDOW_DAYS = 90;
+export const WITHDRAW_WINDOW_DAYS = 90;
+
+/** The adopters whose new requests are paused right now: this many withdrawals within the window, none of
+ *  them before an admin cleared the account. The admin console lists them (admin.ts); requestsRestricted
+ *  below applies the same rule to one person. */
+export const PAUSED_SQL = `SELECT u.id, u.name, u.email, u.phone, count(*) AS withdrawals, max(r.updated_at) AS last
+    FROM adoption_requests r JOIN users u ON u.id = r.user_id
+   WHERE r.status = 'withdrawn' AND r.updated_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-${WITHDRAW_WINDOW_DAYS} days')
+     AND (u.requests_cleared_at IS NULL OR r.updated_at > u.requests_cleared_at)
+   GROUP BY u.id HAVING count(*) >= ${WITHDRAW_LIMIT}`;
 
 /** Whether new requests are paused for this adopter because of recent withdrawals. */
 export async function requestsRestricted(db: D1Database, userId: string): Promise<boolean> {

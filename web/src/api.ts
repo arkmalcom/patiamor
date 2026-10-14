@@ -36,6 +36,17 @@ export interface OwnerForm {
   about: string;
   consent: boolean;
 }
+/** An adopter whose new requests are paused (three withdrawals in 90 days), as an admin sees them. */
+export interface AdminPaused {
+  id: string;
+  who: { name: string | null; email: string; phone: string | null };
+  /** When they withdrew the last one. */
+  since: string;
+  withdrawals: { pet: string; shelter: string | null; reason: string | null; at: string }[];
+  /** Their requests in progress, and animals already adopted through Patiamor. */
+  open: number;
+  adopted: number;
+}
 /** A shelter or another request that may be the same one, for the admin to check before approving. */
 export interface LookAlike {
   kind: 'shelter' | 'request';
@@ -300,7 +311,9 @@ export const api = {
   relistPet: (petId: string) => call<PetChange>(`/api/portal/pets/${encodeURIComponent(petId)}/relist`, 'POST', {}),
   runDigest: () => call<{ shelters: number; digestEmails: number; alertEmails: number; deferred: boolean }>('/api/admin/digest', 'POST', {}),
   /** How many of each kind of request are waiting for an admin. */
-  adminSummary: () => call<{ shelters: number; owners: number; bulk: number }>('/api/admin/summary'),
+  adminSummary: () => call<{ shelters: number; owners: number; bulk: number; paused: number }>('/api/admin/summary'),
+  adminPaused: () => call<{ paused: AdminPaused[] }>('/api/admin/paused').then((r) => r.paused),
+  adminClearPause: (userId: string, note?: string) => call<{ cleared: { id: string } }>(`/api/admin/paused/${encodeURIComponent(userId)}/clear`, 'POST', { note }),
   adminShelters: (status: ShelterStatus) => call<{ shelters: AdminShelter[] }>(`/api/admin/shelters?status=${status}`).then((r) => r.shelters),
   adminBulk: (status: BulkStatus) => call<{ requests: AdminBulk[] }>(`/api/admin/bulk?status=${status}`).then((r) => r.requests),
   adminBulkDecision: (id: string, action: 'approve' | 'decline', note?: string) =>

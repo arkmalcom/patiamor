@@ -669,10 +669,12 @@ html[data-route='deck'] .view { min-height: 0; }
   .admin-card__count { grid-column: 2; justify-self: start; }
 }
 /* The three queues share the width, so none is hidden past the edge of a small phone. */
-.list-tabs.admin-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; width: 100%; }
+.list-tabs.admin-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; width: 100%; border-radius: 28px; }
+@media (min-width: 560px) { .list-tabs.admin-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); border-radius: 999px; } }
+.paused__item { display: block; }
+.paused__item + .paused__item { margin-top: 8px; }
 .admin-nav .list-tabs__tab { justify-content: center; gap: 4px; padding: 0 6px; font-size: 0.92rem; white-space: nowrap; min-width: 0; }
 .admin-nav .list-tabs__count { min-width: 20px; padding: 1px 6px; }
-@media (max-width: 340px) { .list-tabs.admin-nav .list-tabs__tab { font-size: 0.85rem; padding: 0 3px; gap: 3px; } }
 /* The status tabs under the queue tabs: lighter, so the two rows don't read as one; they wrap if there are many. */
 .list-tabs.list-tabs--sub { background: none; box-shadow: none; padding: 0; gap: 6px; flex-wrap: wrap; width: 100%; border-radius: 0; }
 .list-tabs--sub .list-tabs__tab { min-height: 36px; padding: 0 12px; border: 1.5px solid var(--rule-strong); white-space: nowrap; }

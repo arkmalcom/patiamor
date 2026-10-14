@@ -1,5 +1,5 @@
-import { BadgeCheck, CircleAlert, Clock, House, Mail, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, UserCheck, Users, UsersRound } from 'lucide';
-import { api, ApiError, type AdminBulk, type AdminOwnerRequest, type AdminShelter, type BulkStatus, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
+import { BadgeCheck, CircleAlert, CirclePause, Clock, House, Mail, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, UserCheck, Users, UsersRound } from 'lucide';
+import { api, ApiError, type AdminBulk, type AdminOwnerRequest, type AdminPaused, type AdminShelter, type BulkStatus, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
 import { CONTACT_EMAIL, type Place } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, failText, t, type Key } from '../i18n';
@@ -20,6 +20,7 @@ export type PortalView =
   | { view: 'registro' }
   | { view: 'editar'; id: string }
   | { view: 'adminHub' }
+  | { view: 'adminPaused' }
   | { view: 'adminShelters'; status: ShelterStatus }
   | { view: 'adminBulk'; status: BulkStatus }
   | { view: 'adminOwners'; status: BulkStatus }
@@ -47,6 +48,7 @@ export function renderPortal(root: HTMLElement, route: PortalView) {
   if (route.view === 'registro') return state.user?.shelterOwner ? form(root, null) : void home(root);
   if (route.view === 'editar') return void edit(root, route.id);
   if (route.view === 'adminHub') return void adminHub(root);
+  if (route.view === 'adminPaused') return void adminPausedQueue(root);
   if (route.view === 'adminShelters') return void adminQueue(root, route.status);
   if (route.view === 'adminBulk') return void adminBulkQueue(root, route.status);
   if (route.view === 'adminOwners') return void adminOwnersQueue(root, route.status);
@@ -396,15 +398,16 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
 
 // ---------- The admin console ----------
 
-type AdminCounts = { shelters: number; owners: number; bulk: number };
+type AdminCounts = { shelters: number; owners: number; bulk: number; paused: number };
 type Queue = keyof AdminCounts;
-const ADMIN_PATH: Record<Queue, string> = { owners: '/refugio/admin/duenos', shelters: '/refugio/admin/refugios', bulk: '/refugio/admin/grandes' };
-const ADMIN_ICON = { owners: UserCheck, shelters: House, bulk: UsersRound } as const;
+const QUEUES: Queue[] = ['owners', 'shelters', 'bulk', 'paused'];
+const ADMIN_PATH: Record<Queue, string> = { owners: '/refugio/admin/duenos', shelters: '/refugio/admin/refugios', bulk: '/refugio/admin/grandes', paused: '/refugio/admin/pausa' };
+const ADMIN_ICON = { owners: UserCheck, shelters: House, bulk: UsersRound, paused: CirclePause } as const;
 
 /** The same tabs on every queue, each with how many are waiting, to move between them in one tap. */
 const adminNav = (current: Queue, counts: AdminCounts): Raw => html`
   <nav class="list-tabs admin-nav" aria-label="${t('admin.title')}">
-    ${(['owners', 'shelters', 'bulk'] as Queue[]).map(
+    ${QUEUES.map(
       (k) => html`<a class="list-tabs__tab" href="${ADMIN_PATH[k]}" aria-current="${k === current ? 'page' : 'false'}">${t(`admin.nav.${k}`)}${counts[k] ? html` <span class="list-tabs__count">${counts[k]}</span>` : ''}</a>`,
     )}
   </nav>`;
@@ -437,7 +440,7 @@ async function adminHub(root: HTMLElement) {
         <a class="text-button portal__back" href="/refugio">${t('portal.back')}</a>
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('admin.title')}</h1>
         <p class="portal__lede">${t('admin.lede')}</p>
-        <ul class="admin-cards">${(['owners', 'shelters', 'bulk'] as Queue[]).map(card)}</ul>
+        <ul class="admin-cards">${QUEUES.map(card)}</ul>
         <h2 class="section-title">${t('admin.tools')}</h2>
         <div class="admin-tools">
           <a class="button button--outline button--small" href="/refugio/admin/registrar">${icon(Plus, 16)}${t('owners.admin.registerLink')}</a>
@@ -511,6 +514,81 @@ async function adminQueue(root: HTMLElement, status: ShelterStatus) {
       }
     }),
   );
+}
+
+// ---------- Adopters whose requests are paused (admins) ----------
+
+async function adminPausedQueue(root: HTMLElement) {
+  if (!state.user?.isAdmin) return mount(root, html`<section class="portal"><p class="loading-note">${t('portal.notFound')}</p></section>`);
+  mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
+  let list: AdminPaused[];
+  let counts: AdminCounts;
+  try {
+    [list, counts] = await Promise.all([api.adminPaused(), api.adminSummary()]);
+  } catch {
+    return mount(root, html`<p class="loading-note" role="alert">${t('auth.err.network')}</p>`);
+  }
+  mount(
+    root,
+    html`
+      <section class="portal portal--admin" aria-labelledby="portal-title">
+        <a class="text-button portal__back" href="/refugio/admin">${t('admin.title')}</a>
+        <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('paused.title')}</h1>
+        ${adminNav('paused', counts)}
+        <p class="portal__lede">${t('paused.lede')}</p>
+        ${list.length ? html`<ul class="portal-list">${list.map(pausedCard)}</ul>` : html`<p class="passed__empty">${t('paused.empty')}</p>`}
+      </section>`,
+  );
+  $$<HTMLFormElement>('[data-clear-pause]', root).forEach((f) =>
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const note = String(new FormData(f).get('note') ?? '').trim();
+      $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = true));
+      try {
+        await api.adminClearPause(f.dataset.clearPause!, note || undefined);
+        toast(t('paused.done'));
+        void adminPausedQueue(root);
+      } catch (err) {
+        $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = false));
+        toast(failText(err));
+      }
+    }),
+  );
+}
+
+function pausedCard(r: AdminPaused): Raw {
+  const row = (label: Key, value: Raw | string | null | undefined) => (value ? html`<div><dt>${t(label)}</dt><dd>${value}</dd></div>` : '');
+  const who = r.who.name ?? r.who.email;
+  return html`
+    <li class="portal-card">
+      <div class="portal-card__head">
+        <span class="shelter__mark" aria-hidden="true">${icon(CirclePause, 22)}</span>
+        <div>
+          <h2 class="portal-card__name">${who}</h2>
+          <span class="portal-card__place">${t('paused.since', { date: formatDate(r.since.slice(0, 10)) })}</span>
+        </div>
+      </div>
+      <dl class="portal-facts">
+        ${row('owners.admin.contact', html`${emailParts(r.who.email)}${r.who.phone ? html`<br /><a href="${waLink(r.who.phone)}" target="_blank" rel="noopener">${icon(MessageCircle, 15)} ${showPhone(r.who.phone)}</a>` : ''}`)}
+        ${row(
+          'paused.withdrew',
+          html`${r.withdrawals.map(
+            (w) => html`<span class="paused__item">${w.pet}${w.shelter ? ` · ${w.shelter}` : ''}${w.reason ? html` <span class="muted">«${t(`request.withdraw.${w.reason as 'otro'}`)}»</span>` : ''} <span class="muted">· ${formatDate(w.at.slice(0, 10))}</span></span>`,
+          )}`,
+        )}
+        ${row('paused.open', String(r.open))}
+        ${row('bulk.admin.adopted', String(r.adopted))}
+      </dl>
+      <form class="portal-decide" data-clear-pause="${r.id}">
+        <label class="field">
+          <span class="field__label">${t('paused.noteLabel')}</span>
+          <textarea class="field__input field__input--area" name="note" rows="2" maxlength="500" placeholder="${t('paused.notePlaceholder')}"></textarea>
+        </label>
+        <div class="portal-decide__actions">
+          <button class="button button--primary button--small" type="submit">${icon(BadgeCheck, 16)}${t('paused.clear')}</button>
+        </div>
+      </form>
+    </li>`;
 }
 
 // ---------- Requests to be a shelter owner (admins) ----------

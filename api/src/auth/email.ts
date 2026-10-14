@@ -147,6 +147,17 @@ function renderOwnerDecision(o: { decision: BulkDecision; note: string | null; p
   return { subject: copy.subject, text, html };
 }
 
+/** To an adopter whose pause an admin lifted. */
+function renderPauseCleared(o: { note: string | null; exploreUrl: string }): Message {
+  const lede = 'Revisamos tu cuenta y quitamos la pausa: ya puedes volver a enviar solicitudes de adopción.';
+  const text = [lede, o.note ?? '', '', `Ver quién espera: ${o.exploreUrl}`].filter((l, i) => l || i === 2).join('\n');
+  const html = shell(`
+      <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">${escape(lede)}</td></tr>
+      ${o.note ? `<tr><td style="padding:8px 28px;font-size:16px;line-height:1.5">${escape(o.note)}</td></tr>` : ''}
+      <tr><td style="padding:16px 28px 28px">${button(o.exploreUrl, 'Ver quién espera')}</td></tr>`);
+  return { subject: 'Ya puedes volver a enviar solicitudes en Patiamor', text, html };
+}
+
 const listOf = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} y ${names.at(-1)}`);
 
 /** The shelter's morning summary: new requests since the last one, and how many are still unopened. */
@@ -194,7 +205,7 @@ export function isQuotaError(status: number, body: string): boolean {
   }
 }
 
-export type EmailKind = 'signin' | 'request_sent' | 'shelter_decision' | 'digest' | 'available' | 'bulk_admin' | 'bulk_decision' | 'owner_admin' | 'owner_decision';
+export type EmailKind = 'signin' | 'request_sent' | 'shelter_decision' | 'digest' | 'available' | 'bulk_admin' | 'bulk_decision' | 'owner_admin' | 'owner_decision' | 'pause_cleared';
 
 // One budget for every email (email_log, migration 0007). Sign-in codes may use all of it; everything
 // else stops short, so a busy day of confirmations can never lock people out of signing in.
@@ -255,6 +266,9 @@ export const sendOwnerAdminEmail = (env: Env, to: string, o: { who: string; shel
 
 export const sendOwnerDecisionEmail = (env: Env, to: string, o: { decision: BulkDecision; note: string | null; portalUrl: string }) =>
   send(env, 'owner_decision', to, renderOwnerDecision(o), `decision=${o.decision}`);
+
+export const sendPauseClearedEmail = (env: Env, to: string, o: { note: string | null; exploreUrl: string }) =>
+  send(env, 'pause_cleared', to, renderPauseCleared(o), 'pause lifted');
 
 export const sendDigestEmail = (env: Env, to: string, o: { shelter: string; fresh: number; pets: string[]; unopened: number; inboxUrl: string }) =>
   send(env, 'digest', to, renderDigest(o), `shelter=${o.shelter} fresh=${o.fresh} unopened=${o.unopened}`);
