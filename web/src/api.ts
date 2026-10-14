@@ -147,7 +147,7 @@ export interface InboxRequest {
   seenAt: string | null;
   closedReason: string | null;
   answers: { space: string; time: string; cost: string };
-  about: { home: string | null; otherPets: string[]; kids: string | null; experience: string | null; visit: string | null };
+  about: { home: string | null; otherPets: string[]; kids: string | null; experience: string | null; visit: string | null; distanceKm: number | null; travel: 'si' | 'pensando' | null };
   message: string | null;
   contact: { name: string; email?: string; phone?: string | null; pref?: ContactPref };
   pet: { id: string; name: string; species: string; status: PetStatus; requestsPaused: boolean; openRequests: number; photo: { url: string | null; thumb: string | null; focus: string } };

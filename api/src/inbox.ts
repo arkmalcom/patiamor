@@ -28,7 +28,7 @@ const MOVES: Record<string, readonly string[]> = {
 type Row = {
   id: string; status: string; created_at: string; updated_at: string; seen_at: string | null; closed_reason: string | null;
   answer_space: string; answer_time: string; answer_cost: string; home: string | null; other_pets: string; kids: string | null;
-  experience: string | null; visit: string | null; message: string | null;
+  experience: string | null; visit: string | null; message: string | null; distance_km: number | null; travel: string | null;
   contact_name: string; contact_email: string; contact_phone: string | null; contact_pref: string;
   pet_id: string; pet_name: string; pet_species: string; pet_status: string; requests_paused: number; open_requests: number;
   cover: string | null; thumb: string | null; focus: string | null;
@@ -46,7 +46,7 @@ function view(r: Row) {
     seenAt: r.seen_at,
     closedReason: r.closed_reason,
     answers: { space: r.answer_space, time: r.answer_time, cost: r.answer_cost },
-    about: { home: r.home, otherPets: JSON.parse(r.other_pets || '[]') as string[], kids: r.kids, experience: r.experience, visit: r.visit },
+    about: { home: r.home, otherPets: JSON.parse(r.other_pets || '[]') as string[], kids: r.kids, experience: r.experience, visit: r.visit, distanceKm: r.distance_km, travel: r.travel },
     message: r.message,
     // The adopter agreed to share these with this shelter for this request, while it's open.
     contact: open ? { name: r.contact_name, email: r.contact_email, phone: r.contact_phone, pref: r.contact_pref } : { name: r.contact_name },
@@ -63,7 +63,7 @@ function view(r: Row) {
 }
 
 const SELECT = `SELECT r.id, r.status, r.created_at, r.updated_at, r.seen_at, r.closed_reason,
-    r.answer_space, r.answer_time, r.answer_cost, r.home, r.other_pets, r.kids, r.experience, r.visit, r.message,
+    r.answer_space, r.answer_time, r.answer_cost, r.home, r.other_pets, r.kids, r.experience, r.visit, r.message, r.distance_km, r.travel,
     r.contact_name, r.contact_email, r.contact_phone, r.contact_pref,
     d.id AS pet_id, d.name AS pet_name, d.species AS pet_species, d.status AS pet_status, d.requests_paused, d.open_requests,
     ph.r2_key AS cover, ph.thumb_key AS thumb, ph.focus

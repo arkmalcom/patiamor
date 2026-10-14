@@ -40,6 +40,10 @@ export interface RequestForm {
   visit?: 'semana' | 'fin' | 'cualquiera';
   message: string;
   consent: boolean;
+  /** Beyond TRAVEL_FROM_KM: can they travel to meet the animal? */
+  travel?: 'si' | 'pensando';
+  /** The area they browse from. The server keeps only the distance, rounded. */
+  fromPlaceId?: string;
 }
 
 export interface Filters {

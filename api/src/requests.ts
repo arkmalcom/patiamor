@@ -3,6 +3,7 @@ import { nowIso } from './auth/crypto';
 import { hasEmailBudget, sendRequestSentEmail } from './auth/email';
 import { appOrigin } from './auth/routes';
 import type { AppContext } from './env';
+import { distanceKm, placeById } from './places';
 import { PET_JOINS, REQUEST_CAP, SUMMARY_COLUMNS, summary, VIEWABLE, type SummaryRow } from './pets';
 
 // Adoption requests. Mi lista's three slots are requests: liking a pet leads to its full profile, and
@@ -22,6 +23,9 @@ const OTHER_PETS = ['perros', 'gatos', 'otros'] as const;
 const KIDS = ['no', 'menores', 'mayores'] as const;
 const EXPERIENCE = ['si', 'primera'] as const;
 const VISIT = ['semana', 'fin', 'cualquiera'] as const;
+const TRAVEL = ['si', 'pensando'] as const;
+/** Beyond this the form asks "¿Puedes viajar?" (the same number is in web/src/ui/request.ts). */
+export const TRAVEL_FROM_KM = 50;
 const WITHDRAW_REASONS = ['situacion', 'vivienda', 'otra_mascota', 'refugio', 'otro'] as const;
 
 /** This many withdrawals within the window pause new requests until an admin clears the account. */
@@ -65,6 +69,10 @@ type RequestBody = {
   visit?: string;
   message?: string;
   consent?: boolean;
+  /** Whether they can travel to meet the animal; asked only beyond TRAVEL_FROM_KM. */
+  travel?: string;
+  /** The area they browse from, to work out how far they are (the distance is kept, never the place). */
+  fromPlaceId?: string;
 };
 
 type RequestRow = SummaryRow & {
@@ -121,23 +129,29 @@ requests.post('/', async (c) => {
   const otherPets = b.otherPets === undefined ? [] : Array.isArray(b.otherPets) ? [...new Set(b.otherPets)] : null;
   const about = { home: optional(HOMES, b.home), kids: optional(KIDS, b.kids), experience: optional(EXPERIENCE, b.experience), visit: optional(VISIT, b.visit) };
   const message = (b.message ?? '').trim().slice(0, 500) || null;
+  const travel = optional(TRAVEL, b.travel);
+  const fromPlace = typeof b.fromPlaceId === 'string' ? placeById(b.fromPlaceId) : null;
 
   if (b.consent !== true) return c.json({ error: 'consent_required' }, 400);
   if (name.length < 2 || name.length > 80) return c.json({ error: 'invalid_name' }, 400);
   if (!pref) return c.json({ error: 'invalid_request' }, 400);
   // WhatsApp and calls need a number; email-only adopters may leave it out (but a typo is still an error).
   if ((pref !== 'correo' || b.phone) && !phone) return c.json({ error: 'invalid_phone' }, 400);
-  if (!b.petId || !oneOf(REFLECTION, a.space) || !oneOf(REFLECTION, a.time) || !oneOf(REFLECTION, a.cost) || !otherPets?.every((p) => oneOf(OTHER_PETS, p)) || Object.values(about).includes(undefined)) {
+  if (!b.petId || !oneOf(REFLECTION, a.space) || !oneOf(REFLECTION, a.time) || !oneOf(REFLECTION, a.cost) || !otherPets?.every((p) => oneOf(OTHER_PETS, p)) || Object.values(about).includes(undefined) || travel === undefined) {
     return c.json({ error: 'invalid_request' }, 400);
   }
 
   const db = c.env.DB;
   if (await requestsRestricted(db, user.id)) return c.json({ error: 'restricted' }, 403);
   const pet = await db
-    .prepare(`SELECT d.name, d.status, d.open_requests, d.requests_paused, s.name AS shelter_name FROM pets d LEFT JOIN shelters s ON s.id = d.shelter_id WHERE d.id = ? AND ${VIEWABLE}`)
+    .prepare(`SELECT d.name, d.status, d.open_requests, d.requests_paused, s.name AS shelter_name, COALESCE(s.place_id, d.place_id) AS place_id FROM pets d LEFT JOIN shelters s ON s.id = d.shelter_id WHERE d.id = ? AND ${VIEWABLE}`)
     .bind(b.petId)
-    .first<{ name: string; status: string; open_requests: number; requests_paused: number; shelter_name: string | null }>();
+    .first<{ name: string; status: string; open_requests: number; requests_paused: number; shelter_name: string | null; place_id: string }>();
   if (!pet) return c.json({ error: 'not_found' }, 404);
+  // How far, if the app said where they browse from. Far away, they must say whether they can come.
+  const petPlace = placeById(pet.place_id);
+  const km = fromPlace && petPlace ? distanceKm(fromPlace, petPlace) : null;
+  if (km !== null && km > TRAVEL_FROM_KM && !travel) return c.json({ error: 'travel_required' }, 400);
 
   const existing = await db
     .prepare(`SELECT id, status, created_at FROM adoption_requests WHERE user_id = ? AND pet_id = ? AND status IN ${OPEN_STATUSES}`)
@@ -155,11 +169,11 @@ requests.post('/', async (c) => {
       db
         .prepare(
           `INSERT INTO adoption_requests (id, pet_id, user_id, answer_space, answer_time, answer_cost, home, other_pets, kids, experience, visit,
-             message, contact_name, contact_email, contact_phone, contact_pref, consent_at, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             message, contact_name, contact_email, contact_phone, contact_pref, consent_at, created_at, updated_at, distance_km, travel)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(id, b.petId, user.id, a.space, a.time, a.cost, about.home, JSON.stringify(otherPets), about.kids, about.experience, about.visit,
-          message, name, user.email, phone, pref, now, now, now),
+          message, name, user.email, phone, pref, now, now, now, km === null ? null : Math.round(km / 5) * 5, km !== null && km > TRAVEL_FROM_KM ? travel : null),
     ]);
   } catch (err) {
     // The database refuses a 4th open request (trigger in 0007), e.g. one sent from another device.

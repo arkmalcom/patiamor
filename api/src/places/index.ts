@@ -75,6 +75,13 @@ export function nearestPlace(lat: number, lng: number): Place | null {
   return best ? toPlace(best) : null;
 }
 
+/** Straight-line distance in km between two places (the same formula the app uses on the phone). */
+export function distanceKm(a: Pick<Place, 'lat' | 'lng'>, b: Pick<Place, 'lat' | 'lng'>): number {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lng - a.lng) / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+
 /** Rough bounding box of the Dominican Republic. */
 export const inDR = (lat: number, lng: number) => lat > 17.3 && lat < 20.1 && lng > -72.1 && lng < -68.2;
 

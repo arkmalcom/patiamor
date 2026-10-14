@@ -2,13 +2,14 @@ import { Bell, BellRing, CalendarCheck, Check, Eye, HeartHandshake, House, Mail,
 import { ApiError } from '../api';
 import { CONTACT_EMAIL, type PetDetail, type PetSummary } from '../data';
 import { $, $$, html, icon, type Raw } from '../dom';
-import { formatDate, sentence, failText, t } from '../i18n';
+import { formatDate, formatKm, sentence, failText, t } from '../i18n';
 import {
   activeRequestFor,
   activeRequests,
   loadRequests,
   MAX_SLOTS,
   petCache,
+  placePet,
   sendRequest,
   stashPendingRequest,
   state,
@@ -39,9 +40,14 @@ const showPhone = (p: string | null | undefined) => {
   return d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : (p ?? '');
 };
 
-/** What a careful adopter should know before committing: compatibility warnings and the pet's needs. */
+/** Beyond this the form asks whether they can travel (the same number is in api/src/requests.ts). */
+const TRAVEL_FROM_KM = 50;
+
+/** What a careful adopter should know before committing: how far it is, compatibility warnings and the pet's needs. */
 export function cautions(pet: PetSummary): string[] {
   const out: string[] = [];
+  const km = placePet(pet).km;
+  if (km > TRAVEL_FROM_KM) out.push(t('reflect.far', { km: formatKm(km), place: pet.place.name, lo: lo(pet) }));
   if (pet.goodWith.cats === false) out.push(t('reflect.notCats'));
   if (pet.goodWith.dogs === false) out.push(t('reflect.notDogs'));
   if (pet.goodWith.kids === false) out.push(t('reflect.notKids'));
@@ -156,6 +162,7 @@ function openForm(pet: PetSummary) {
   const user = state.user;
   // A returning adopter sees one line with how they'll be reached, and can change it.
   const known = !!(user?.name && user.contactPref && (user.contactPref === 'correo' || user.phone));
+  const far = placePet(pet).km > TRAVEL_FROM_KM;
   const pref = user?.contactPref ?? 'whatsapp';
   const body = html`
     <form class="request" id="request-form" novalidate>
@@ -169,6 +176,7 @@ function openForm(pet: PetSummary) {
       </div>
       ${beforeYouStart(pet)}
       ${reflection(pet)}
+      ${far ? choice('travel', t('request.travel', { name: pet.name }), ['si', 'pensando'], yesUnsure, { hint: t('request.travelHint', { km: formatKm(placePet(pet).km), place: pet.place.name }) }) : ''}
       <p class="unsure-note" hidden data-unsure>${t('reflect.unsureNote', { lister })}</p>
       <fieldset class="question contact">
         <legend>${t('request.contact')}</legend>
@@ -244,10 +252,12 @@ function openForm(pet: PetSummary) {
       visit: opt('visit'),
       message: String(f.get('message') ?? '').trim(),
       consent: f.get('consent') === 'on',
+      travel: far ? ((f.get('travel') as RequestForm['travel'] | null) ?? undefined) : undefined,
+      fromPlaceId: state.location?.id,
     };
   };
   const phoneOk = (r: RequestForm) => (r.pref === 'correo' && !r.phone) || r.phone.replace(/\D/g, '').length >= 10;
-  const complete = (r: RequestForm) => !!(r.answers.space && r.answers.time && r.answers.cost) && r.name.length >= 2 && phoneOk(r) && r.consent;
+  const complete = (r: RequestForm) => !!(r.answers.space && r.answers.time && r.answers.cost) && (!far || !!r.travel) && r.name.length >= 2 && phoneOk(r) && r.consent;
   const sync = () => {
     const r = read();
     const ok = complete(r);
@@ -280,7 +290,7 @@ function openForm(pet: PetSummary) {
       if (code === 'requests_full') return openFull(pet);
       if (code === 'restricted') return void openRestricted();
       if (code === 'invalid_phone' || code === 'invalid_name') showFields(); // so it can be fixed
-      const known = ['invalid_phone', 'invalid_name', 'reserved', 'paused'];
+      const known = ['invalid_phone', 'invalid_name', 'reserved', 'paused', 'travel_required'];
       error.textContent = known.includes(code) ? sentence(t(`request.err.${code as 'invalid_phone'}`, { name: pet.name, lister })) : failText(code);
       error.hidden = false;
       error.scrollIntoView({ block: 'nearest' });

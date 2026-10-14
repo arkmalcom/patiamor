@@ -177,6 +177,8 @@ function card(r: InboxRequest, shelter: string, shelterId: string): Raw {
             ${fact('inbox.q.kids', r.about.kids && t(`request.kids.${r.about.kids as 'no'}`))}
             ${fact('inbox.q.experience', r.about.experience && t(`request.experience.${r.about.experience as 'si'}`))}
             ${fact('inbox.q.visit', r.about.visit && t(`request.visit.${r.about.visit as 'semana'}`))}
+            ${fact('inbox.q.distance', r.about.distanceKm !== null && r.about.distanceKm > 0 ? t('inbox.distance', { km: r.about.distanceKm }) : null)}
+            ${r.about.travel ? answer('inbox.q.travel', r.about.travel) : ''}
           </dl>
           ${open ? actions(r, first) : ''}
           <a class="text-button request-card__pet" href="/refugio/${encodeURIComponent(shelterId)}/animales/${encodeURIComponent(pet.id)}">${t(pet.status === 'available' || pet.status === 'reserved' ? 'inbox.petLink' : 'inbox.petLinkEnded', { pet: pet.name })}</a>
