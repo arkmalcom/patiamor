@@ -1,8 +1,9 @@
-import { BadgeCheck, CircleAlert, Clock, House, Mail, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, Users } from 'lucide';
-import { api, ApiError, type AdminShelter, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
+import { BadgeCheck, CircleAlert, Clock, House, Mail, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, Users, UsersRound } from 'lucide';
+import { api, ApiError, type AdminBulk, type AdminShelter, type BulkStatus, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
 import { CONTACT_EMAIL, type Place } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, failText, t, type Key } from '../i18n';
+import { bulkWhat } from '../ui/bulk';
 import { state } from '../store';
 import { renderAuth } from '../ui/auth';
 import { renderInbox } from './inbox';
@@ -18,6 +19,7 @@ export type PortalView =
   | { view: 'registro' }
   | { view: 'editar'; id: string }
   | { view: 'admin'; status: ShelterStatus }
+  | { view: 'adminBulk'; status: BulkStatus }
   | { view: 'animales'; id: string; tab: string | null }
   | { view: 'animal'; id: string; petId: string | null }
   | { view: 'solicitudes'; id: string; tab: string | null };
@@ -40,6 +42,7 @@ export function renderPortal(root: HTMLElement, route: PortalView) {
   if (route.view === 'registro') return form(root, null);
   if (route.view === 'editar') return void edit(root, route.id);
   if (route.view === 'admin') return void adminQueue(root, route.status);
+  if (route.view === 'adminBulk') return void adminBulkQueue(root, route.status);
   if (route.view === 'animales') return void renderListings(root, route.id, route.tab);
   if (route.view === 'animal') return void renderListingForm(root, route.id, route.petId);
   if (route.view === 'solicitudes') return void renderInbox(root, route.id, route.tab);
@@ -72,9 +75,10 @@ async function home(root: HTMLElement) {
   mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
   let shelters: PortalShelter[] = [];
   let pending = 0;
+  let pendingBulk = 0;
   try {
     shelters = await api.myShelters();
-    if (state.user?.isAdmin) pending = (await api.adminShelters('pending')).length;
+    if (state.user?.isAdmin) [pending, pendingBulk] = await Promise.all([api.adminShelters('pending').then((l) => l.length), api.adminBulk('pending').then((l) => l.length)]);
   } catch {
     return mount(root, html`<p class="loading-note" role="alert">${t('auth.err.network')}</p>`);
   }
@@ -86,7 +90,8 @@ async function home(root: HTMLElement) {
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('portal.title')}</h1>
         <p class="portal__who">${t('portal.who', { who: state.user?.name ? `${state.user.name} · ${state.user.email}` : (state.user?.email ?? '') })}</p>
         ${state.user?.isAdmin
-          ? html`<a class="portal-admin-link" href="/refugio/admin">${icon(ShieldCheck, 20)}<span>${t('portal.admin.link')}</span>${pending ? html`<span class="list-tabs__count">${pending}</span>` : ''}</a>`
+          ? html`<a class="portal-admin-link" href="/refugio/admin">${icon(ShieldCheck, 20)}<span>${t('portal.admin.link')}</span>${pending ? html`<span class="list-tabs__count">${pending}</span>` : ''}</a>
+            <a class="portal-admin-link" href="/refugio/admin/grandes">${icon(UsersRound, 20)}<span>${t('bulk.admin.link')}</span>${pendingBulk ? html`<span class="list-tabs__count">${pendingBulk}</span>` : ''}</a>`
           : ''}
         ${shelters.length
           ? html`<ul class="portal-list">${shelters.map(shelterCard)}</ul>`
@@ -358,6 +363,7 @@ async function adminQueue(root: HTMLElement, status: ShelterStatus) {
           <button class="button button--outline button--small" type="button" data-digest>${t('portal.admin.digest')}</button>
           <p class="muted">${t('portal.admin.digestNote')}</p>
         </div>
+        <a class="text-button" href="/refugio/admin/grandes">${t('bulk.admin.link')}</a>
         <nav class="list-tabs" aria-label="${t('portal.admin.title')}">
           ${QUEUE.map((s) => html`<a class="list-tabs__tab" href="/refugio/admin?estado=${s}" aria-current="${s === status ? 'page' : 'false'}">${t(`portal.admin.tab.${s}`)}</a>`)}
         </nav>
@@ -398,6 +404,98 @@ async function adminQueue(root: HTMLElement, status: ShelterStatus) {
       }
     }),
   );
+}
+
+// ---------- Special requests to adopt more than three ----------
+
+const BULK_QUEUE: BulkStatus[] = ['pending', 'approved', 'declined'];
+
+async function adminBulkQueue(root: HTMLElement, status: BulkStatus) {
+  if (!state.user?.isAdmin) return mount(root, html`<section class="portal"><p class="loading-note">${t('portal.notFound')}</p></section>`);
+  mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
+  let list: AdminBulk[];
+  try {
+    list = await api.adminBulk(status);
+  } catch {
+    return mount(root, html`<p class="loading-note" role="alert">${t('auth.err.network')}</p>`);
+  }
+  mount(
+    root,
+    html`
+      <section class="portal portal--admin" aria-labelledby="portal-title">
+        <a class="text-button portal__back" href="/refugio/admin">${t('portal.admin.title')}</a>
+        <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('bulk.admin.title')}</h1>
+        <p class="portal__lede">${t('bulk.admin.lede')}</p>
+        <nav class="list-tabs" aria-label="${t('bulk.admin.title')}">
+          ${BULK_QUEUE.map((s) => html`<a class="list-tabs__tab" href="/refugio/admin/grandes?estado=${s}" aria-current="${s === status ? 'page' : 'false'}">${t(`bulk.admin.tab.${s}`)}</a>`)}
+        </nav>
+        ${list.length ? html`<ul class="portal-list">${list.map(bulkCard)}</ul>` : html`<p class="passed__empty">${t('bulk.admin.empty')}</p>`}
+      </section>`,
+  );
+  $$<HTMLFormElement>('[data-bulk-decide]', root).forEach((f) =>
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const action = ((e as SubmitEvent).submitter as HTMLButtonElement | null)?.value as 'approve' | 'decline';
+      const note = String(new FormData(f).get('note') ?? '').trim();
+      if (action === 'decline' && !note) {
+        const box = $<HTMLTextAreaElement>('textarea[name=note]', f);
+        box.focus();
+        return toast(t('bulk.admin.needNote'));
+      }
+      $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = true));
+      try {
+        await api.adminBulkDecision(f.dataset.bulkDecide!, action, note || undefined);
+        toast(t(`bulk.admin.done.${action}`));
+        void adminBulkQueue(root, status);
+      } catch (err) {
+        $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = false));
+        toast(failText(err));
+      }
+    }),
+  );
+}
+
+/** An email with a place to wrap after the @, so a long address doesn't break mid-word. */
+const emailParts = (email: string): Raw => {
+  const at = email.indexOf('@');
+  return at < 0 ? html`${email}` : html`${email.slice(0, at)}@<wbr />${email.slice(at + 1)}`;
+};
+
+function bulkCard(r: AdminBulk): Raw {
+  const row = (label: Key, value: Raw | string | null | undefined) => (value ? html`<div><dt>${t(label)}</dt><dd>${value}</dd></div>` : '');
+  const who = r.who.name ?? r.who.email;
+  return html`
+    <li class="portal-card">
+      <div class="portal-card__head">
+        <span class="shelter__mark" aria-hidden="true">${icon(UsersRound, 22)}</span>
+        <div>
+          <h2 class="portal-card__name">${t('bulk.admin.wants', { who, n: r.animals, what: bulkWhat(r.species) })}</h2>
+          <span class="portal-card__place">${t('bulk.admin.sent')} ${formatDate(r.createdAt.slice(0, 10))}</span>
+        </div>
+      </div>
+      <p class="bulk-admin__about">${r.about}</p>
+      <dl class="portal-facts">
+        ${row('bulk.admin.contact', html`${emailParts(r.who.email)}${r.who.phone ? html`<br /><a href="${waLink(r.who.phone)}" target="_blank" rel="noopener">${icon(MessageCircle, 15)} ${showPhone(r.who.phone)}</a>` : ''}`)}
+        ${row('bulk.admin.wanted', r.wanted)}
+        ${row('bulk.admin.inProgress', r.inProgress.length ? html`${r.inProgress.map((o) => html`${o.pet}${o.shelter ? ` · ${o.shelter}` : ''}<br />`)}` : t('bulk.admin.none'))}
+        ${row('bulk.admin.withdrawn', String(r.withdrawn90))}
+        ${row('bulk.admin.adopted', String(r.adopted))}
+      </dl>
+      ${r.status === 'pending'
+        ? html`<form class="portal-decide" data-bulk-decide="${r.id}">
+            <label class="field">
+              <span class="field__label">${t('bulk.admin.noteLabel')}</span>
+              <textarea class="field__input field__input--area" name="note" rows="2" maxlength="500" placeholder="${t('bulk.admin.notePlaceholder')}"></textarea>
+            </label>
+            <div class="portal-decide__actions">
+              <button class="button button--primary button--small" type="submit" value="approve">${icon(BadgeCheck, 16)}${t('bulk.admin.approve')}</button>
+              <button class="button button--outline button--small" type="submit" value="decline">${t('bulk.admin.decline')}</button>
+            </div>
+          </form>`
+        : r.note
+          ? html`<p class="portal-card__reason"><strong>${t('portal.reason')}:</strong> ${r.note}</p>`
+          : ''}
+    </li>`;
 }
 
 function adminCard(s: AdminShelter): Raw {

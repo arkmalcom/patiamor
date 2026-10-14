@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
-import { nowIso } from './auth/crypto';
-import { hasEmailBudget, sendRequestSentEmail } from './auth/email';
+import { isoIn, nowIso } from './auth/crypto';
+import { hasEmailBudget, sendBulkAdminEmail, sendRequestSentEmail } from './auth/email';
 import { appOrigin } from './auth/routes';
+import { BULK_MAX, BULK_MIN, BULK_PER_MONTH, BULK_SPECIES, bulkView, latestBulk, type BulkRow } from './bulk';
 import type { AppContext } from './env';
 import { distanceKm, placeById } from './places';
 import { PET_JOINS, REQUEST_CAP, SUMMARY_COLUMNS, summary, VIEWABLE, type SummaryRow } from './pets';
@@ -96,7 +97,7 @@ requests.use('*', async (c, next) => {
 requests.get('/', async (c) => {
   const user = c.get('user')!;
   const db = c.env.DB;
-  const [{ results }, { results: alertRows }] = await Promise.all([
+  const [{ results }, { results: alertRows }, bulk] = await Promise.all([
     db
       .prepare(
         `SELECT ${SUMMARY_COLUMNS}, r.id AS request_id, r.status AS request_status, r.answer_space, r.answer_time, r.answer_cost,
@@ -108,8 +109,10 @@ requests.get('/', async (c) => {
       .bind(user.id)
       .all<RequestRow>(),
     db.prepare('SELECT pet_id FROM availability_alerts WHERE user_id = ?').bind(user.id).all<{ pet_id: string }>(),
+    latestBulk(db, user.id),
   ]);
   return c.json({
+    bulk,
     items: results.map((r) => ({
       pet: summary(r),
       answers: { space: r.answer_space, time: r.answer_time, cost: r.answer_cost },
@@ -117,6 +120,59 @@ requests.get('/', async (c) => {
     })),
     alerts: alertRows.map((a) => a.pet_id),
   });
+});
+
+/** Admin notices about special requests per day: a flood of accounts can't spend the email budget on them. */
+const BULK_ADMIN_EMAILS_PER_DAY = 5;
+
+type BulkBody = { animals?: unknown; species?: unknown; wanted?: string; about?: string; phone?: string; consent?: boolean };
+
+// A special request to adopt more than Mi lista's three. It isn't about one animal: an admin reviews it
+// with the person's other requests in mind and, if approved, puts them in touch with the shelters.
+requests.post('/bulk', async (c) => {
+  const user = c.get('user')!;
+  const b = await c.req.json<BulkBody>().catch(() => ({}) as BulkBody);
+  const animals = Number(b.animals);
+  const species = oneOf(BULK_SPECIES, b.species) ? b.species : null;
+  const wanted = (typeof b.wanted === 'string' ? b.wanted : '').trim().replace(/\s+/g, ' ').slice(0, 200) || null;
+  const about = (typeof b.about === 'string' ? b.about : '').trim().slice(0, 1000);
+  const phone = b.phone ? drPhone(String(b.phone)) : null;
+
+  if (b.consent !== true) return c.json({ error: 'consent_required' }, 400);
+  if (!Number.isInteger(animals) || animals < BULK_MIN || animals > BULK_MAX) return c.json({ error: 'invalid_animals' }, 400);
+  if (!species) return c.json({ error: 'invalid_request' }, 400);
+  if (about.length < 30) return c.json({ error: 'about_too_short' }, 400);
+  if (b.phone && !phone) return c.json({ error: 'invalid_phone' }, 400);
+
+  const db = c.env.DB;
+  // Withdrawing several requests pauses new ones until Patiamor has checked in: that includes this.
+  if (await requestsRestricted(db, user.id)) return c.json({ error: 'restricted' }, 403);
+  const recent = await db.prepare('SELECT count(*) AS n FROM bulk_requests WHERE user_id = ? AND created_at > ?').bind(user.id, isoIn(-30 * 24 * 60 * 60 * 1000)).first<{ n: number }>();
+  if ((recent?.n ?? 0) >= BULK_PER_MONTH) return c.json({ error: 'too_many_bulk' }, 409);
+
+  const id = crypto.randomUUID();
+  const now = nowIso();
+  try {
+    await db
+      .prepare('INSERT INTO bulk_requests (id, user_id, animals, species, wanted, about, contact_phone, consent_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(id, user.id, animals, species, wanted, about, phone, now, now)
+      .run();
+  } catch (err) {
+    // One waiting at a time (a unique index on pending ones).
+    if (String(err).includes('UNIQUE')) return c.json({ error: 'already_pending' }, 409);
+    throw err;
+  }
+
+  // Tell the admins, within the email budget and a small daily cap (they also see it in the portal).
+  const sent = await db.prepare("SELECT count(*) AS n FROM email_log WHERE kind = 'bulk_admin' AND created_at > ?").bind(isoIn(-24 * 60 * 60 * 1000)).first<{ n: number }>();
+  if ((sent?.n ?? 0) < BULK_ADMIN_EMAILS_PER_DAY && (await hasEmailBudget(db, 'bulk_admin'))) {
+    const { results: admins } = await db.prepare('SELECT email FROM users WHERE is_admin = 1').all<{ email: string }>();
+    for (const a of admins) {
+      await sendBulkAdminEmail(c.env, a.email, { who: user.name ?? user.email, animals, species, adminUrl: `${appOrigin(c)}/refugio/admin/grandes` }).catch((err) => console.error('bulk admin email failed', err));
+    }
+  }
+  const row = await db.prepare('SELECT id, animals, species, status, decision_note, created_at, decided_at FROM bulk_requests WHERE id = ?').bind(id).first<BulkRow>();
+  return c.json({ bulk: bulkView(row!) }, 201);
 });
 
 requests.post('/', async (c) => {

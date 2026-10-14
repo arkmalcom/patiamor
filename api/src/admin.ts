@@ -1,11 +1,13 @@
 import { Hono } from 'hono';
-import { nowIso } from './auth/crypto';
-import { hasEmailBudget, sendShelterDecisionEmail, type ShelterDecision } from './auth/email';
+import { isoIn, nowIso } from './auth/crypto';
+import { hasEmailBudget, sendBulkDecisionEmail, sendShelterDecisionEmail, type BulkDecision, type ShelterDecision } from './auth/email';
 import { appOrigin } from './auth/routes';
+import type { BulkRow } from './bulk';
 import { forgetCatalogVersion } from './cache';
 import { runDigest } from './digest';
 import type { AppContext } from './env';
 import { placeById } from './places';
+import { OPEN_STATUSES } from './requests';
 
 // Admin tools. For now: the shelter verification queue (PAT-13). Every decision is written to
 // admin_actions; the full console (PAT-14) builds on this.
@@ -103,6 +105,90 @@ admin.post('/shelters/:id/decision', async (c) => {
     );
   }
   return c.json({ shelter: { id, status: rule.to } });
+});
+
+// ---------- Special requests to adopt more than three ----------
+
+type BulkQueueRow = BulkRow & { wanted: string | null; about: string; contact_phone: string | null; name: string | null; email: string; user_id: string; account_phone: string | null };
+const BULK_STATUSES = ['pending', 'approved', 'declined'] as const;
+
+// The queue, each with what an admin needs to weigh it: the person's requests in progress, how many
+// they've withdrawn lately and how many animals they've already adopted through Patiamor.
+admin.get('/bulk', async (c) => {
+  const status = BULK_STATUSES.includes(c.req.query('status') as never) ? c.req.query('status')! : 'pending';
+  const db = c.env.DB;
+  const { results } = await db
+    .prepare(
+      `SELECT b.id, b.user_id, b.animals, b.species, b.wanted, b.about, b.contact_phone, b.status, b.decision_note, b.created_at, b.decided_at,
+              u.name, u.email, u.phone AS account_phone
+         FROM bulk_requests b JOIN users u ON u.id = b.user_id WHERE b.status = ?
+        ORDER BY b.created_at ${status === 'pending' ? 'ASC' : 'DESC'} LIMIT 100`,
+    )
+    .bind(status)
+    .all<BulkQueueRow>();
+  const ids = JSON.stringify([...new Set(results.map((r) => r.user_id))]);
+  const [{ results: open }, { results: history }] = await Promise.all([
+    db
+      .prepare(
+        `SELECT r.user_id, r.status, d.name AS pet, s.name AS shelter FROM adoption_requests r JOIN pets d ON d.id = r.pet_id LEFT JOIN shelters s ON s.id = d.shelter_id
+          WHERE r.user_id IN (SELECT value FROM json_each(?)) AND r.status IN ${OPEN_STATUSES} ORDER BY r.created_at`,
+      )
+      .bind(ids)
+      .all<{ user_id: string; status: string; pet: string; shelter: string | null }>(),
+    db
+      .prepare(
+        `SELECT user_id, sum(status = 'withdrawn' AND updated_at > ?) AS withdrawn, sum(status = 'adopted') AS adopted FROM adoption_requests
+          WHERE user_id IN (SELECT value FROM json_each(?)) GROUP BY user_id`,
+      )
+      .bind(isoIn(-90 * 24 * 60 * 60 * 1000), ids)
+      .all<{ user_id: string; withdrawn: number; adopted: number }>(),
+  ]);
+  return c.json({
+    requests: results.map((r) => ({
+      id: r.id,
+      status: r.status,
+      animals: r.animals,
+      species: r.species,
+      wanted: r.wanted,
+      about: r.about,
+      createdAt: r.created_at,
+      decidedAt: r.decided_at,
+      note: r.decision_note,
+      who: { name: r.name, email: r.email, phone: r.contact_phone ?? r.account_phone },
+      inProgress: open.filter((o) => o.user_id === r.user_id).map((o) => ({ pet: o.pet, shelter: o.shelter, status: o.status })),
+      withdrawn90: history.find((h) => h.user_id === r.user_id)?.withdrawn ?? 0,
+      adopted: history.find((h) => h.user_id === r.user_id)?.adopted ?? 0,
+    })),
+  });
+});
+
+// Approve (optionally with a note for the adopter) or decline (with the reason the adopter will read).
+admin.post('/bulk/:id/decision', async (c) => {
+  const id = c.req.param('id');
+  const adminUser = c.get('user')!;
+  const b = await c.req.json<{ action?: string; note?: string }>().catch(() => ({}) as { action?: string; note?: string });
+  const decision: BulkDecision | null = b.action === 'approve' ? 'approved' : b.action === 'decline' ? 'declined' : null;
+  if (!decision) return c.json({ error: 'invalid_action' }, 400);
+  const note = (b.note ?? '').trim().slice(0, 500) || null;
+  if (decision === 'declined' && !note) return c.json({ error: 'reason_required' }, 400);
+
+  const db = c.env.DB;
+  const row = await db
+    .prepare('SELECT b.status, b.animals, u.email FROM bulk_requests b JOIN users u ON u.id = b.user_id WHERE b.id = ?')
+    .bind(id)
+    .first<{ status: string; animals: number; email: string }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+  if (row.status !== 'pending') return c.json({ error: 'invalid_transition' }, 409);
+
+  const now = nowIso();
+  await db.batch([
+    db.prepare("UPDATE bulk_requests SET status = ?, decision_note = ?, decided_by = ?, decided_at = ? WHERE id = ? AND status = 'pending'").bind(decision, note, adminUser.id, now, id),
+    db.prepare("INSERT INTO admin_actions (id, admin_id, action, subject_type, subject_id, note) VALUES (?, ?, ?, 'bulk_request', ?, ?)").bind(crypto.randomUUID(), adminUser.id, `bulk.${b.action}`, id, note),
+  ]);
+  if (await hasEmailBudget(db, 'bulk_decision')) {
+    await sendBulkDecisionEmail(c.env, row.email, { decision, animals: row.animals, note, listUrl: `${appOrigin(c)}/lista` }).catch((err) => console.error('bulk decision email failed', err));
+  }
+  return c.json({ bulk: { id, status: decision } });
 });
 
 // Run the morning job now (it also runs daily at 8:00): for checking the emails on staging, or catching

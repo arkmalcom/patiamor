@@ -125,6 +125,39 @@ export interface Listing extends PetForm {
 export type ListingSummary = PetSummary & { status: PetStatus; openRequests: number; updatedAt: string };
 
 export type CloseReason = 'otra_familia' | 'no_encaja' | 'sin_respuesta' | 'otro';
+/** A special request to adopt more than Mi lista's three (a farm, a large family home). */
+export type BulkStatus = 'pending' | 'approved' | 'declined';
+export type BulkSpecies = 'perros' | 'gatos' | 'ambos';
+export interface BulkRequest {
+  id: string;
+  status: BulkStatus;
+  animals: number;
+  species: BulkSpecies;
+  createdAt: string;
+  decidedAt: string | null;
+  /** What the admin wrote: the reason for a no, or a word for a yes. */
+  note: string | null;
+}
+export interface BulkForm {
+  animals: number;
+  species: BulkSpecies;
+  wanted: string;
+  about: string;
+  phone: string;
+  consent: boolean;
+}
+/** A special request as an admin reads it, with what's needed to weigh it. */
+export interface AdminBulk extends Omit<BulkRequest, 'species'> {
+  species: BulkSpecies;
+  wanted: string | null;
+  about: string;
+  who: { name: string | null; email: string; phone: string | null };
+  inProgress: { pet: string; shelter: string | null; status: string }[];
+  /** Requests they withdrew in the last 90 days, and animals already adopted through Patiamor. */
+  withdrawn90: number;
+  adopted: number;
+}
+
 /** Why a shelter withdrew an animal: for its own records; adopters only see "Ya no está disponible". */
 export type WithdrawReason = 'familia_original' | 'salud' | 'fallecio' | 'otro';
 /** An animal's state after a lifecycle change, and how many open requests that change closed. */
@@ -195,7 +228,8 @@ export const api = {
   searchPlaces: (q: string) => call<{ places: Place[] }>(`/api/places?q=${encodeURIComponent(q)}`).then((r) => r.places),
   nearestPlace: (at: LatLng) => call<{ place: Place }>(`/api/places/nearest?${point(at)}`).then((r) => r.place),
   whereami: () => call<{ place: Place; source: 'ip' | 'default' }>('/api/whereami'),
-  myRequests: () => call<{ items: MyRequest[]; alerts: string[] }>('/api/requests'),
+  myRequests: () => call<{ items: MyRequest[]; alerts: string[]; bulk: BulkRequest | null }>('/api/requests'),
+  sendBulk: (form: BulkForm) => call<{ bulk: BulkRequest }>('/api/requests/bulk', 'POST', form).then((r) => r.bulk),
   requestAdoption: (form: RequestForm) => call<{ request: AdoptionRequest }>('/api/requests', 'POST', form).then((r) => r.request),
   withdrawRequest: (id: string, reason: string) => call<{ ok: true }>(`/api/requests/${encodeURIComponent(id)}/withdraw`, 'POST', { reason }),
   alertOn: (petId: string) => call<{ ok: true }>(`/api/alerts/${encodeURIComponent(petId)}`, 'PUT', {}),
@@ -227,6 +261,9 @@ export const api = {
   relistPet: (petId: string) => call<PetChange>(`/api/portal/pets/${encodeURIComponent(petId)}/relist`, 'POST', {}),
   runDigest: () => call<{ shelters: number; digestEmails: number; alertEmails: number; deferred: boolean }>('/api/admin/digest', 'POST', {}),
   adminShelters: (status: ShelterStatus) => call<{ shelters: AdminShelter[] }>(`/api/admin/shelters?status=${status}`).then((r) => r.shelters),
+  adminBulk: (status: BulkStatus) => call<{ requests: AdminBulk[] }>(`/api/admin/bulk?status=${status}`).then((r) => r.requests),
+  adminBulkDecision: (id: string, action: 'approve' | 'decline', note?: string) =>
+    call<{ bulk: { id: string; status: BulkStatus } }>(`/api/admin/bulk/${encodeURIComponent(id)}/decision`, 'POST', { action, note }),
   adminDecision: (id: string, action: 'verify' | 'reject' | 'suspend', reason?: string) =>
     call<{ shelter: { id: string; status: ShelterStatus } }>(`/api/admin/shelters/${encodeURIComponent(id)}/decision`, 'POST', { action, reason }),
 };

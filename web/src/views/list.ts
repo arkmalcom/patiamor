@@ -1,10 +1,11 @@
 import { Compass, Eye, Undo2 } from 'lucide';
 import { frameFor } from '../data';
 import { $$, html, icon, mount, type Raw } from '../dom';
-import { away, sentence, t } from '../i18n';
+import { away, formatDate, sentence, t } from '../i18n';
 import { activeRequests, isOpen, MAX_SLOTS, petCache, placePet, state, update, type Answer, type MyRequest } from '../store';
 import { listerLabel, miniFrame, photo } from '../ui/canvas';
 import { listerName, openWithdraw, requestStatus, statusKey } from '../ui/request';
+import { bulkWhat, openBulk } from '../ui/bulk';
 import { pips } from '../ui/save';
 import { toast } from '../ui/toast';
 
@@ -57,6 +58,29 @@ const empty = (compact: boolean) => html`
 export function slots(compact = false): Raw {
   const open = activeRequests();
   return html`<ol class="slots ${compact ? 'slots--compact' : ''}">${Array.from({ length: MAX_SLOTS }, (_, i) => (open[i] ? filled(open[i], compact) : empty(compact)))}</ol>`;
+}
+
+/** Under the slots: "¿Quieres adoptar a más de tres?", or where their special request stands. */
+function bulkSection(): Raw {
+  if (!state.signedIn) return html``;
+  const b = state.bulk;
+  if (!b) {
+    return html`
+      <section class="many bulk-prompt" aria-labelledby="bulk-title">
+        <h2 class="many__title" id="bulk-title">${t('bulk.promptTitle')}</h2>
+        <p>${t('bulk.promptBody')}</p>
+        <button class="button button--outline" type="button" data-bulk>${t('bulk.promptCta')}</button>
+      </section>`;
+  }
+  const what = bulkWhat(b.species);
+  return html`
+    <section class="bulk-card bulk-card--${b.status}" aria-labelledby="bulk-title" role="status">
+      <h2 class="bulk-card__title" id="bulk-title">${t(`bulk.status.${b.status}`)}</h2>
+      <p>${t(`bulk.status.${b.status}.body`, { n: b.animals, what, email: state.user?.email ?? '' })}</p>
+      ${b.note ? html`<p class="bulk-card__note">${b.status === 'declined' ? html`<strong>${t('bulk.status.reason')}:</strong> ` : ''}${b.note}</p>` : ''}
+      <p class="bulk-card__date">${t('request.sentOn', { date: formatDate(b.createdAt.slice(0, 10)) })}</p>
+      ${b.status === 'declined' ? html`<button class="text-button" type="button" data-bulk>${t('bulk.again')}</button>` : ''}
+    </section>`;
 }
 
 /** Requests that ended in the last 30 days: how things turned out, never a mystery. */
@@ -152,10 +176,12 @@ export function renderList(root: HTMLElement, deps: ListDeps) {
               <p class="list-view__lede">${t('list.body')}</p>
               ${!state.signedIn && !open.length ? html`<p class="sample-note">${t('list.signedOut')}</p>` : ''}
               ${slots()}
+              ${bulkSection()}
               ${ended()}`}
         <button class="button button--outline" type="button" data-explore>${icon(Compass, 20)}${t('list.explore')}</button>
       </section>`,
   );
   bindSlots(root, deps);
+  root.querySelector('[data-bulk]')?.addEventListener('click', openBulk);
   root.querySelector('[data-explore]')!.addEventListener('click', deps.explore);
 }

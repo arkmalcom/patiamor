@@ -1124,6 +1124,23 @@ html.sheet-open { overflow: hidden; }
 .full__slots { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .full__slot { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
 .full__slot-text { flex: 1; display: grid; min-width: 0; }
+/* Adopting more than three: the form's explanation, and where the request stands in Mi lista. */
+.bulk { display: grid; gap: 16px; }
+.bulk__lede { margin: 0; font-size: 1.05rem; line-height: 1.5; }
+.bulk__how { background: var(--sky-tint); border-radius: 14px; padding: 14px 16px; }
+.bulk__how-title { font-size: 1rem; font-weight: 800; margin-bottom: 6px; }
+.bulk__steps { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
+.bulk__steps li::marker { font-weight: 800; color: var(--hoja-deep); }
+.field__input--short { max-width: 9rem; }
+.bulk-prompt { margin-top: 4px; }
+.bulk-card { display: grid; gap: 6px; padding: 16px 18px; border-radius: 16px; background: var(--paper); box-shadow: var(--shadow-soft); border-left: 6px solid var(--mango); }
+.bulk-card--approved { border-left-color: var(--hoja); }
+.bulk-card--declined { border-left-color: var(--rule-strong); }
+.bulk-card p { margin: 0; }
+.bulk-card__title { font-family: var(--font-display); font-weight: 400; font-size: 1.25rem; line-height: 1.15; }
+.bulk-card__note { padding: 8px 12px; background: var(--sky-tint); border-radius: 10px; }
+.bulk-card__date { font-size: 0.85rem; color: var(--ink-2); }
+.bulk-card .text-button { justify-self: start; }
 .many { background: var(--sky); border-radius: 16px; padding: 18px; display: grid; gap: 10px; justify-items: start; }
 .many__title { font-family: var(--font-display); font-weight: 400; font-size: 1.3rem; line-height: 1.15; }
 

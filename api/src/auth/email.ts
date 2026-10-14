@@ -79,6 +79,40 @@ function renderShelterDecision(o: { shelter: string; decision: ShelterDecision; 
   return { subject: copy.subject, text, html };
 }
 
+/** To the admins: someone asked to adopt more than three. */
+function renderBulkAdmin(o: { who: string; animals: number; species: string; adminUrl: string }): Message {
+  const lede = `${o.who} quiere adoptar a ${o.animals} animales (${o.species}) a la vez.`;
+  const text = [lede, '', `Revísala junto con sus solicitudes en curso: ${o.adminUrl}`].join('\n');
+  const html = shell(`
+      <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">${escape(lede)}</td></tr>
+      <tr><td style="padding:8px 28px;font-size:16px;line-height:1.5">Está esperando una respuesta. Puedes verla con sus solicitudes en curso y aprobarla o no.</td></tr>
+      <tr><td style="padding:16px 28px 28px">${button(o.adminUrl, 'Revisar la solicitud')}</td></tr>`);
+  return { subject: `Solicitud especial: ${o.animals} animales`, text, html };
+}
+
+export type BulkDecision = 'approved' | 'declined';
+
+/** To the adopter, when an admin has decided. */
+function renderBulkDecision(o: { decision: BulkDecision; animals: number; note: string | null; listUrl: string }): Message {
+  const copy = {
+    approved: {
+      subject: 'Aprobamos tu solicitud para adoptar a varios animales',
+      lede: `¡Buenas noticias! Revisamos tu solicitud para adoptar a ${o.animals} animales y la aprobamos. Te escribiremos para ponerte en contacto con el refugio o los refugios con los que encaje; ellos eligen qué animales van contigo.`,
+    },
+    declined: {
+      subject: 'Sobre tu solicitud para adoptar a varios animales',
+      lede: `Revisamos tu solicitud para adoptar a ${o.animals} animales y por ahora no pudimos aprobarla. Mientras tanto, puedes seguir con tus tres espacios de siempre.`,
+    },
+  }[o.decision];
+  const note = o.note ? (o.decision === 'declined' ? `Motivo: ${o.note}` : o.note) : '';
+  const text = [copy.lede, note, '', `Mi lista: ${o.listUrl}`].filter((l, i) => l || i === 2).join('\n');
+  const html = shell(`
+      <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">${escape(copy.lede)}</td></tr>
+      ${note ? `<tr><td style="padding:8px 28px;font-size:16px;line-height:1.5">${escape(note)}</td></tr>` : ''}
+      <tr><td style="padding:16px 28px 28px">${button(o.listUrl, 'Ver mi lista')}</td></tr>`);
+  return { subject: copy.subject, text, html };
+}
+
 const listOf = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} y ${names.at(-1)}`);
 
 /** The shelter's morning summary: new requests since the last one, and how many are still unopened. */
@@ -126,7 +160,7 @@ export function isQuotaError(status: number, body: string): boolean {
   }
 }
 
-export type EmailKind = 'signin' | 'request_sent' | 'shelter_decision' | 'digest' | 'available';
+export type EmailKind = 'signin' | 'request_sent' | 'shelter_decision' | 'digest' | 'available' | 'bulk_admin' | 'bulk_decision';
 
 // One budget for every email (email_log, migration 0007). Sign-in codes may use all of it; everything
 // else stops short, so a busy day of confirmations can never lock people out of signing in.
@@ -175,6 +209,12 @@ export const sendRequestSentEmail = (env: Env, to: string, o: { pet: string; lis
 
 export const sendShelterDecisionEmail = (env: Env, to: string, o: { shelter: string; decision: ShelterDecision; reason: string | null; portalUrl: string }) =>
   send(env, 'shelter_decision', to, renderShelterDecision(o), `shelter=${o.shelter} decision=${o.decision}`);
+
+export const sendBulkAdminEmail = (env: Env, to: string, o: { who: string; animals: number; species: string; adminUrl: string }) =>
+  send(env, 'bulk_admin', to, renderBulkAdmin(o), `who=${o.who} animals=${o.animals}`);
+
+export const sendBulkDecisionEmail = (env: Env, to: string, o: { decision: BulkDecision; animals: number; note: string | null; listUrl: string }) =>
+  send(env, 'bulk_decision', to, renderBulkDecision(o), `decision=${o.decision} animals=${o.animals}`);
 
 export const sendDigestEmail = (env: Env, to: string, o: { shelter: string; fresh: number; pets: string[]; unopened: number; inboxUrl: string }) =>
   send(env, 'digest', to, renderDigest(o), `shelter=${o.shelter} fresh=${o.fresh} unopened=${o.unopened}`);

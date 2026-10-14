@@ -33,6 +33,10 @@ function parse(where: string): Route {
   // The shelter portal: /refugio, /refugio/registro, /refugio/<id>/editar, /refugio/admin?estado=…
   if (a === 'refugio') {
     if (b === 'registro') return { name: 'portal', view: 'registro' };
+    if (b === 'admin' && c === 'grandes') {
+      const estado = new URLSearchParams(query).get('estado');
+      return { name: 'portal', view: 'adminBulk', status: (['pending', 'approved', 'declined'] as const).find((s) => s === estado) ?? 'pending' };
+    }
     if (b === 'admin') {
       const estado = new URLSearchParams(query).get('estado');
       return { name: 'portal', view: 'admin', status: (['pending', 'verified', 'rejected', 'suspended'] as const).find((s) => s === estado) ?? 'pending' };

@@ -1,4 +1,4 @@
-import { api, type Me } from './api';
+import { api, type BulkRequest, type Me } from './api';
 import { ageGroup, ageMonths, companionKey, RADIUS_ANY, type SpeciesFilter, type AgeGroup, type Companion, type PetDetail, type PetSummary, type Energy, type Place, type Sex, type Size } from './data';
 import { bearing, distanceKm } from './geo';
 
@@ -77,6 +77,8 @@ export interface State {
   requests: MyRequest[];
   /** Pets the person asked to hear about when they're available again. */
   alerts: string[];
+  /** Their special request to adopt more than three: the one waiting, or decided in the last 30 days. */
+  bulk: BulkRequest | null;
   /** Pets set aside this session. They come back next session. */
   skipped: string[];
 }
@@ -128,6 +130,7 @@ export const state: State = {
   user: null,
   requests: [],
   alerts: [],
+  bulk: null,
   skipped: sessionState.skipped,
 };
 
@@ -281,15 +284,15 @@ export function setUser(user: Me | null) {
   update((s) => {
     s.user = user;
     s.signedIn = !!user;
-    if (!user) (s.requests = []), (s.alerts = []);
+    if (!user) (s.requests = []), (s.alerts = []), (s.bulk = null);
   });
   if (user) void loadRequests().catch(() => {});
 }
 
 export async function loadRequests() {
-  const { items, alerts } = await api.myRequests();
+  const { items, alerts, bulk } = await api.myRequests();
   cachePets(items.map((i) => i.pet));
-  update((s) => ((s.requests = items), (s.alerts = alerts)));
+  update((s) => ((s.requests = items), (s.alerts = alerts), (s.bulk = bulk)));
 }
 
 /** The slots: requests still in progress, oldest first. */

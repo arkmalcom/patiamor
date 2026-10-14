@@ -22,6 +22,7 @@ import {
   type RequestStatus,
 } from '../store';
 import { renderAuth } from './auth';
+import { openBulk } from './bulk';
 import { listerLabel, miniFrame } from './canvas';
 import { closeSheet, openSheet } from './sheet';
 import { toast } from './toast';
@@ -122,8 +123,6 @@ function showAuth(pet: PetSummary) {
 
 /** Three requests in progress: no swapping on the spot. Another can start when one of them ends. */
 function openFull(pet: PetSummary) {
-  const subject = encodeURIComponent(t('full.manySubject'));
-  const mailBody = encodeURIComponent(`Hola, me interesa adoptar a ${pet.name} y a otros animales más.`);
   const body = html`
     <div class="full">
       <p class="muted">${t('full.body', { name: pet.name })}</p>
@@ -139,11 +138,12 @@ function openFull(pet: PetSummary) {
       <div class="many">
         <h3 class="many__title">${t('full.manyTitle')}</h3>
         <p>${t('full.manyBody')}</p>
-        <a class="button button--ink" href="mailto:${CONTACT_EMAIL}?subject=${subject}&body=${mailBody}">${icon(Mail, 18)}${t('full.manyCta')}</a>
+        <button class="button button--ink" type="button" data-bulk>${t('bulk.promptCta')}</button>
       </div>
     </div>`;
   const dialog = openSheet(t('full.title'), body);
   $('[data-to-list]', dialog).addEventListener('click', () => closeSheet());
+  $('[data-bulk]', dialog).addEventListener('click', openBulk);
 }
 
 /** New requests are paused after several withdrawals, until Patiamor has checked in. */
