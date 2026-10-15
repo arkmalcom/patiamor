@@ -1,14 +1,15 @@
-import { BadgeCheck, CircleAlert, CirclePause, Clock, House, Mail, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, UserCheck, Users, UsersRound } from 'lucide';
+import { BadgeCheck, CircleAlert, CirclePause, Clock, House, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, UserCheck, Users, UsersRound } from 'lucide';
 import { api, ApiError, type AdminAdopter, type AdminBulk, type AdminOwnerRequest, type AdminPaused, type AdminShelter, type BulkStatus, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
-import { CONTACT_EMAIL, type Place } from '../data';
+import type { Place } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
-import { formatDate, failText, t, type Key } from '../i18n';
+import { formatDate, failText, pesos, t, type Key } from '../i18n';
 import { bulkWhat } from '../ui/bulk';
 import { setUser, state } from '../store';
 import { openOwnerRequest } from '../ui/owner';
 import { renderAuth } from '../ui/auth';
 import { renderInbox } from './inbox';
 import { renderListingForm, renderListings } from './listings';
+import { closeSheet, openSheet } from '../ui/sheet';
 import { toast } from '../ui/toast';
 import { navigate } from '../nav';
 
@@ -119,6 +120,9 @@ async function home(root: HTMLElement) {
       </section>`,
   );
   root.querySelector('[data-owner]')?.addEventListener('click', openOwnerRequest);
+  $$<HTMLButtonElement>('[data-review]', root).forEach((b) =>
+    b.addEventListener('click', () => openReview(shelters.find((x) => x.id === b.dataset.review)!, () => void home(root))),
+  );
 }
 
 /** For someone not yet approved: ask for access, or where the request stands. */
@@ -142,6 +146,56 @@ function ownerCard(): Raw {
     </section>`;
 }
 
+/** Where a suspended shelter's request to lift it stands, and the button to ask (owners only). */
+function reviewState(s: PortalShelter): Raw {
+  const r = s.review;
+  if (r?.status === 'pending') return html`<p class="muted">${t('review.pending', { date: formatDate(r.createdAt.slice(0, 10)) })}</p>`;
+  const kept = r?.status === 'kept' ? html`<p>${t('review.kept', { date: formatDate((r.decidedAt ?? r.createdAt).slice(0, 10)) })}</p>${r.note ? html`<blockquote class="request-card__message">${r.note}</blockquote>` : ''}` : '';
+  return html`${kept}${s.role === 'owner'
+    ? html`<button class="button button--ink button--small" type="button" data-review="${s.id}">${t(kept ? 'review.again' : 'review.ask')}</button>`
+    : html`<p class="muted">${t('review.ownerOnly')}</p>`}`;
+}
+
+/** The form to ask for a suspension to be lifted. */
+function openReview(shelter: PortalShelter, done: () => void) {
+  const dialog = openSheet(
+    t('review.title', { name: shelter.name }),
+    html`<form class="outcome__form" id="review-form" novalidate>
+      <p>${t('review.lede')}</p>
+      <label class="field">
+        <span class="field__label">${t('review.label')}</span>
+        <textarea class="field__input field__input--area" name="message" rows="6" maxlength="1500" required></textarea>
+        <span class="field__hint">${t('review.hint')}</span>
+      </label>
+      <p class="form-error" role="alert" hidden data-error></p>
+    </form>`,
+    {
+      footer: html`<button class="button button--ghost" type="button" data-cancel>${t('request.cancel')}</button>
+        <button class="button button--primary" type="submit" form="review-form" data-send>${t('review.send')}</button>`,
+    },
+  );
+  $('[data-cancel]', dialog).addEventListener('click', () => closeSheet());
+  $<HTMLFormElement>('#review-form', dialog).addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const message = String(new FormData(e.currentTarget as HTMLFormElement).get('message') ?? '').trim();
+    const error = $('[data-error]', dialog);
+    const send = $<HTMLButtonElement>('[data-send]', dialog);
+    if (message.length < 30) return ((error.textContent = t('review.err.message_too_short')), (error.hidden = false));
+    send.disabled = true;
+    try {
+      await api.requestReview(shelter.id, message);
+      closeSheet();
+      toast(t('review.sent'));
+      done();
+    } catch (err) {
+      const code = err instanceof ApiError ? err.code : '';
+      error.textContent = ['message_too_short', 'already_pending', 'too_many_reviews'].includes(code) ? t(`review.err.${code as 'already_pending'}`) : failText(err);
+      error.hidden = false;
+      send.disabled = false;
+    }
+  });
+}
+
 function shelterCard(s: PortalShelter): Raw {
   const animals = `/refugio/${encodeURIComponent(s.id)}/animales`;
   const next: Record<ShelterStatus, Raw> = {
@@ -160,7 +214,7 @@ function shelterCard(s: PortalShelter): Raw {
       </div>`,
     suspended: html`
       <p class="portal-card__reason"><strong>${t('portal.reason')}:</strong> ${s.statusReason ?? ''}</p>
-      <a class="button button--ink button--small" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(t('portal.suspendedSubject', { name: s.name }))}">${icon(Mail, 16)}${t('full.manyCta')}</a>`,
+      ${reviewState(s)}`,
   };
   return html`
     <li class="portal-card">
@@ -475,9 +529,10 @@ async function adminQueue(root: HTMLElement, status: ShelterStatus) {
   if (!state.user?.isAdmin) return mount(root, html`<section class="portal"><p class="loading-note">${t('portal.notFound')}</p></section>`);
   mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
   let shelters: AdminShelter[];
+  let pendingReviews: number;
   let counts: AdminCounts;
   try {
-    [shelters, counts] = await Promise.all([api.adminShelters(status), api.adminSummary()]);
+    [{ shelters, pendingReviews }, counts] = await Promise.all([api.adminShelters(status), api.adminSummary()]);
   } catch {
     return mount(root, html`<p class="loading-note" role="alert">${t('auth.err.network')}</p>`);
   }
@@ -491,14 +546,32 @@ async function adminQueue(root: HTMLElement, status: ShelterStatus) {
         <nav class="list-tabs list-tabs--sub" aria-label="${t('portal.admin.title')}">
           ${QUEUE.map((s) => html`<a class="list-tabs__tab" href="/refugio/admin/refugios?estado=${s}" aria-current="${s === status ? 'page' : 'false'}">${t(`portal.admin.tab.${s}`)}</a>`)}
         </nav>
+        ${pendingReviews && status !== 'suspended'
+          ? html`<a class="portal-card__reason admin-review-pointer" href="/refugio/admin/refugios?estado=suspended">${t(pendingReviews === 1 ? 'review.admin.pointer1' : 'review.admin.pointerN', { n: pendingReviews })}</a>`
+          : ''}
         ${shelters.length ? html`<ul class="portal-list">${shelters.map(adminCard)}</ul>` : html`<p class="passed__empty">${t('portal.admin.empty')}</p>`}
       </section>`,
+  );
+  $$<HTMLFormElement>('[data-fee-cap]', root).forEach((f) =>
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const raw = String(new FormData(f).get('cap') ?? '').trim();
+      $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = true));
+      try {
+        const r = await api.adminFeeCap(f.dataset.feeCap!, raw === '' ? null : Number(raw));
+        toast(t('fee.admin.done', { cap: pesos(r.shelter.feeCapDop) }));
+        void adminQueue(root, status);
+      } catch (err) {
+        $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = false));
+        toast(failText(err));
+      }
+    }),
   );
   $$<HTMLFormElement>('[data-decide]', root).forEach((f) =>
     f.addEventListener('submit', async (e) => {
       e.preventDefault();
       const submitter = (e as SubmitEvent).submitter as HTMLButtonElement | null;
-      const action = submitter?.value as 'verify' | 'reject' | 'suspend';
+      const action = submitter?.value as 'verify' | 'reject' | 'suspend' | 'keep';
       const reason = String(new FormData(f).get('reason') ?? '').trim();
       if (action !== 'verify' && !reason) {
         const box = $<HTMLTextAreaElement>('textarea[name=reason]', f);
@@ -508,8 +581,9 @@ async function adminQueue(root: HTMLElement, status: ShelterStatus) {
       }
       $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = true));
       try {
-        await api.adminDecision(f.dataset.decide!, action, reason || undefined);
-        toast(t(`portal.admin.done.${action}`));
+        if (action === 'keep') await api.adminKeepSuspension(f.dataset.decide!, reason);
+        else await api.adminDecision(f.dataset.decide!, action, reason || undefined);
+        toast(t(action === 'keep' ? 'review.admin.kept' : `portal.admin.done.${action}`));
         void adminQueue(root, status);
       } catch (err) {
         $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = false));
@@ -900,6 +974,13 @@ function adminCard(s: AdminShelter): Raw {
         ${statusChip(s.status)}
       </div>
       ${s.statusReason ? html`<p class="portal-card__reason"><strong>${t('portal.reason')}:</strong> ${s.statusReason}</p>` : ''}
+      ${s.review
+        ? html`<div class="admin-review">
+            <h3 class="form-subsection__title">${t('review.admin.title', { date: formatDate(s.review.createdAt.slice(0, 10)) })}</h3>
+            <blockquote class="request-card__message">${s.review.message}</blockquote>
+            <p class="muted">${t('review.admin.how')}</p>
+          </div>`
+        : ''}
       ${s.description ? html`<p>${s.description}</p>` : ''}
       <dl class="portal-facts">
         ${row('portal.admin.owners', s.owners)}
@@ -919,6 +1000,16 @@ function adminCard(s: AdminShelter): Raw {
         ${row('portal.form.website', s.website)}
       </dl>
       ${a?.history ? html`<div class="portal-history"><h3 class="form-subsection__title">${t('portal.form.history')}</h3><p>${a.history}</p></div>` : ''}
+      ${s.status === 'verified' || s.status === 'suspended'
+        ? html`<form class="fee-cap" data-fee-cap="${s.id}">
+            <label class="field">
+              <span class="field__label">${t('fee.admin.label')}</span>
+              <span class="money"><span class="money__unit" aria-hidden="true">RD$</span><input class="field__input" name="cap" type="number" inputmode="numeric" min="0" max="50000" step="1" value="${s.feeCapDop}" /></span>
+              <span class="field__hint">${t(s.feeCapRaised ? 'fee.admin.raised' : 'fee.admin.default')}</span>
+            </label>
+            <button class="button button--outline button--small" type="submit">${t('fee.admin.save')}</button>
+          </form>`
+        : ''}
       <p class="muted portal-checklist">${t('portal.admin.checklist')}</p>
       <form class="portal-decide" data-decide="${s.id}">
         <label class="field" hidden>
@@ -929,6 +1020,7 @@ function adminCard(s: AdminShelter): Raw {
           ${s.status !== 'verified' ? html`<button class="button button--primary button--small" type="submit" value="verify">${icon(BadgeCheck, 16)}${t('portal.admin.verify')}</button>` : ''}
           ${s.status === 'pending' ? html`<button class="button button--outline button--small" type="submit" value="reject">${t('portal.admin.reject')}</button>` : ''}
           ${s.status === 'verified' ? html`<button class="button button--outline button--danger button--small" type="submit" value="suspend">${icon(ShieldOff, 16)}${t('portal.admin.suspend')}</button>` : ''}
+          ${s.review ? html`<button class="button button--outline button--small" type="submit" value="keep">${t('review.admin.keep')}</button>` : ''}
         </div>
       </form>
     </li>`;

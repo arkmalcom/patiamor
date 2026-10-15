@@ -54,8 +54,10 @@ function renderRequestSent(o: { pet: string; lister: string; listUrl: string }):
 }
 
 export type ShelterDecision = 'verified' | 'rejected' | 'suspended';
+/** Also told to a suspended shelter's owners: their review request was read and the suspension stays. */
+type ShelterOutcome = ShelterDecision | 'kept';
 
-function renderShelterDecision(o: { shelter: string; decision: ShelterDecision; reason: string | null; portalUrl: string }): Message {
+function renderShelterDecision(o: { shelter: string; decision: ShelterOutcome; reason: string | null; portalUrl: string }): Message {
   const copy = {
     verified: {
       subject: `${o.shelter} ya está verificado en Patiamor`,
@@ -67,7 +69,11 @@ function renderShelterDecision(o: { shelter: string; decision: ShelterDecision; 
     },
     suspended: {
       subject: `${o.shelter} está suspendido en Patiamor`,
-      lede: `Suspendimos a ${o.shelter} y sus animales ya no se muestran. Escríbenos si crees que es un error.`,
+      lede: `Suspendimos a ${o.shelter} y sus animales ya no se muestran. Si crees que es un error, pide una revisión desde el portal.`,
+    },
+    kept: {
+      subject: `Revisamos la suspensión de ${o.shelter}`,
+      lede: `Leímos tu solicitud de revisión y, por ahora, ${o.shelter} sigue suspendido.`,
     },
   }[o.decision];
   const reason = o.reason ? `Motivo: ${o.reason}` : '';
@@ -122,6 +128,17 @@ function renderOwnerAdmin(o: { who: string; shelter: string; adminUrl: string })
       <tr><td style="padding:8px 28px;font-size:16px;line-height:1.5">Contáctala para conocerla y confirmar los datos del refugio; después puedes aprobarla o registrar el refugio tú.</td></tr>
       <tr><td style="padding:16px 28px 28px">${button(o.adminUrl, 'Revisar la solicitud')}</td></tr>`);
   return { subject: `Solicitud de dueño de refugio: ${o.shelter}`, text, html };
+}
+
+/** To the admins: a suspended shelter's owner asks for the suspension to be lifted. */
+function renderReviewAdmin(o: { who: string; shelter: string; adminUrl: string }): Message {
+  const lede = `${o.who} pide revisar la suspensión de «${o.shelter}».`;
+  const text = [lede, '', `Lee lo que escribió y decide: ${o.adminUrl}`].join('\n');
+  const html = shell(`
+      <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">${escape(lede)}</td></tr>
+      <tr><td style="padding:8px 28px;font-size:16px;line-height:1.5">Explica por qué debería levantarse. Puedes quitar la suspensión o mantenerla con una nota que el refugio leerá.</td></tr>
+      <tr><td style="padding:16px 28px 28px">${button(o.adminUrl, 'Revisar la suspensión')}</td></tr>`);
+  return { subject: `Revisión de suspensión: ${o.shelter}`, text, html };
 }
 
 /** To the person, when an admin has decided on their request to be a shelter owner. */
@@ -205,7 +222,7 @@ export function isQuotaError(status: number, body: string): boolean {
   }
 }
 
-export type EmailKind = 'signin' | 'request_sent' | 'shelter_decision' | 'digest' | 'available' | 'bulk_admin' | 'bulk_decision' | 'owner_admin' | 'owner_decision' | 'pause_cleared';
+export type EmailKind = 'signin' | 'request_sent' | 'shelter_decision' | 'digest' | 'available' | 'bulk_admin' | 'bulk_decision' | 'owner_admin' | 'owner_decision' | 'pause_cleared' | 'review_admin';
 
 // One budget for every email (email_log, migration 0007). Sign-in codes may use all of it; everything
 // else stops short, so a busy day of confirmations can never lock people out of signing in.
@@ -252,7 +269,7 @@ export const sendSignInEmail = (env: Env, to: string, code: string, link: string
 export const sendRequestSentEmail = (env: Env, to: string, o: { pet: string; lister: string; listUrl: string }) =>
   send(env, 'request_sent', to, renderRequestSent(o), `pet=${o.pet} lister=${o.lister}`);
 
-export const sendShelterDecisionEmail = (env: Env, to: string, o: { shelter: string; decision: ShelterDecision; reason: string | null; portalUrl: string }) =>
+export const sendShelterDecisionEmail = (env: Env, to: string, o: { shelter: string; decision: ShelterOutcome; reason: string | null; portalUrl: string }) =>
   send(env, 'shelter_decision', to, renderShelterDecision(o), `shelter=${o.shelter} decision=${o.decision}`);
 
 export const sendBulkAdminEmail = (env: Env, to: string, o: { who: string; animals: number; species: string; adminUrl: string }) =>
@@ -260,6 +277,9 @@ export const sendBulkAdminEmail = (env: Env, to: string, o: { who: string; anima
 
 export const sendBulkDecisionEmail = (env: Env, to: string, o: { decision: BulkDecision; animals: number; note: string | null; listUrl: string }) =>
   send(env, 'bulk_decision', to, renderBulkDecision(o), `decision=${o.decision} animals=${o.animals}`);
+
+export const sendReviewAdminEmail = (env: Env, to: string, o: { who: string; shelter: string; adminUrl: string }) =>
+  send(env, 'review_admin', to, renderReviewAdmin(o), `who=${o.who} shelter=${o.shelter}`);
 
 export const sendOwnerAdminEmail = (env: Env, to: string, o: { who: string; shelter: string; adminUrl: string }) =>
   send(env, 'owner_admin', to, renderOwnerAdmin(o), `who=${o.who} shelter=${o.shelter}`);

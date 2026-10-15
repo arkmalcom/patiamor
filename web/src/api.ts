@@ -92,6 +92,8 @@ export interface PortalShelter {
   submittedAt?: string | null;
   /** Requests no one at the shelter has opened yet. */
   newRequests?: number;
+  /** For a suspended shelter: its latest request to lift it. */
+  review?: ShelterReview | null;
   description?: string | null;
   publicPhone?: string | null;
   email?: string | null;
@@ -131,9 +133,25 @@ export interface ShelterForm {
   rules: boolean;
 }
 
-export interface AdminShelter extends Omit<PortalShelter, 'role'> {
+export interface AdminShelter extends Omit<PortalShelter, 'role' | 'review'> {
   owners: string | null;
   application: ShelterApplication | null;
+  feeCapDop: number;
+  /** An admin set this shelter's cap (otherwise it's the default). */
+  feeCapRaised: boolean;
+  /** A suspended shelter's request to lift it, while it waits. */
+  review: { id: string; message: string; createdAt: string } | null;
+}
+
+/** A suspended shelter's owner asking to lift the suspension, and how it was answered. */
+export interface ShelterReview {
+  id: string;
+  status: 'pending' | 'lifted' | 'kept';
+  message: string;
+  /** Why it was kept: the owner reads it. */
+  note: string | null;
+  createdAt: string;
+  decidedAt: string | null;
 }
 
 export type PetStatus = 'draft' | 'in_review' | 'available' | 'reserved' | 'adopted' | 'withdrawn';
@@ -145,6 +163,8 @@ export interface ListingShelter {
   status: ShelterStatus;
   place: Place | null;
   role: 'owner' | 'maintainer';
+  /** The most it may ask as an adoption fee: RD$2,000 unless an admin raised it. */
+  feeCapDop: number;
 }
 
 /** A listing as the form edits it (and sends it back). */
@@ -342,7 +362,10 @@ export const api = {
   adminFindAdopter: (email: string) => call<{ adopter: AdminAdopter | null }>(`/api/admin/adopters/lookup?email=${encodeURIComponent(email)}`).then((r) => r.adopter),
   adminVerifyAdopter: (id: string, note: string) => call<{ adopter: { id: string; verified: boolean } }>(`/api/admin/adopters/${encodeURIComponent(id)}/verify`, 'POST', { note }),
   adminUnverifyAdopter: (id: string, note?: string) => call<{ adopter: { id: string; verified: boolean } }>(`/api/admin/adopters/${encodeURIComponent(id)}/unverify`, 'POST', { note }),
-  adminShelters: (status: ShelterStatus) => call<{ shelters: AdminShelter[] }>(`/api/admin/shelters?status=${status}`).then((r) => r.shelters),
+  adminShelters: (status: ShelterStatus) => call<{ shelters: AdminShelter[]; pendingReviews: number }>(`/api/admin/shelters?status=${status}`),
+  adminKeepSuspension: (shelterId: string, note: string) => call<{ review: { status: 'kept' } }>(`/api/admin/shelters/${encodeURIComponent(shelterId)}/review/keep`, 'POST', { note }),
+  adminFeeCap: (shelterId: string, capDop: number | null) => call<{ shelter: { id: string; feeCapDop: number } }>(`/api/admin/shelters/${encodeURIComponent(shelterId)}/fee-cap`, 'POST', { capDop }),
+  requestReview: (shelterId: string, message: string) => call<{ review: ShelterReview }>(`/api/portal/shelters/${encodeURIComponent(shelterId)}/review`, 'POST', { message }).then((r) => r.review),
   adminBulk: (status: BulkStatus) => call<{ requests: AdminBulk[] }>(`/api/admin/bulk?status=${status}`).then((r) => r.requests),
   adminBulkDecision: (id: string, action: 'approve' | 'decline', note?: string) =>
     call<{ bulk: { id: string; status: BulkStatus } }>(`/api/admin/bulk/${encodeURIComponent(id)}/decision`, 'POST', { action, note }),

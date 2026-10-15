@@ -1,6 +1,10 @@
 # Política de privacidad de Patiamor
 
-> **BORRADOR para revisión.** No está publicado. Lo que va entre corchetes `[así]` falta por completar o decidir. Antes de publicarlo, debe leerlo alguien que conozca la Ley 172-13 de la República Dominicana.
+> **BORRADOR para revisión.** No está publicado. Lo que va entre corchetes `[así]` falta por decidir. Antes de publicarlo, debe leerlo alguien que conozca la Ley 172-13 de la República Dominicana.
+>
+> **Para el abogado:**
+> - Patiamor es por ahora un proyecto personal sin personalidad jurídica: la fundación todavía no existe, así que el texto dice «Patiamor» donde iría el responsable. ¿Hace falta nombrar a una persona física mientras tanto?
+> - El plazo de 10 días hábiles para responder está tomado de fuentes secundarias sobre la ley. Confirmar el artículo, y si aplica también a la supresión y a la oposición.
 
 **Última actualización:** [fecha de publicación]
 
@@ -8,7 +12,7 @@ Patiamor es una plataforma gratuita para encontrar perros y gatos en adopción e
 
 ## Quién es responsable de tus datos
 
-[Nombre completo o razón social del responsable], [cédula o RNC], con domicilio en [dirección], es responsable del tratamiento de los datos personales en Patiamor (patiamor.com). Puedes escribirnos a **hola@patiamor.com** para cualquier pregunta o solicitud sobre tus datos.
+Patiamor (patiamor.com) es responsable del tratamiento de los datos personales que guardamos. Puedes escribirnos a **hola@patiamor.com** para cualquier pregunta o solicitud sobre tus datos.
 
 ## Lo esencial
 
@@ -24,7 +28,7 @@ Patiamor es una plataforma gratuita para encontrar perros y gatos en adopción e
 
 **Tus solicitudes de adopción.** Cuando pides conocer a un animal, guardamos tus respuestas (espacio, tiempo, gastos), lo que quieras contar de tu hogar (vivienda, otros animales, niños, experiencia, cuándo puedes visitar, un mensaje), cómo prefieres que te contacten y a qué distancia estás del animal. Si la solicitud termina, también guardamos el motivo, incluido el que des tú si la retiras.
 
-**Solicitudes especiales y para ser dueño de un refugio.** Si pides adoptar a más de tres animales a la vez, o registrar un refugio, guardamos lo que escribes en el formulario y tu teléfono para que podamos hablar contigo. Si registras un refugio, también guardamos los datos de la solicitud de verificación: persona de contacto, dirección, RNC si lo tiene, redes sociales, historia de rescate y los datos de las referencias que nos des. **Si nos das los datos de otra persona como referencia, asegúrate de que está de acuerdo.**
+**Solicitudes especiales, de dueño de refugio y de revisión.** Si pides adoptar a más de tres animales a la vez, registrar un refugio o revisar la suspensión de tu refugio, guardamos lo que escribes en el formulario y, cuando lo pedimos, tu teléfono para que podamos hablar contigo. Si registras un refugio, también guardamos los datos de la solicitud de verificación: persona de contacto, dirección, RNC si lo tiene, redes sociales, historia de rescate y los datos de las referencias que nos des. **Si nos das los datos de otra persona como referencia, asegúrate de que está de acuerdo.**
 
 **Notas del equipo de Patiamor.** Si alguien de Patiamor verifica a un adoptante, o revisa una solicitud, escribe una nota interna (por ejemplo, cómo conoce a esa persona). Solo la ve el equipo de Patiamor. Los refugios solo ven la marca «Verificado por Patiamor», nunca la nota.
 
@@ -66,13 +70,13 @@ Según la Ley 172-13, puedes pedirnos:
 - borrarlos;
 - que dejemos de usarlos.
 
-Para cualquiera de estas cosas, escríbenos a **hola@patiamor.com** desde el correo de tu cuenta. Te responderemos en un plazo de [10 días hábiles — confirmar el plazo legal]. Si borramos tu cuenta, se cierran tus solicitudes abiertas y el refugio deja de ver tus datos. Lo que el refugio ya anotó por su cuenta fuera de Patiamor no está en nuestras manos.
+Para cualquiera de estas cosas, escríbenos a **hola@patiamor.com** desde el correo de tu cuenta. Te responderemos en un plazo máximo de 10 días hábiles. Si borramos tu cuenta, se cierran tus solicitudes abiertas y el refugio deja de ver tus datos. Lo que el refugio ya anotó por su cuenta fuera de Patiamor no está en nuestras manos.
 
 Tu nombre lo puedes cambiar tú mismo en «Mi cuenta». Tu teléfono y cómo prefieres que te contacten se actualizan cada vez que envías una solicitud. Para cualquier otro cambio, escríbenos.
 
 ## Menores de edad
 
-Para adoptar en Patiamor tienes que ser mayor de [18] años. No creamos cuentas a sabiendas para menores de edad. Si crees que un menor nos dio sus datos, escríbenos y los borraremos.
+Para adoptar en Patiamor tienes que ser mayor de 18 años. No creamos cuentas a sabiendas para menores de edad. Si crees que un menor nos dio sus datos, escríbenos y los borraremos.
 
 ## Seguridad
 
@@ -85,4 +89,3 @@ Si cambiamos algo importante, lo avisaremos en Patiamor [y por correo] antes de 
 ## Contacto
 
 **hola@patiamor.com**
-[Dirección postal del responsable]

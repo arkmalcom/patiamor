@@ -1,12 +1,12 @@
 # Términos de uso de Patiamor
 
-> **BORRADOR para revisión.** No está publicado. Lo que va entre corchetes `[así]` falta por completar o decidir. Antes de publicarlo, debe leerlo alguien que conozca el derecho dominicano.
+> **BORRADOR para revisión.** No está publicado. Lo que va entre corchetes `[así]` falta por decidir. Antes de publicarlo, debe leerlo alguien que conozca el derecho dominicano.
+>
+> **Para el abogado:** Patiamor es por ahora un proyecto personal sin personalidad jurídica: la fundación todavía no existe, así que el texto dice «Patiamor» donde iría quien ofrece el servicio. ¿Qué implica eso para estos términos, la limitación de responsabilidad y la jurisdicción?
 
 **Última actualización:** [fecha de publicación]
 
 Estos términos explican las reglas para usar Patiamor (patiamor.com). Al crear una cuenta o usar Patiamor, los aceptas. Si no estás de acuerdo, no uses Patiamor. Sobre cómo tratamos tus datos, lee la [Política de privacidad](./privacidad.md).
-
-Patiamor lo ofrece [nombre completo o razón social del responsable], [cédula o RNC], con domicilio en [dirección] («nosotros»).
 
 ## Qué es Patiamor, y qué no es
 
@@ -18,7 +18,7 @@ Patiamor es una plataforma gratuita que ayuda a que perros y gatos que buscan fa
 
 ## Tu cuenta
 
-- Tienes que ser mayor de [18] años para crear una cuenta y enviar solicitudes.
+- Tienes que ser mayor de 18 años para crear una cuenta y enviar solicitudes.
 - Usa datos reales: tu nombre, un correo y un teléfono donde de verdad te puedan localizar.
 - Tu cuenta es personal. No la compartas, y avísanos si alguien entró en ella sin tu permiso.
 
@@ -33,7 +33,7 @@ Patiamor es una plataforma gratuita que ayuda a que perros y gatos que buscan fa
 
 Para publicar, tu refugio tiene que ser aprobado y verificado por el equipo de Patiamor. Al publicar, te comprometes a:
 
-- **No vender animales.** Patiamor es solo para adopciones. No se permiten la venta, la cría con fines comerciales, los «depósitos» para reservar ni el intercambio por dinero o bienes. Una cuota de adopción es aceptable solo si cubre gastos reales del animal (vacunas, esterilización, cuidados) y se indica en su ficha. [Decidir si hay un monto máximo.]
+- **No vender animales.** Patiamor es solo para adopciones. No se permiten la venta, la cría con fines comerciales, los «depósitos» para reservar ni el intercambio por dinero o bienes. Una cuota de adopción es aceptable solo si cubre gastos reales del animal (vacunas, esterilización, cuidados) y se indica en su ficha. La cuota puede ser de **hasta RD$2,000**. Si un refugio necesita cobrar más (por ejemplo, por una cirugía que pagó), debe hablarlo antes con el equipo de Patiamor, que puede subir el límite para ese refugio.
 - Publicar solo animales que están bajo tu cuidado, de al menos 8 semanas de edad.
 - Describir a cada animal con honestidad: su salud, su carácter y con quién se lleva bien, hasta donde lo sepas.
 - Usar fotos que sean tuyas o que tengas permiso de usar.
@@ -52,7 +52,9 @@ Al subir fotos y textos, nos das permiso para mostrarlos en Patiamor y en los en
 
 ## Moderación y suspensión
 
-Podemos revisar, ocultar o retirar cualquier publicación, y pausar o suspender cualquier cuenta o refugio que no cumpla estos términos o que ponga en riesgo a los animales o a las personas. Cuando sea posible, te diremos el motivo, y podrás responder escribiendo a hola@patiamor.com. [Decidir si un refugio suspendido puede pedir una revisión, y cómo.]
+Podemos revisar, ocultar o retirar cualquier publicación, y pausar o suspender cualquier cuenta o refugio que no cumpla estos términos o que ponga en riesgo a los animales o a las personas. Cuando sea posible, te diremos el motivo, y podrás responder escribiendo a hola@patiamor.com.
+
+Si suspendemos tu refugio, su dueño puede **pedir una revisión** desde el portal de refugios, explicando por qué debería levantarse. La leerá una persona del equipo de Patiamor, que puede quitar la suspensión o mantenerla. Te responderemos por correo y, si la mantenemos, te diremos por qué. Se pueden pedir hasta tres revisiones en 90 días.
 
 ## Responsabilidad
 
@@ -72,9 +74,8 @@ Podemos cambiar estos términos. Si el cambio es importante, lo avisaremos en Pa
 
 ## Ley aplicable
 
-Estos términos se rigen por las leyes de la República Dominicana. Cualquier disputa se resolverá ante los tribunales de [Santo Domingo, Distrito Nacional], salvo que la ley indique otra cosa.
+Patiamor está abierto a refugios y adoptantes de toda la República Dominicana. Estos términos se rigen por las leyes dominicanas. Cualquier disputa se resolverá ante los tribunales de Santo Domingo, Distrito Nacional, salvo que la ley indique otra cosa.
 
 ## Contacto
 
 **hola@patiamor.com**
-[Dirección postal del responsable]

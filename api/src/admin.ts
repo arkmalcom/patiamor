@@ -9,6 +9,7 @@ import { runDigest } from './digest';
 import type { AppContext } from './env';
 import { placeById } from './places';
 import { loadKnown, lookAlikes } from './owners';
+import { DEFAULT_FEE_CAP_DOP, MAX_FEE_DOP } from './listings';
 import { insertShelter, MAX_OWNED, readApplication } from './portal';
 import { OPEN_STATUSES, PAUSED_SQL, requestsRestricted, WITHDRAW_WINDOW_DAYS } from './requests';
 
@@ -36,7 +37,8 @@ admin.use('*', async (c, next) => {
 admin.get('/summary', async (c) => {
   const db = c.env.DB;
   const [shelters, owners, bulk, paused] = await db.batch<{ n: number }>([
-    db.prepare("SELECT count(*) AS n FROM shelters WHERE status = 'pending'"),
+    // Shelters to verify, and suspended ones asking for a review: both are answered in the same queue.
+    db.prepare("SELECT (SELECT count(*) FROM shelters WHERE status = 'pending') + (SELECT count(*) FROM shelter_reviews WHERE status = 'pending') AS n"),
     db.prepare("SELECT count(*) AS n FROM shelter_owner_requests WHERE status = 'pending'"),
     db.prepare("SELECT count(*) AS n FROM bulk_requests WHERE status = 'pending'"),
     db.prepare(`SELECT count(*) AS n FROM (${PAUSED_SQL})`),
@@ -47,19 +49,27 @@ admin.get('/summary', async (c) => {
 admin.get('/shelters', async (c) => {
   const status = STATUSES.includes(c.req.query('status') as never) ? c.req.query('status')! : 'pending';
   const { results } = await c.env.DB.prepare(
-    `SELECT s.id, s.name, s.slug, s.description, s.place_id, s.phone, s.email, s.website, s.visit_hours, s.status, s.status_reason, s.created_at,
+    `SELECT s.id, s.name, s.slug, s.description, s.place_id, s.phone, s.email, s.website, s.visit_hours, s.status, s.status_reason, s.created_at, s.fee_cap_dop,
+            v.id AS review_id, v.message AS review_message, v.created_at AS review_at,
             a.contact_name, a.contact_phone, a.rnc, a.address, a.social, a.history, a.reference_name, a.reference_contact, a.reference_kind, a.more_references, a.submitted_at,
             (SELECT group_concat(u.email, ', ') FROM shelter_members m JOIN users u ON u.id = m.user_id WHERE m.shelter_id = s.id AND m.role = 'owner') AS owners
        FROM shelters s LEFT JOIN shelter_applications a ON a.shelter_id = s.id
-      WHERE s.status = ? ORDER BY coalesce(a.submitted_at, s.created_at)`,
+       LEFT JOIN shelter_reviews v ON v.shelter_id = s.id AND v.status = 'pending'
+      WHERE s.status = ? ORDER BY v.created_at IS NULL, coalesce(v.created_at, a.submitted_at, s.created_at)`,
   )
     .bind(status)
     .all<Record<string, string | null>>();
+  const reviews = await c.env.DB.prepare("SELECT count(*) AS n FROM shelter_reviews WHERE status = 'pending'").first<{ n: number }>();
   return c.json({
+    // How many suspended shelters ask for a review, for a pointer from the other tabs.
+    pendingReviews: reviews?.n ?? 0,
     shelters: results.map((r) => ({
       id: r.id,
       name: r.name,
       slug: r.slug,
+      feeCapDop: r.fee_cap_dop === null ? DEFAULT_FEE_CAP_DOP : Number(r.fee_cap_dop),
+      feeCapRaised: r.fee_cap_dop !== null,
+      review: r.review_id ? { id: r.review_id, message: r.review_message, createdAt: r.review_at } : null,
       description: r.description,
       place: placeById(r.place_id!) ?? null,
       publicPhone: r.phone,
@@ -108,6 +118,10 @@ admin.post('/shelters/:id/decision', async (c) => {
     db
       .prepare("INSERT INTO admin_actions (id, admin_id, action, subject_type, subject_id, note) VALUES (?, ?, ?, 'shelter', ?, ?)")
       .bind(crypto.randomUUID(), adminUser.id, `shelter.${b.action}`, id, reason),
+    // Lifting a suspension answers the owner's review request, if there was one.
+    db
+      .prepare("UPDATE shelter_reviews SET status = 'lifted', decided_by = ?, decided_at = ? WHERE shelter_id = ? AND status = 'pending' AND ? = 'verified'")
+      .bind(adminUser.id, now, id, rule.to),
   ]);
 
   forgetCatalogVersion(); // the shelter's pets appear or disappear at once here
@@ -121,6 +135,48 @@ admin.post('/shelters/:id/decision', async (c) => {
     );
   }
   return c.json({ shelter: { id, status: rule.to } });
+});
+
+// Keep a suspension after reading the owner's review request: { note } is the reason they read.
+admin.post('/shelters/:id/review/keep', async (c) => {
+  const id = c.req.param('id');
+  const adminUser = c.get('user')!;
+  const b = await c.req.json<{ note?: string }>().catch(() => ({}) as { note?: string });
+  const note = (b.note ?? '').trim().slice(0, 500);
+  if (!note) return c.json({ error: 'reason_required' }, 400);
+  const db = c.env.DB;
+  const s = await db.prepare('SELECT name FROM shelters WHERE id = ?').bind(id).first<{ name: string }>();
+  if (!s) return c.json({ error: 'not_found' }, 404);
+  const now = nowIso();
+  const [kept] = await db.batch([
+    db.prepare("UPDATE shelter_reviews SET status = 'kept', decision_note = ?, decided_by = ?, decided_at = ? WHERE shelter_id = ? AND status = 'pending' RETURNING id").bind(note, adminUser.id, now, id),
+    db.prepare("INSERT INTO admin_actions (id, admin_id, action, subject_type, subject_id, note) VALUES (?, ?, 'shelter.review_kept', 'shelter', ?, ?)").bind(crypto.randomUUID(), adminUser.id, id, note),
+  ]);
+  if (!kept.results.length) return c.json({ error: 'no_pending_review' }, 409);
+  const { results: owners } = await db.prepare("SELECT u.email FROM shelter_members m JOIN users u ON u.id = m.user_id WHERE m.shelter_id = ? AND m.role = 'owner'").bind(id).all<{ email: string }>();
+  for (const o of owners) {
+    if (!(await hasEmailBudget(db, 'shelter_decision'))) break;
+    await sendShelterDecisionEmail(c.env, o.email, { shelter: s.name, decision: 'kept', reason: note, portalUrl: `${appOrigin(c)}/refugio` }).catch((err) => console.error('review kept email failed', err));
+  }
+  return c.json({ review: { status: 'kept' } });
+});
+
+// The most a shelter may ask as an adoption fee: { capDop } (null goes back to the default). Raised when a
+// shelter explains a higher one, e.g. surgery it paid for.
+admin.post('/shelters/:id/fee-cap', async (c) => {
+  const id = c.req.param('id');
+  const b = await c.req.json<{ capDop?: unknown }>().catch(() => ({}) as { capDop?: unknown });
+  const cap = b.capDop === null || b.capDop === undefined ? null : Number(b.capDop);
+  if (cap !== null && !(Number.isInteger(cap) && cap >= 0 && cap <= MAX_FEE_DOP)) return c.json({ error: 'invalid_fee', max: MAX_FEE_DOP }, 400);
+  const db = c.env.DB;
+  const s = await db.prepare('SELECT 1 FROM shelters WHERE id = ?').bind(id).first();
+  if (!s) return c.json({ error: 'not_found' }, 404);
+  const stored = cap === DEFAULT_FEE_CAP_DOP ? null : cap;
+  await db.batch([
+    db.prepare('UPDATE shelters SET fee_cap_dop = ? WHERE id = ?').bind(stored, id),
+    db.prepare("INSERT INTO admin_actions (id, admin_id, action, subject_type, subject_id, note) VALUES (?, ?, 'shelter.fee_cap', 'shelter', ?, ?)").bind(crypto.randomUUID(), c.get('user')!.id, id, String(cap ?? DEFAULT_FEE_CAP_DOP)),
+  ]);
+  return c.json({ shelter: { id, feeCapDop: stored ?? DEFAULT_FEE_CAP_DOP } });
 });
 
 // ---------- Adopters whose new requests are paused ----------

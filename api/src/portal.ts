@@ -1,5 +1,7 @@
 import { Hono, type Context } from 'hono';
-import { nowIso } from './auth/crypto';
+import { isoIn, nowIso } from './auth/crypto';
+import { hasEmailBudget, sendReviewAdminEmail } from './auth/email';
+import { appOrigin } from './auth/routes';
 import type { AppContext } from './env';
 import { placeById } from './places';
 import { drPhone } from './requests';
@@ -18,6 +20,14 @@ export const MAX_OWNED = 3;
 const MAX_REGISTRATIONS_PER_DAY = 2;
 const MAX_PENDING_QUEUE = 30;
 const REFERENCE_KINDS = ['veterinaria', 'refugio', 'otro'] as const;
+/** Asking to lift a suspension: a real explanation, at most three in 90 days, admins emailed five a day at most. */
+const REVIEW_MIN = 30;
+const REVIEW_MAX = 1500;
+const REVIEWS_PER_90_DAYS = 3;
+const REVIEW_ADMIN_EMAILS_PER_DAY = 5;
+
+type ReviewRow = { id: string; shelter_id: string; status: string; message: string; decision_note: string | null; created_at: string; decided_at: string | null };
+export const reviewView = (r: ReviewRow) => ({ id: r.id, status: r.status, message: r.message, note: r.decision_note, createdAt: r.created_at, decidedAt: r.decided_at });
 const MAX_REFERENCES = 3;
 
 /** This user's role in the shelter, or null if they aren't a member. */
@@ -113,6 +123,16 @@ portal.get('/shelters', async (c) => {
   )
     .bind(c.get('user')!.id)
     .all<{ id: string; name: string; slug: string; status: string; status_reason: string | null; place_id: string; role: Role; submitted_at: string | null; new_requests: number }>();
+  // For suspended ones, their latest request to lift it, so the card says where it stands.
+  const suspended = JSON.stringify(results.filter((r) => r.status === 'suspended').map((r) => r.id));
+  const { results: reviews } = await c.env.DB.prepare(
+    `SELECT id, shelter_id, status, message, decision_note, created_at, decided_at FROM shelter_reviews
+      WHERE shelter_id IN (SELECT value FROM json_each(?)) ORDER BY created_at DESC`,
+  )
+    .bind(suspended)
+    .all<ReviewRow>();
+  const latest = new Map<string, ReviewRow>();
+  for (const v of reviews) if (!latest.has(v.shelter_id)) latest.set(v.shelter_id, v); // newest first
   return c.json({
     shelters: results.map((r) => ({
       id: r.id,
@@ -124,8 +144,44 @@ portal.get('/shelters', async (c) => {
       role: r.role,
       submittedAt: r.submitted_at,
       newRequests: r.new_requests,
+      review: latest.has(r.id) ? reviewView(latest.get(r.id)!) : null,
     })),
   });
+});
+
+// A suspended shelter's owner asks to lift the suspension: { message } explains why. An admin decides
+// (admin.ts) and the owner is emailed.
+portal.post('/shelters/:id/review', async (c) => {
+  const id = c.req.param('id');
+  if ((await roleIn(c, id)) !== 'owner') return c.json({ error: 'not_found' }, 404);
+  const user = c.get('user')!;
+  const db = c.env.DB;
+  const shelter = await db.prepare('SELECT name, status FROM shelters WHERE id = ?').bind(id).first<{ name: string; status: string }>();
+  if (!shelter) return c.json({ error: 'not_found' }, 404);
+  if (shelter.status !== 'suspended') return c.json({ error: 'not_suspended' }, 409);
+  const b = await c.req.json<{ message?: unknown }>().catch(() => ({}) as { message?: unknown });
+  const message = typeof b.message === 'string' ? b.message.trim().slice(0, REVIEW_MAX) : '';
+  if (message.length < REVIEW_MIN) return c.json({ error: 'message_too_short', min: REVIEW_MIN }, 400);
+  const [pending, recent] = await db.batch<{ n: number }>([
+    db.prepare("SELECT count(*) AS n FROM shelter_reviews WHERE shelter_id = ? AND status = 'pending'").bind(id),
+    db.prepare('SELECT count(*) AS n FROM shelter_reviews WHERE shelter_id = ? AND created_at > ?').bind(id, isoIn(-90 * 24 * 60 * 60 * 1000)),
+  ]);
+  if (pending.results[0].n) return c.json({ error: 'already_pending' }, 409);
+  if (recent.results[0].n >= REVIEWS_PER_90_DAYS) return c.json({ error: 'too_many_reviews' }, 429);
+
+  const reviewId = crypto.randomUUID();
+  await db.prepare('INSERT INTO shelter_reviews (id, shelter_id, user_id, message) VALUES (?, ?, ?, ?)').bind(reviewId, id, user.id, message).run();
+  const sent = await db.prepare("SELECT count(*) AS n FROM email_log WHERE kind = 'review_admin' AND created_at > ?").bind(isoIn(-24 * 60 * 60 * 1000)).first<{ n: number }>();
+  if ((sent?.n ?? 0) < REVIEW_ADMIN_EMAILS_PER_DAY && (await hasEmailBudget(db, 'review_admin'))) {
+    const { results: admins } = await db.prepare('SELECT email FROM users WHERE is_admin = 1').all<{ email: string }>();
+    for (const a of admins) {
+      await sendReviewAdminEmail(c.env, a.email, { who: user.name ?? user.email, shelter: shelter.name, adminUrl: `${appOrigin(c)}/refugio/admin/refugios?estado=suspended` }).catch((err) =>
+        console.error('review admin email failed', err),
+      );
+    }
+  }
+  const row = await db.prepare('SELECT id, shelter_id, status, message, decision_note, created_at, decided_at FROM shelter_reviews WHERE id = ?').bind(reviewId).first<ReviewRow>();
+  return c.json({ review: reviewView(row!) }, 201);
 });
 
 // Register a shelter: it starts pending, with the person as its owner.

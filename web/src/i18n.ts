@@ -374,6 +374,35 @@ const es = {
   'admin.tools': 'Herramientas',
   'admin.adoptersLink': 'Verificar adoptantes',
 
+  // ---------- Adoption fee cap (admins) ----------
+  'fee.admin.label': 'Cuota de adopción máxima',
+  'fee.admin.default': 'La de siempre. Súbela solo si el refugio te explicó por qué necesita cobrar más.',
+  'fee.admin.raised': 'Subida para este refugio. Déjala vacía o en 2,000 para volver a la de siempre.',
+  'fee.admin.save': 'Guardar cuota',
+  'fee.admin.done': 'Listo: la cuota máxima es {cap}.',
+
+  // ---------- Asking to lift a suspension ----------
+  'review.ask': 'Pedir una revisión',
+  'review.again': 'Pedir otra revisión',
+  'review.ownerOnly': 'Solo el dueño del refugio puede pedir una revisión.',
+  'review.pending': 'Pediste una revisión el {date}. Te escribiremos cuando la leamos.',
+  'review.kept': 'Revisamos tu solicitud el {date} y, por ahora, la suspensión sigue:',
+  'review.title': 'Revisión de {name}',
+  'review.lede': 'Cuéntanos por qué debería levantarse la suspensión: qué pasó, y qué cambiaron si hizo falta. Lo leerá una persona del equipo de Patiamor.',
+  'review.label': 'Tu explicación',
+  'review.hint': 'Al menos unas líneas. Puedes pedir hasta tres revisiones en 90 días.',
+  'review.send': 'Enviar',
+  'review.sent': 'Enviada. Te escribiremos por correo cuando la revisemos.',
+  'review.err.message_too_short': 'Escribe al menos unas líneas (30 letras).',
+  'review.err.already_pending': 'Ya hay una revisión esperando respuesta.',
+  'review.err.too_many_reviews': 'Ya pediste tres revisiones en 90 días. Escríbenos a hola@patiamor.com.',
+  'review.admin.title': 'Pidió una revisión el {date}',
+  'review.admin.how': '«Verificar» quita la suspensión. «Mantener la suspensión» necesita un motivo, que el refugio leerá.',
+  'review.admin.keep': 'Mantener la suspensión',
+  'review.admin.kept': 'Suspensión mantenida. Le avisamos al refugio.',
+  'review.admin.pointer1': '1 refugio suspendido pide una revisión →',
+  'review.admin.pointerN': '{n} refugios suspendidos piden una revisión →',
+
   // ---------- "Verificado por Patiamor" on adopters (PAT-2) ----------
   'verified.badge': 'Verificado por Patiamor',
   'verified.inboxNote': 'Alguien de Patiamor conoce a {who} o ya habló con esa persona.',
@@ -598,7 +627,6 @@ const es = {
   'portal.resent': 'Reenviaste la solicitud. La revisamos de nuevo.',
   'portal.pendingBody': 'Estamos revisando tu solicitud. Te escribiremos por WhatsApp en unos días para una videollamada corta.',
   'portal.verifiedBody': 'Tu refugio está verificado. Ya puedes publicar a tus animales.',
-  'portal.suspendedSubject': 'Mi refugio {name} está suspendido',
   'portal.status.pending': 'En revisión',
   'portal.status.verified': 'Verificado',
   'portal.status.rejected': 'Necesita cambios',
@@ -726,7 +754,7 @@ const es = {
   'listing.story': 'Cuéntales cómo es',
   'listing.storyHint': 'Cómo llegó, cómo es en casa, qué le gusta. Un par de frases bastan para publicar.',
   'listing.needsHint': 'Una por línea, hasta 5. Por ejemplo: Patio cercado, Ser el único gato.',
-  'listing.feeHint': 'Solo si la cobran para cubrir vacunas o esterilización. Déjalo vacío si no hay cuota.',
+  'listing.feeHint': 'Solo si la cobran para cubrir vacunas, esterilización u otros cuidados, hasta {cap}. Si necesitan cobrar más, escríbenos a {email} y lo vemos. Déjalo vacío si no hay cuota.',
   'listing.inCareSince': 'En el refugio desde',
   'listing.preview': 'Así lo verán las familias',
   'listing.photos': 'Fotos',
@@ -758,6 +786,7 @@ const es = {
   'listing.err.invalid_size': 'Elige su tamaño.',
   'listing.err.invalid_energy': 'Elige su nivel de energía.',
   'listing.err.invalid_fee': 'Revisa la cuota: un número entero en pesos, de 0 a 50,000.',
+  'listing.err.fee_over_cap': 'La cuota puede ser de hasta {cap}. Si necesitan cobrar más, escríbenos a {email} y lo vemos.',
   'listing.err.invalid_in_care_since': 'Revisa la fecha en que llegó al refugio: no puede ser antes de nacer ni en el futuro.',
   'listing.err.shelter_not_verified': 'Podrás publicar cuando verifiquemos tu refugio. Mientras, guárdalo como borrador.',
   'listing.err.too_young': 'Todavía no tiene 8 semanas. Guárdalo como borrador y publícalo cuando las cumpla.',
@@ -996,6 +1025,9 @@ export function formatAge(months: number): string {
   const years = Math.floor(months / 12);
   return years === 1 ? t('age.year') : t('age.years', { n: years });
 }
+
+/** "RD$2,000". */
+export const pesos = (n: number) => `RD$${n.toLocaleString('es-DO')}`;
 
 export function formatDate(iso: string, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long' }): string {
   return new Intl.DateTimeFormat(locale, opts).format(new Date(iso + (iso.length === 10 ? 'T12:00:00' : '')));

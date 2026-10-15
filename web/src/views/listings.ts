@@ -1,8 +1,8 @@
 import { Camera, Copy, Eye, EyeOff, Handshake, HeartHandshake, ListChecks, PencilLine, Plus, Star, Syringe, X, type IconNode } from 'lucide';
 import { api, ApiError, type Listing, type ListingPhoto, type ListingShelter, type ListingSummary, type ManyChange, type PetForm, type PetStatus, type WithdrawReason } from '../api';
-import { ageMonths, type PetSummary } from '../data';
+import { ageMonths, CONTACT_EMAIL, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
-import { failText, t, type Key } from '../i18n';
+import { failText, pesos, t, type Key } from '../i18n';
 import { petChanged, placePet } from '../store';
 import { age, canvas, miniFrame } from '../ui/canvas';
 import { openOutcome, outcomeButton } from '../ui/outcome';
@@ -349,7 +349,7 @@ function monthsAgo(months: number): string {
 }
 
 const ERRORS = [
-  'invalid_species', 'invalid_name', 'invalid_sex', 'invalid_birth_date', 'invalid_size', 'invalid_energy', 'invalid_fee',
+  'invalid_species', 'invalid_name', 'invalid_sex', 'invalid_birth_date', 'invalid_size', 'invalid_energy', 'invalid_fee', 'fee_over_cap',
   'invalid_in_care_since', 'shelter_not_verified', 'too_young', 'story_required', 'shelter_suspended',
   'photo_required', 'photos_full', 'upload_limit', 'storage_full', 'image_too_large', 'invalid_image', 'duplicate_photo', 'last_photo', 'too_many_pets',
 ] as const;
@@ -464,8 +464,8 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
               </label>
               <label class="field">
                 <span class="field__label">${t('profile.fee')} <span class="muted">(${t('request.optional')})</span></span>
-                <span class="money"><span class="money__unit" aria-hidden="true">RD$</span><input class="field__input" name="fee" type="number" inputmode="numeric" min="0" max="50000" step="1" value="${v.adoptionFeeDop ?? ''}" aria-describedby="fee-hint" /></span>
-                <span class="field__hint" id="fee-hint">${t('listing.feeHint')}</span>
+                <span class="money"><span class="money__unit" aria-hidden="true">RD$</span><input class="field__input" name="fee" type="number" inputmode="numeric" min="0" max="${Math.max(shelter.feeCapDop, existing?.adoptionFeeDop ?? 0)}" step="1" value="${v.adoptionFeeDop ?? ''}" aria-describedby="fee-hint" /></span>
+                <span class="field__hint" id="fee-hint">${t('listing.feeHint', { cap: pesos(shelter.feeCapDop), email: CONTACT_EMAIL })}</span>
               </label>
               <label class="field">
                 <span class="field__label">${t('listing.inCareSince')} <span class="muted">(${t('request.optional')})</span></span>
@@ -689,7 +689,9 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
     const buttons = $$<HTMLButtonElement>('[data-send]', root);
     const fail = (code: string) => {
       const known = code.startsWith('thumb_') ? 'invalid_image' : code === 'invalid_dimensions' ? 'invalid_image' : code;
-      error.textContent = (ERRORS as readonly string[]).includes(known) ? t(`listing.err.${known as (typeof ERRORS)[number]}`) : failText(known);
+      error.textContent = (ERRORS as readonly string[]).includes(known)
+        ? t(`listing.err.${known as (typeof ERRORS)[number]}`, { cap: pesos(shelter.feeCapDop), email: CONTACT_EMAIL })
+        : failText(known);
       error.hidden = false;
       progress.textContent = '';
       error.scrollIntoView({ block: 'center', behavior: 'smooth' });
