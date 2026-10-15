@@ -11,6 +11,7 @@ import { admin } from './admin';
 import { runDigest } from './digest';
 import { inbox } from './inbox';
 import { lifecycle, trimAdoptedPhotos } from './lifecycle';
+import { reports } from './moderation';
 import { listings } from './listings';
 import { photoRoutes, servePhoto } from './photos';
 import { owners, isShelterOwner, latestOwnerRequest } from './owners';
@@ -70,6 +71,7 @@ app.route('/api/auth', auth);
 // The app with link-preview tags for a pet (the only page path the Worker sees: run_worker_first).
 app.get('/mascota/:id', petPage);
 app.route('/api/pets', pets);
+app.route('/api/pets', reports);
 app.route('/api/requests', requests);
 app.route('/api/alerts', alerts);
 app.route('/api/portal', portal);
@@ -121,10 +123,20 @@ app.get('/api/me', async (c) => {
   )
     .bind(user.id)
     .all<{ id: string; name: string; status: string; role: 'owner' | 'maintainer' }>();
-  const contact = await c.env.DB.prepare('SELECT phone, contact_pref FROM users WHERE id = ?').bind(user.id).first<{ phone: string | null; contact_pref: string | null }>();
+  const contact = await c.env.DB.prepare('SELECT phone, contact_pref, lister_rules_at FROM users WHERE id = ?')
+    .bind(user.id)
+    .first<{ phone: string | null; contact_pref: string | null; lister_rules_at: string | null }>();
   const restricted = await requestsRestricted(c.env.DB, user.id);
   const ownerRequest = isShelterOwner(user) ? null : await latestOwnerRequest(c.env.DB, user.id);
-  return c.json({ user: { ...publicUser(user), phone: contact?.phone ?? null, contactPref: contact?.contact_pref ?? null, requestsRestricted: restricted, shelters, shelterOwner: isShelterOwner(user), ownerRequest } });
+  return c.json({ user: { ...publicUser(user), phone: contact?.phone ?? null, contactPref: contact?.contact_pref ?? null, requestsRestricted: restricted, shelters, shelterOwner: isShelterOwner(user), ownerRequest, listerRules: !!contact?.lister_rules_at } });
+});
+
+// "Entendido" on the rules for listing (PAT-16): shown once per person, before their first animal.
+app.post('/api/me/lister-rules', async (c) => {
+  const user = c.get('user');
+  if (!user) return c.json({ error: 'unauthenticated' }, 401);
+  await c.env.DB.prepare("UPDATE users SET lister_rules_at = coalesce(lister_rules_at, strftime('%Y-%m-%dT%H:%M:%SZ', 'now')) WHERE id = ?").bind(user.id).run();
+  return c.json({ listerRules: true });
 });
 
 app.patch('/api/me', async (c) => {

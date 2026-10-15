@@ -1,15 +1,16 @@
 import { Camera, Copy, Eye, EyeOff, Handshake, HeartHandshake, ListChecks, PencilLine, Plus, Star, Syringe, X, type IconNode } from 'lucide';
-import { api, ApiError, type Listing, type ListingPhoto, type ListingShelter, type ListingSummary, type ManyChange, type PetForm, type PetStatus, type WithdrawReason } from '../api';
+import { api, ApiError, type Listing, type ListingPhoto, type ListingReview, type ListingShelter, type ListingSummary, type ManyChange, type PetForm, type PetStatus, type WithdrawReason } from '../api';
 import { ageMonths, CONTACT_EMAIL, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { failText, pesos, t, type Key } from '../i18n';
-import { petChanged, placePet } from '../store';
+import { moneyWords } from '../money';
+import { petChanged, placePet, state } from '../store';
 import { age, canvas, miniFrame } from '../ui/canvas';
 import { openOutcome, outcomeButton } from '../ui/outcome';
 import { PhotoError, preparePhoto, toBase64, type PreparedPhoto } from '../ui/photos';
 import { closeSheet, openSheet } from '../ui/sheet';
 import { toast } from '../ui/toast';
-import { navigate } from '../nav';
+import { here, navigate } from '../nav';
 
 // A shelter's animals in the portal (PAT-8): the list at /refugio/<id>/animales, and the form at
 // …/animales/nuevo or …/animales/<petId>. Any shelter that isn't suspended can prepare drafts; verified
@@ -73,7 +74,7 @@ export async function renderListings(root: HTMLElement, shelterId: string, slug:
           <p class="portal__who">${shelter.name}</p>
         </div>
         ${shelter.status === 'verified' ? '' : html`<p class="portal-card__reason">${t(shelter.status === 'suspended' ? 'listing.suspendedNote' : 'listing.unverifiedNote')}</p>`}
-        ${canAdd ? html`<a class="button button--primary portal__new" href="${base}/nuevo">${icon(Plus, 20)}${t('listing.add')}</a>` : ''}
+        ${canAdd ? html`<a class="button button--primary portal__new" href="${withRules(`${base}/nuevo`)}">${icon(Plus, 20)}${t('listing.add')}</a>` : ''}
         ${counts.adopted || counts.withdrawn
           ? html`<nav class="list-tabs listings__tabs" aria-label="${t('listing.title')}">
               ${(['active', 'adopted', 'withdrawn'] as Tab[])
@@ -301,7 +302,12 @@ function openMany(shelterId: string, pets: ListingSummary[], done: () => void) {
 
 // ---------- The form ----------
 
+/** The rules for listing come first, the first time (PAT-16): then on to `path`. */
+const withRules = (path: string) => (state.user?.listerRules ? path : `/refugio/reglas?siguiente=${encodeURIComponent(path)}`);
+
 export async function renderListingForm(root: HTMLElement, shelterId: string, petId: string | null, copyOf: string | null = null) {
+  // A new animal (or a copy) by someone who hasn't read the rules yet: the rules first.
+  if (!petId && state.user && !state.user.listerRules) return navigate(withRules(here()));
   mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
   try {
     if (petId) {
@@ -382,6 +388,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${existing ? existing.name : t('listing.newTitle')}</h1>
         ${copyOf ? html`<p class="portal-card__reason">${t('listing.copyNote', { name: copyOf.name })}</p>` : ''}
         ${existing ? html`<p class="listing-status" data-status-line>${statusLine(existing)}</p>` : ''}
+        ${existing?.review ? html`<p class="portal-card__reason">${reviewNote(existing.review)}</p>` : ''}
         ${existing && shelter.status !== 'suspended'
           ? html`<a class="button button--outline button--small listing-copy" href="${list}/nuevo?desde=${encodeURIComponent(existing.id)}">${icon(Copy, 16)}${t('listing.copy')}</a>`
           : ''}
@@ -457,6 +464,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
                 <textarea class="field__input field__input--area" name="story" rows="5" maxlength="2000">${v.story}</textarea>
                 <span class="field__hint">${t('listing.storyHint')}</span>
               </label>
+              <p class="money-warning" role="status" data-money hidden></p>
               <label class="field">
                 <span class="field__label">${t('profile.needs')} <span class="muted">(${t('request.optional')})</span></span>
                 <textarea class="field__input field__input--area" name="needs" rows="3" maxlength="420">${v.needs.join('\n')}</textarea>
@@ -672,6 +680,16 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
     draw();
   });
   formEl.addEventListener('input', (e) => (e.target as HTMLElement).dataset.photoInput === undefined && draw());
+  // Money or a phone number in the text: say so while they write, before it sends the listing to review.
+  const moneyBox = $('[data-money]', root);
+  const checkMoney = () => {
+    const p = read();
+    const words = moneyWords(p.name, p.story, p.needs.join('\n'));
+    moneyBox.hidden = !words.length;
+    moneyBox.textContent = words.length ? t('listing.moneyWarning', { words: words.map((w) => `«${w}»`).join(', ') }) : '';
+  };
+  formEl.addEventListener('input', checkMoney);
+  checkMoney();
   drawPhotos();
 
   // Saving: the listing (a new one starts as a draft), then new photos, removals, order and framing, and
@@ -719,15 +737,21 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
       if (arranged && items.length) await api.arrangePhotos(petId, items.map((it) => ({ id: it.id!, focus: it.focus })));
       arranged = false;
       progress.textContent = '';
-      const status = !fresh || publish ? (await api.savePet(petId, body, publish)).status : 'draft';
+      const saved = !fresh || publish ? await api.savePet(petId, body, publish) : { status: 'draft' as PetStatus, review: null };
+      const status = saved.status;
       petChanged(petId);
-      toast(t(publish ? 'listing.published' : status === 'draft' ? 'listing.savedDraft' : 'listing.saved', { name: body.name }));
+      if (saved.review) toast(t('listing.heldMoney', { name: body.name, words: saved.review.words.map((w) => `«${w}»`).join(', ') }));
+      else toast(t(publish ? 'listing.published' : status === 'draft' ? 'listing.savedDraft' : 'listing.saved', { name: body.name }));
       navigate(list);
     } catch (err) {
       fail(err instanceof ApiError ? err.code : 'network');
     }
   });
 }
+
+/** Why a listing is hidden: reports, or what the money check found. */
+const reviewNote = (r: ListingReview): string =>
+  r.reason === 'dinero' ? t('listing.reviewMoney', { words: r.words.map((w) => `«${w}»`).join(', ') }) : t('listing.reviewReports');
 
 const statusLine = (p: Listing): Raw =>
   html`${petChip(p)}${['available', 'reserved'].includes(p.status) ? html`<a class="text-button" href="/mascota/${encodeURIComponent(p.id)}">${t('listing.viewLive')}</a>` : ''}`;

@@ -26,7 +26,7 @@ describe('the admin summary', () => {
       .bind(crypto.randomUUID(), user.id)
       .run();
     const after = (await summary(admin.cookie)).json;
-    expect(after).toEqual({ shelters: before.shelters + 1, owners: before.owners + 1, bulk: before.bulk + 1, paused: before.paused });
+    expect(after).toEqual({ shelters: before.shelters + 1, owners: before.owners + 1, bulk: before.bulk + 1, paused: before.paused, reports: before.reports });
     // A decided one stops counting.
     await env.DB.prepare("UPDATE shelter_owner_requests SET status = 'declined' WHERE user_id = ?").bind(user.id).run();
     expect((await summary(admin.cookie)).json.owners).toBe(before.owners);

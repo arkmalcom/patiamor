@@ -130,6 +130,30 @@ function renderOwnerAdmin(o: { who: string; shelter: string; adminUrl: string })
   return { subject: `Solicitud de dueño de refugio: ${o.shelter}`, text, html };
 }
 
+/** To a shelter's owners: one of its listings was hidden after reports, or taken down by Patiamor. */
+function renderListingReview(o: { pet: string; kind: 'held' | 'down'; note: string | null; url: string }): Message {
+  const copy =
+    o.kind === 'held'
+      ? {
+          subject: `Estamos revisando la publicación de ${o.pet}`,
+          lede: `Varias personas reportaron la publicación de ${o.pet}, así que la ocultamos mientras la revisamos. Sus solicitudes abiertas siguen como estaban.`,
+          more: 'Una persona del equipo de Patiamor la revisará pronto. Si crees que es un error, o quieres contarnos algo, responde a este correo o escríbenos a hola@patiamor.com.',
+        }
+      : {
+          subject: `Retiramos la publicación de ${o.pet}`,
+          lede: `Revisamos la publicación de ${o.pet} y la retiramos de Patiamor: no cumple las reglas para publicar.`,
+          more: 'Sus solicitudes abiertas se cerraron. Si crees que es un error, escríbenos a hola@patiamor.com.',
+        };
+  const note = o.note ? `Motivo: ${o.note}` : '';
+  const text = [copy.lede, note, copy.more, '', `Ver la publicación: ${o.url}`].filter((l, i) => l || i === 3).join('\n');
+  const html = shell(`
+      <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">${escape(copy.lede)}</td></tr>
+      ${note ? `<tr><td style="padding:8px 28px;font-size:16px;line-height:1.5">${escape(note)}</td></tr>` : ''}
+      <tr><td style="padding:8px 28px;font-size:16px;line-height:1.5">${escape(copy.more)}</td></tr>
+      <tr><td style="padding:16px 28px 28px">${button(o.url, 'Ver la publicación')}</td></tr>`);
+  return { subject: copy.subject, text, html };
+}
+
 /** To the admins: a suspended shelter's owner asks for the suspension to be lifted. */
 function renderReviewAdmin(o: { who: string; shelter: string; adminUrl: string }): Message {
   const lede = `${o.who} pide revisar la suspensión de «${o.shelter}».`;
@@ -222,7 +246,7 @@ export function isQuotaError(status: number, body: string): boolean {
   }
 }
 
-export type EmailKind = 'signin' | 'request_sent' | 'shelter_decision' | 'digest' | 'available' | 'bulk_admin' | 'bulk_decision' | 'owner_admin' | 'owner_decision' | 'pause_cleared' | 'review_admin';
+export type EmailKind = 'signin' | 'request_sent' | 'shelter_decision' | 'digest' | 'available' | 'bulk_admin' | 'bulk_decision' | 'owner_admin' | 'owner_decision' | 'pause_cleared' | 'review_admin' | 'listing_review';
 
 // One budget for every email (email_log, migration 0007). Sign-in codes may use all of it; everything
 // else stops short, so a busy day of confirmations can never lock people out of signing in.
@@ -277,6 +301,9 @@ export const sendBulkAdminEmail = (env: Env, to: string, o: { who: string; anima
 
 export const sendBulkDecisionEmail = (env: Env, to: string, o: { decision: BulkDecision; animals: number; note: string | null; listUrl: string }) =>
   send(env, 'bulk_decision', to, renderBulkDecision(o), `decision=${o.decision} animals=${o.animals}`);
+
+export const sendListingReviewEmail = (env: Env, to: string, o: { pet: string; kind: 'held' | 'down'; note: string | null; url: string }) =>
+  send(env, 'listing_review', to, renderListingReview(o), `pet=${o.pet} kind=${o.kind}`);
 
 export const sendReviewAdminEmail = (env: Env, to: string, o: { who: string; shelter: string; adminUrl: string }) =>
   send(env, 'review_admin', to, renderReviewAdmin(o), `who=${o.who} shelter=${o.shelter}`);

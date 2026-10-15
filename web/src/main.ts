@@ -35,6 +35,8 @@ function parse(where: string): Route {
   if (a === 'refugio') {
     if (b === 'registro') return { name: 'portal', view: 'registro' };
     if (b === 'admin' && c === 'pausa') return { name: 'portal', view: 'adminPaused' };
+    if (b === 'admin' && c === 'reportes') return { name: 'portal', view: 'adminReports' };
+    if (b === 'reglas') return { name: 'portal', view: 'rules', next: new URLSearchParams(query).get('siguiente') };
     if (b === 'admin' && c === 'adoptantes') return { name: 'portal', view: 'adminAdopters', email: new URLSearchParams(query).get('correo') };
     if (b === 'admin' && c === 'duenos') {
       const estado = new URLSearchParams(query).get('estado');

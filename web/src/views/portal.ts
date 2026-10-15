@@ -1,6 +1,7 @@
-import { BadgeCheck, CircleAlert, CirclePause, Clock, House, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, UserCheck, Users, UsersRound } from 'lucide';
-import { api, ApiError, type AdminAdopter, type AdminBulk, type AdminOwnerRequest, type AdminPaused, type AdminShelter, type BulkStatus, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
-import type { Place } from '../data';
+import { BadgeCheck, CircleAlert, CirclePause, Clock, Eye, EyeOff, Flag, House, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, UserCheck, Users, UsersRound } from 'lucide';
+import { api, ApiError, type AdminAdopter, type AdminReviewPet, type AdminBulk, type AdminOwnerRequest, type AdminPaused, type AdminShelter, type BulkStatus, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
+import { frameFor, type PetSummary, type Place } from '../data';
+import { photo } from '../ui/canvas';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, failText, pesos, t, type Key } from '../i18n';
 import { bulkWhat } from '../ui/bulk';
@@ -22,6 +23,8 @@ export type PortalView =
   | { view: 'editar'; id: string }
   | { view: 'adminHub' }
   | { view: 'adminPaused' }
+  | { view: 'adminReports' }
+  | { view: 'rules'; next: string | null }
   | { view: 'adminAdopters'; email: string | null }
   | { view: 'adminShelters'; status: ShelterStatus }
   | { view: 'adminBulk'; status: BulkStatus }
@@ -51,6 +54,8 @@ export function renderPortal(root: HTMLElement, route: PortalView) {
   if (route.view === 'editar') return void edit(root, route.id);
   if (route.view === 'adminHub') return void adminHub(root);
   if (route.view === 'adminPaused') return void adminPausedQueue(root);
+  if (route.view === 'adminReports') return void adminReportsQueue(root);
+  if (route.view === 'rules') return rulesPage(root, route.next);
   if (route.view === 'adminAdopters') return void adminAdopters(root, route.email);
   if (route.view === 'adminShelters') return void adminQueue(root, route.status);
   if (route.view === 'adminBulk') return void adminBulkQueue(root, route.status);
@@ -454,11 +459,17 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
 
 // ---------- The admin console ----------
 
-type AdminCounts = { shelters: number; owners: number; bulk: number; paused: number };
+type AdminCounts = { shelters: number; owners: number; bulk: number; paused: number; reports: number };
 type Queue = keyof AdminCounts;
-const QUEUES: Queue[] = ['owners', 'shelters', 'bulk', 'paused'];
-const ADMIN_PATH: Record<Queue, string> = { owners: '/refugio/admin/duenos', shelters: '/refugio/admin/refugios', bulk: '/refugio/admin/grandes', paused: '/refugio/admin/pausa' };
-const ADMIN_ICON = { owners: UserCheck, shelters: House, bulk: UsersRound, paused: CirclePause } as const;
+const QUEUES: Queue[] = ['owners', 'shelters', 'reports', 'bulk', 'paused'];
+const ADMIN_PATH: Record<Queue, string> = {
+  owners: '/refugio/admin/duenos',
+  shelters: '/refugio/admin/refugios',
+  reports: '/refugio/admin/reportes',
+  bulk: '/refugio/admin/grandes',
+  paused: '/refugio/admin/pausa',
+};
+const ADMIN_ICON = { owners: UserCheck, shelters: House, reports: Flag, bulk: UsersRound, paused: CirclePause } as const;
 
 /** The same tabs on every queue, each with how many are waiting, to move between them in one tap. */
 const adminNav = (current: Queue, counts: AdminCounts): Raw => html`
@@ -591,6 +602,130 @@ async function adminQueue(root: HTMLElement, status: ShelterStatus) {
       }
     }),
   );
+}
+
+// ---------- Listings under review: reports and money language (admins) ----------
+
+async function adminReportsQueue(root: HTMLElement) {
+  if (!state.user?.isAdmin) return mount(root, html`<section class="portal"><p class="loading-note">${t('portal.notFound')}</p></section>`);
+  mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
+  let pets: AdminReviewPet[];
+  let counts: AdminCounts;
+  try {
+    [pets, counts] = await Promise.all([api.adminReports(), api.adminSummary()]);
+  } catch {
+    return mount(root, html`<p class="loading-note" role="alert">${t('auth.err.network')}</p>`);
+  }
+  mount(
+    root,
+    html`
+      <section class="portal portal--admin" aria-labelledby="portal-title">
+        <a class="text-button portal__back" href="/refugio/admin">${t('admin.title')}</a>
+        <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('reports.admin.title')}</h1>
+        ${adminNav('reports', counts)}
+        <p class="portal__lede">${t('reports.admin.lede')}</p>
+        ${pets.length ? html`<ul class="portal-list">${pets.map(reviewCard)}</ul>` : html`<p class="passed__empty">${t('reports.admin.empty')}</p>`}
+      </section>`,
+  );
+  $$<HTMLFormElement>('[data-review-pet]', root).forEach((f) =>
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const action = ((e as SubmitEvent).submitter as HTMLButtonElement | null)?.value as 'restore' | 'takedown';
+      const note = String(new FormData(f).get('note') ?? '').trim();
+      if (action === 'takedown' && !note) {
+        $<HTMLTextAreaElement>('textarea[name=note]', f).focus();
+        return toast(t('portal.admin.needReason'));
+      }
+      $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = true));
+      try {
+        if (action === 'restore') await api.adminRestorePet(f.dataset.reviewPet!, note || undefined);
+        else await api.adminTakedownPet(f.dataset.reviewPet!, note);
+        toast(t(action === 'restore' ? 'reports.admin.restored' : 'reports.admin.takenDown'));
+        void adminReportsQueue(root);
+      } catch (err) {
+        $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = false));
+        toast(failText(err));
+      }
+    }),
+  );
+}
+
+function reviewCard(p: AdminReviewPet): Raw {
+  const hidden = p.status === 'in_review';
+  const why = !p.review
+    ? hidden && !p.reports.length
+      ? t('reports.admin.hiddenOther') // in review for another reason, e.g. a private lister's first listing
+      : t(p.reports.length === 1 ? 'reports.admin.reported1' : 'reports.admin.reportedN', { n: p.reports.length })
+    : p.review.reason === 'dinero'
+      ? t('reports.admin.money', { words: p.review.words.map((w) => `«${w}»`).join(', ') })
+      : t('reports.admin.hiddenByReports', { n: p.reports.length });
+  return html`
+    <li class="portal-card">
+      <div class="portal-card__head">
+        <span class="mini-frame mini-frame--sm" data-frame="${frameFor(p.id)}">${photo({ id: p.id, photo: p.photo } as PetSummary, 'lazy', true)}</span>
+        <div>
+          <h2 class="portal-card__name">${p.name}</h2>
+          <span class="portal-card__place">${p.shelter?.name ?? t('lister.private')}</span>
+        </div>
+        <span class="status-chip ${hidden ? 'status-chip--suspended' : 'status-chip--pending'}">${icon(hidden ? EyeOff : Flag, 16)}${t(hidden ? 'reports.admin.hidden' : 'reports.admin.live')}</span>
+      </div>
+      <p class="portal-card__reason">${why}</p>
+      ${p.reports.length
+        ? html`<ul class="review-reports">${p.reports.map(
+            (r) => html`<li><strong>${t(`report.reason.${r.reason}`)}</strong>${r.details ? html` «${r.details}»` : ''} <span class="muted">· ${formatDate(r.at.slice(0, 10))}${r.by ? ` · ${r.by}` : ''}</span></li>`,
+          )}</ul>`
+        : ''}
+      <details class="review-text">
+        <summary>${t('reports.admin.text')}</summary>
+        <p>${p.story}</p>
+        ${p.needs.length ? html`<p class="muted">${p.needs.join(' · ')}</p>` : ''}
+      </details>
+      ${p.openRequests ? html`<p class="muted">${t(p.openRequests === 1 ? 'reports.admin.requests1' : 'reports.admin.requestsN', { n: p.openRequests })}</p>` : ''}
+      <form class="portal-decide" data-review-pet="${p.id}">
+        <label class="field">
+          <span class="field__label">${t('reports.admin.noteLabel')}</span>
+          <textarea class="field__input field__input--area" name="note" rows="2" maxlength="500" placeholder="${t('reports.admin.notePlaceholder')}"></textarea>
+        </label>
+        <div class="portal-decide__actions">
+          <button class="button button--primary button--small" type="submit" value="restore">${icon(Eye, 16)}${t(hidden ? 'reports.admin.restore' : 'reports.admin.dismiss')}</button>
+          <button class="button button--outline button--danger button--small" type="submit" value="takedown">${icon(EyeOff, 16)}${t('reports.admin.takedown')}</button>
+        </div>
+        ${p.shelter ? html`<a class="text-button" href="/refugio/admin/refugios?estado=verified">${t('reports.admin.shelterLink', { name: p.shelter.name ?? '' })}</a>` : ''}
+      </form>
+    </li>`;
+}
+
+// ---------- The rules for listing (PAT-16), before someone's first animal ----------
+
+const RULES = ['rules.sales', 'rules.fee', 'rules.breeding', 'rules.age', 'rules.text', 'rules.honest'] as const;
+
+function rulesPage(root: HTMLElement, next: string | null) {
+  // Back into the portal only: never an outside address.
+  const to = next && next.startsWith('/refugio/') ? next : '/refugio';
+  mount(
+    root,
+    html`
+      <section class="portal rules" aria-labelledby="portal-title">
+        <a class="text-button portal__back" href="/refugio">${t('portal.back')}</a>
+        <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('rules.title')}</h1>
+        <p class="portal__lede">${t('rules.lede')}</p>
+        <ol class="rules__list">${RULES.map((k) => html`<li><strong>${t(`${k}.title`)}</strong> ${t(k, { cap: pesos(2000), email: 'hola@patiamor.com' })}</li>`)}</ol>
+        <p class="portal-card__reason">${t('rules.enforced')}</p>
+        <button class="button button--primary" type="button" data-accept>${t('rules.accept')}</button>
+      </section>`,
+  );
+  $<HTMLButtonElement>('[data-accept]', root).addEventListener('click', async (e) => {
+    const b = e.currentTarget as HTMLButtonElement;
+    b.disabled = true;
+    try {
+      await api.acceptListerRules();
+      if (state.user) setUser({ ...state.user, listerRules: true });
+      navigate(to);
+    } catch (err) {
+      b.disabled = false;
+      toast(failText(err));
+    }
+  });
 }
 
 // ---------- Adopters whose requests are paused (admins) ----------

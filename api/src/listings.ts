@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono';
 import { nowIso } from './auth/crypto';
 import { forgetCatalogVersion } from './cache';
 import type { AppContext } from './env';
+import { hold, newMoneyWords } from './moderation';
 import { PET_JOINS, photoUrl, SUMMARY_COLUMNS, summary, type SummaryRow } from './pets';
 import { placeById } from './places';
 import { roleIn } from './portal';
@@ -78,6 +79,9 @@ function readPet(b: Record<string, unknown>, cap: number, keptFee: number | null
   else if (pet.inCareSince && !isDate(pet.inCareSince, pet.birthDate)) error = 'invalid_in_care_since';
   return { pet, error };
 }
+
+/** The texts the money check reads: never the fee, which has its own capped field. */
+const textsOf = (pet: { name: string; story: string; needs: string[] }) => [pet.name, pet.story, pet.needs.join('\n')];
 
 /** What a listing needs before adopters can see it; null when it's ready. */
 export function publishProblem(shelterStatus: string, pet: { birthDate: string; story: string }, photos: number) {
@@ -157,6 +161,9 @@ listings.post('/shelters/:id/pets', async (c) => {
     )
     .run();
   if (publish) forgetCatalogVersion();
+  // Money language in a listing going live sends it to review (PAT-16).
+  const words = publish ? newMoneyWords(textsOf(pet), null) : [];
+  if (words.length && (await hold(c.env, id, 'dinero', words))) return c.json({ pet: { id, status: 'in_review' }, review: { reason: 'dinero', words } }, 201);
   return c.json({ pet: { id, status } }, 201);
 });
 
@@ -165,6 +172,7 @@ type PetRow = {
   size: string; energy: string; good_with_kids: number | null; good_with_dogs: number | null; good_with_cats: number | null;
   vaccinated: number; sterilized: number; dewormed: number; story: string; needs: string; adoption_fee_dop: number | null;
   in_care_since: string | null; status: string; published_at: string | null; open_requests: number; requests_paused: number; updated_at: string;
+  review_reason: string | null; review_words: string | null; review_at: string | null;
 };
 const triOut = (v: number | null) => (v === null ? null : v === 1);
 
@@ -208,6 +216,8 @@ listings.get('/pets/:id', async (c) => {
       openRequests: r.open_requests,
       updatedAt: r.updated_at,
       photos: photos.map((p) => ({ id: p.id, url: photoUrl(p.r2_key), thumb: photoUrl(p.thumb_key), focus: p.focus })),
+      // Why it's hidden while Patiamor reviews it.
+      review: r.status === 'in_review' && r.review_reason ? { reason: r.review_reason, words: JSON.parse(r.review_words ?? '[]') as string[], at: r.review_at } : null,
     },
   });
 });
@@ -245,5 +255,11 @@ listings.put('/pets/:id', async (c) => {
     )
     .run();
   if (status !== 'draft') forgetCatalogVersion();
+  // A live listing whose text now talks about money goes to review (PAT-16). Words an admin already let
+  // through (review_words with no reason) don't count again.
+  if (status === 'available' || status === 'reserved') {
+    const words = newMoneyWords(textsOf(pet), found.row.review_reason ? null : found.row.review_words);
+    if (words.length && (await hold(c.env, found.row.id, 'dinero', words))) return c.json({ pet: { id: found.row.id, status: 'in_review' }, review: { reason: 'dinero', words } });
+  }
   return c.json({ pet: { id: found.row.id, status } });
 });

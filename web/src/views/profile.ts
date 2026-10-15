@@ -7,6 +7,7 @@ import { activeRequestFor, cachePets, petCache, placePet, state, takeChanged, up
 import { alertButton, beforeYouStart, bindAlerts, listerName, startRequest } from '../ui/request';
 import { age, canvas, companionLabel, photo } from '../ui/canvas';
 import { bindGallery } from '../ui/gallery';
+import { openReport, reportButton } from '../ui/report';
 import { sharePet } from '../ui/share';
 import { toast } from '../ui/toast';
 
@@ -202,7 +203,7 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
           ${canvas(p, { heading: 'h1', photoName: 'pet-photo', gallery: 'profile' })}
         </div>
         <div class="profile__body">
-          ${isDetail(pet) ? body(pet, p.km) : html`<p class="loading-note" role="status">${t('profile.loading')}</p>`}
+          ${isDetail(pet) ? html`${body(pet, p.km)}${reportButton()}` : html`<p class="loading-note" role="status">${t('profile.loading')}</p>`}
         </div>
         <div class="profile__bar">${bar}</div>
       </article>`,
@@ -210,6 +211,7 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
 
   $('[data-back]', root).addEventListener('click', deps.back);
   $('[data-share]', root).addEventListener('click', () => void sharePet(pet));
+  root.querySelector('[data-report]')?.addEventListener('click', () => openReport(pet));
   bindGallery($('.profile__media', root), pet, 'profile');
   root.querySelector('[data-start]')?.addEventListener('click', () => startRequest(pet.id));
   bindAlerts(root);

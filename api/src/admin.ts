@@ -10,6 +10,8 @@ import type { AppContext } from './env';
 import { placeById } from './places';
 import { loadKnown, lookAlikes } from './owners';
 import { DEFAULT_FEE_CAP_DOP, MAX_FEE_DOP } from './listings';
+import { endReview, tellOwners } from './moderation';
+import { photoUrl } from './pets';
 import { insertShelter, MAX_OWNED, readApplication } from './portal';
 import { OPEN_STATUSES, PAUSED_SQL, requestsRestricted, WITHDRAW_WINDOW_DAYS } from './requests';
 
@@ -36,14 +38,15 @@ admin.use('*', async (c, next) => {
 // one per queue.
 admin.get('/summary', async (c) => {
   const db = c.env.DB;
-  const [shelters, owners, bulk, paused] = await db.batch<{ n: number }>([
+  const [shelters, owners, bulk, paused, reported] = await db.batch<{ n: number }>([
     // Shelters to verify, and suspended ones asking for a review: both are answered in the same queue.
     db.prepare("SELECT (SELECT count(*) FROM shelters WHERE status = 'pending') + (SELECT count(*) FROM shelter_reviews WHERE status = 'pending') AS n"),
     db.prepare("SELECT count(*) AS n FROM shelter_owner_requests WHERE status = 'pending'"),
     db.prepare("SELECT count(*) AS n FROM bulk_requests WHERE status = 'pending'"),
     db.prepare(`SELECT count(*) AS n FROM (${PAUSED_SQL})`),
+    db.prepare(`SELECT count(*) AS n FROM pets WHERE ${underReview()}`),
   ]);
-  return c.json({ shelters: shelters.results[0].n, owners: owners.results[0].n, bulk: bulk.results[0].n, paused: paused.results[0].n });
+  return c.json({ shelters: shelters.results[0].n, owners: owners.results[0].n, bulk: bulk.results[0].n, paused: paused.results[0].n, reports: reported.results[0].n });
 });
 
 admin.get('/shelters', async (c) => {
@@ -236,6 +239,75 @@ admin.post('/paused/:userId/clear', async (c) => {
     await sendPauseClearedEmail(c.env, user.email, { note, exploreUrl: appOrigin(c) }).catch((err) => console.error('pause cleared email failed', err));
   }
   return c.json({ cleared: { id: userId } });
+});
+
+// ---------- Listings under review: reports (PAT-15) and money language (PAT-16) ----------
+
+/** Hidden pending review, or reported by someone and not yet looked at. */
+const underReview = (pets = 'pets') => `(${pets}.status = 'in_review' OR ${pets}.id IN (SELECT pet_id FROM reports WHERE resolved_at IS NULL))`;
+
+type ReviewPetRow = {
+  id: string; name: string; species: string; status: string; review_reason: string | null; review_words: string | null; review_at: string | null;
+  open_requests: number; shelter_id: string | null; shelter_name: string | null; thumb: string | null; cover: string | null; focus: string | null;
+  story: string; needs: string;
+};
+
+// What to look at: hidden listings first (oldest first), then those with fewer reports.
+admin.get('/reports', async (c) => {
+  const db = c.env.DB;
+  const { results: pets } = await db
+    .prepare(
+      `SELECT d.id, d.name, d.species, d.status, d.review_reason, d.review_words, d.review_at, d.open_requests, d.shelter_id, s.name AS shelter_name, d.story, d.needs,
+              ph.thumb_key AS thumb, ph.r2_key AS cover, ph.focus
+         FROM pets d LEFT JOIN shelters s ON s.id = d.shelter_id
+         LEFT JOIN pet_photos ph ON ph.pet_id = d.id AND ph.position = (SELECT min(position) FROM pet_photos WHERE pet_id = d.id)
+        WHERE ${underReview('d')}
+        ORDER BY d.status = 'in_review' DESC, coalesce(d.review_at, d.updated_at) LIMIT 100`,
+    )
+    .all<ReviewPetRow>();
+  const { results: reps } = await db
+    .prepare(
+      `SELECT r.pet_id, r.reason, r.details, r.created_at, u.email FROM reports r LEFT JOIN users u ON u.id = r.reported_by
+        WHERE r.resolved_at IS NULL AND r.pet_id IN (SELECT value FROM json_each(?)) ORDER BY r.created_at`,
+    )
+    .bind(JSON.stringify(pets.map((p) => p.id)))
+    .all<{ pet_id: string; reason: string; details: string | null; created_at: string; email: string | null }>();
+  return c.json({
+    pets: pets.map((p) => ({
+      id: p.id,
+      name: p.name,
+      species: p.species,
+      status: p.status,
+      openRequests: p.open_requests,
+      // The text, to judge what the money check found (a hidden listing's public page doesn't open).
+      story: p.story,
+      needs: JSON.parse(p.needs || '[]') as string[],
+      shelter: p.shelter_id ? { id: p.shelter_id, name: p.shelter_name } : null,
+      photo: { url: photoUrl(p.cover), thumb: photoUrl(p.thumb), focus: p.focus ?? '50% 40%' },
+      review: p.status === 'in_review' && p.review_reason ? { reason: p.review_reason, words: JSON.parse(p.review_words ?? '[]') as string[], at: p.review_at } : null,
+      reports: reps.filter((r) => r.pet_id === p.id).map((r) => ({ reason: r.reason, details: r.details, at: r.created_at, by: r.email })),
+    })),
+  });
+});
+
+// Nothing wrong: back to what it was, and its reports are closed. { note? } stays in the log.
+admin.post('/pets/:id/restore', async (c) => {
+  const b = await c.req.json<{ note?: string }>().catch(() => ({}) as { note?: string });
+  const done = await endReview(c.env, c.req.param('id'), c.get('user')!.id, { restore: true, note: (b.note ?? '').trim().slice(0, 500) || null });
+  return done ? c.json({ restored: true }) : c.json({ error: 'not_found' }, 404);
+});
+
+// It breaks the rules: withdrawn ("Retirado por Patiamor"), its open requests closed, the shelter emailed
+// with { note }, which is required.
+admin.post('/pets/:id/takedown', async (c) => {
+  const b = await c.req.json<{ note?: string }>().catch(() => ({}) as { note?: string });
+  const note = (b.note ?? '').trim().slice(0, 500);
+  if (!note) return c.json({ error: 'reason_required' }, 400);
+  const id = c.req.param('id');
+  const done = await endReview(c.env, id, c.get('user')!.id, { restore: false, note });
+  if (!done) return c.json({ error: 'not_found' }, 404);
+  await tellOwners(c.env, appOrigin(c), id, { kind: 'down', note });
+  return c.json({ closed: done.closed });
 });
 
 // ---------- Verified adopters (PAT-2) ----------

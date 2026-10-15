@@ -16,6 +16,8 @@ export interface Me {
   shelterOwner?: boolean;
   /** Their request to be a shelter owner: the one waiting, or decided in the last 30 days. */
   ownerRequest?: OwnerRequest | null;
+  /** They've read the rules for listing (shown before their first animal). */
+  listerRules?: boolean;
 }
 
 /** A request to be allowed to register a shelter. An admin gets to know the person and approves. */
@@ -143,6 +145,30 @@ export interface AdminShelter extends Omit<PortalShelter, 'role' | 'review'> {
   review: { id: string; message: string; createdAt: string } | null;
 }
 
+export type ReportReason = 'venta' | 'estafa' | 'maltrato' | 'datos_falsos' | 'otro';
+
+/** Why a listing is hidden while Patiamor reviews it: reports, or money language in its text. */
+export interface ListingReview {
+  reason: 'reportes' | 'dinero';
+  words: string[];
+  at?: string | null;
+}
+
+/** A listing in the admin's review queue: hidden, or reported and not yet looked at. */
+export interface AdminReviewPet {
+  id: string;
+  name: string;
+  species: string;
+  status: PetStatus;
+  openRequests: number;
+  story: string;
+  needs: string[];
+  shelter: { id: string; name: string | null } | null;
+  photo: { url: string | null; thumb: string | null; focus: string };
+  review: ListingReview | null;
+  reports: { reason: ReportReason; details: string | null; at: string; by: string | null }[];
+}
+
 /** A suspended shelter's owner asking to lift the suspension, and how it was answered. */
 export interface ShelterReview {
   id: string;
@@ -198,6 +224,8 @@ export interface Listing extends PetForm {
   openRequests: number;
   updatedAt: string;
   photos: ListingPhoto[];
+  /** Why it's hidden, while Patiamor reviews it. */
+  review: ListingReview | null;
 }
 
 export type ListingSummary = PetSummary & { status: PetStatus; openRequests: number; updatedAt: string };
@@ -331,8 +359,9 @@ export const api = {
   createPet: (shelterId: string, form: PetForm, publish: boolean) =>
     call<{ pet: { id: string; status: PetStatus } }>(`/api/portal/shelters/${encodeURIComponent(shelterId)}/pets`, 'POST', { ...form, publish }).then((r) => r.pet),
   listing: (petId: string) => call<{ shelter: ListingShelter; pet: Listing }>(`/api/portal/pets/${encodeURIComponent(petId)}`),
+  /** `review` when saving sent it to review (money language in a live listing). */
   savePet: (petId: string, form: PetForm, publish: boolean) =>
-    call<{ pet: { id: string; status: PetStatus } }>(`/api/portal/pets/${encodeURIComponent(petId)}`, 'PUT', { ...form, publish }).then((r) => r.pet),
+    call<{ pet: { id: string; status: PetStatus }; review?: ListingReview }>(`/api/portal/pets/${encodeURIComponent(petId)}`, 'PUT', { ...form, publish }).then((r) => ({ ...r.pet, review: r.review ?? null })),
   uploadPhoto: (petId: string, body: { image: string; thumb: string; focus: string }) =>
     call<{ photo: ListingPhoto }>(`/api/portal/pets/${encodeURIComponent(petId)}/photos`, 'POST', body).then((r) => r.photo),
   arrangePhotos: (petId: string, photos: { id: string; focus: string }[]) => call<{ ok: true }>(`/api/portal/pets/${encodeURIComponent(petId)}/photos`, 'PUT', { photos }),
@@ -355,7 +384,7 @@ export const api = {
   relistPet: (petId: string) => call<PetChange>(`/api/portal/pets/${encodeURIComponent(petId)}/relist`, 'POST', {}),
   runDigest: () => call<{ shelters: number; digestEmails: number; alertEmails: number; deferred: boolean }>('/api/admin/digest', 'POST', {}),
   /** How many of each kind of request are waiting for an admin. */
-  adminSummary: () => call<{ shelters: number; owners: number; bulk: number; paused: number }>('/api/admin/summary'),
+  adminSummary: () => call<{ shelters: number; owners: number; bulk: number; paused: number; reports: number }>('/api/admin/summary'),
   adminPaused: () => call<{ paused: AdminPaused[] }>('/api/admin/paused').then((r) => r.paused),
   adminClearPause: (userId: string, note?: string) => call<{ cleared: { id: string } }>(`/api/admin/paused/${encodeURIComponent(userId)}/clear`, 'POST', { note }),
   adminAdopters: () => call<{ adopters: AdminAdopter[] }>('/api/admin/adopters').then((r) => r.adopters),
@@ -365,6 +394,11 @@ export const api = {
   adminShelters: (status: ShelterStatus) => call<{ shelters: AdminShelter[]; pendingReviews: number }>(`/api/admin/shelters?status=${status}`),
   adminKeepSuspension: (shelterId: string, note: string) => call<{ review: { status: 'kept' } }>(`/api/admin/shelters/${encodeURIComponent(shelterId)}/review/keep`, 'POST', { note }),
   adminFeeCap: (shelterId: string, capDop: number | null) => call<{ shelter: { id: string; feeCapDop: number } }>(`/api/admin/shelters/${encodeURIComponent(shelterId)}/fee-cap`, 'POST', { capDop }),
+  reportPet: (petId: string, reason: ReportReason, details?: string) => call<{ report: { received: boolean } }>(`/api/pets/${encodeURIComponent(petId)}/report`, 'POST', { reason, details }),
+  adminReports: () => call<{ pets: AdminReviewPet[] }>('/api/admin/reports').then((r) => r.pets),
+  adminRestorePet: (petId: string, note?: string) => call<{ restored: boolean }>(`/api/admin/pets/${encodeURIComponent(petId)}/restore`, 'POST', { note }),
+  adminTakedownPet: (petId: string, note: string) => call<{ closed: number }>(`/api/admin/pets/${encodeURIComponent(petId)}/takedown`, 'POST', { note }),
+  acceptListerRules: () => call<{ listerRules: boolean }>('/api/me/lister-rules', 'POST', {}),
   requestReview: (shelterId: string, message: string) => call<{ review: ShelterReview }>(`/api/portal/shelters/${encodeURIComponent(shelterId)}/review`, 'POST', { message }).then((r) => r.review),
   adminBulk: (status: BulkStatus) => call<{ requests: AdminBulk[] }>(`/api/admin/bulk?status=${status}`).then((r) => r.requests),
   adminBulkDecision: (id: string, action: 'approve' | 'decline', note?: string) =>
