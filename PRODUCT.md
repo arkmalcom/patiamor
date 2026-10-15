@@ -8,6 +8,8 @@ web
 
 Mobile-first. The mobile app will wrap this same Vite frontend (Capacitor or PWA), so the web UI must feel native on a phone: touch gestures, safe areas, thumb-reach actions.
 
+The first mobile route is the installable web app (free; the stores aren't needed to launch): a web app manifest plus icons in `web/public/`, so "Add to Home Screen" gives an app icon that opens full-screen. There is deliberately no service worker: the app is live data and sign-in, so offline has little to show, and a cached shell could outlive a deploy. Play Store (one-time $25, plus a 14-day closed test with 12 testers for a personal account) and App Store (paid yearly membership) come later, if at all.
+
 ## Stack
 
 - Frontend: Vite + TypeScript, vanilla (no framework).

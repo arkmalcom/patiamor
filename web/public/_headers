@@ -13,3 +13,9 @@
 
 /favicon.svg
   Cache-Control: public, max-age=86400
+
+# Install icons and manifest keep fixed names; a day is long enough to cache, short enough to swap.
+/icons/*
+  Cache-Control: public, max-age=86400
+/manifest.webmanifest
+  Cache-Control: public, max-age=86400
