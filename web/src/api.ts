@@ -181,6 +181,11 @@ export interface Listing extends PetForm {
 }
 
 export type ListingSummary = PetSummary & { status: PetStatus; openRequests: number; updatedAt: string };
+/** One change for several animals at once. */
+export type ManyChange =
+  | { ids: string[]; action: 'reserved' | 'available' | 'adopted' }
+  | { ids: string[]; action: 'withdrawn'; reason: WithdrawReason }
+  | { ids: string[]; action: 'health'; health: Partial<Record<'vaccinated' | 'sterilized' | 'dewormed', boolean>> };
 
 export type CloseReason = 'otra_familia' | 'no_encaja' | 'sin_respuesta' | 'otro';
 /** A special request to adopt more than Mi lista's three (a farm, a large family home). */
@@ -316,6 +321,13 @@ export const api = {
   shelterRequests: (shelterId: string) => call<{ requests: InboxRequest[] }>(`/api/portal/shelters/${encodeURIComponent(shelterId)}/requests`).then((r) => r.requests),
   moveRequest: (id: string, status: 'seen' | 'contacted' | 'visit' | 'closed', reason?: CloseReason) =>
     call<{ request: InboxRequest }>(`/api/portal/requests/${encodeURIComponent(id)}/status`, 'POST', { status, reason }).then((r) => r.request),
+  /** Several of the shelter's animals at once (PAT-33); those that can't take the change come back in `skipped`. */
+  changeMany: (shelterId: string, change: ManyChange) =>
+    call<{ changed: string[]; skipped: { id: string; why: 'not_found' | 'not_live' | 'already' | 'has_requests' }[]; closed: number }>(
+      `/api/portal/shelters/${encodeURIComponent(shelterId)}/pets/bulk`,
+      'POST',
+      change,
+    ),
   setAvailability: (petId: string, change: { reserved?: boolean; paused?: boolean }) =>
     call<{ pet: { id: string; status: PetStatus; requestsPaused: boolean } }>(`/api/portal/pets/${encodeURIComponent(petId)}/availability`, 'POST', change).then((r) => r.pet),
   markAdopted: (petId: string, requestId?: string) => call<PetChange>(`/api/portal/pets/${encodeURIComponent(petId)}/adopted`, 'POST', { requestId }),

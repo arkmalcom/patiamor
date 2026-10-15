@@ -60,7 +60,9 @@ function parse(where: string): Route {
     const ver = new URLSearchParams(query).get('ver');
     if (b && c === 'solicitudes') return { name: 'portal', view: 'solicitudes', id: decodeURIComponent(b), tab: ver };
     if (b && c === 'animales')
-      return d ? { name: 'portal', view: 'animal', id: decodeURIComponent(b), petId: d === 'nuevo' ? null : decodeURIComponent(d) } : { name: 'portal', view: 'animales', id: decodeURIComponent(b), tab: ver };
+      return d
+        ? { name: 'portal', view: 'animal', id: decodeURIComponent(b), petId: d === 'nuevo' ? null : decodeURIComponent(d), copyOf: d === 'nuevo' ? new URLSearchParams(query).get('desde') : null }
+        : { name: 'portal', view: 'animales', id: decodeURIComponent(b), tab: ver };
     return { name: 'portal', view: 'home' };
   }
   if (a === 'buscar') return { name: 'search', q: new URLSearchParams(query).get('q') ?? '' };

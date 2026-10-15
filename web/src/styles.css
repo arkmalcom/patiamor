@@ -1475,6 +1475,28 @@ html[data-route='profile'] .tabbar { display: none; }
 .listings__tabs .list-tabs__tab { border: 0; font: inherit; font-weight: 800; cursor: pointer; padding: 0 12px; gap: 4px; white-space: nowrap; flex: none; }
 .listings__tabs .list-tabs__tab:not([aria-current='page']) { background: none; }
 .listing-ending .button { justify-self: start; }
+.listing-copy { justify-self: start; }
+
+/* Choosing several (PAT-33): a checkbox in each row, and a bar that stays in reach while scrolling. */
+.listings__pick { justify-self: start; display: inline-flex; align-items: center; gap: 6px; }
+.many-slot { position: sticky; top: 8px; z-index: 5; }
+.many-bar {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px;
+  padding: 10px 12px 10px 16px; border-radius: 16px; background: var(--ink); color: var(--paper);
+  box-shadow: 0 14px 26px -18px rgba(29, 35, 64, 0.7);
+}
+.many-bar__count { font-weight: 800; }
+.many-bar__links { grid-column: 1 / -1; display: flex; gap: 16px; }
+.many-bar .text-button { color: var(--paper); }
+/* Two classes: the narrow-phone .listing-row rule below would otherwise give the frame the stretchy column. */
+.listing-row.listing-row--pick { grid-template-columns: auto auto minmax(0, 1fr) auto; cursor: pointer; }
+.listing-row__box { width: 22px; height: 22px; margin: 0; accent-color: var(--ink); }
+.listing-item.is-picked { outline: 2.5px solid var(--ink); outline-offset: -2.5px; } /* an outline: the hover shadow would replace a box-shadow ring */
+@media (max-width: 420px) {
+  .listing-row.listing-row--pick { grid-template-columns: auto auto minmax(0, 1fr); }
+  .listing-row.listing-row--pick > .status-chip { grid-column: 3; }
+}
+
 
 /* The sheet for ending an animal's search: two big choices, then a short form. */
 .outcome__choices { display: grid; gap: 10px; }

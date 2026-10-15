@@ -1,5 +1,5 @@
-import { Camera, Eye, EyeOff, Handshake, HeartHandshake, PencilLine, Plus, Star, X, type IconNode } from 'lucide';
-import { api, ApiError, type Listing, type ListingPhoto, type ListingShelter, type ListingSummary, type PetForm, type PetStatus } from '../api';
+import { Camera, Copy, Eye, EyeOff, Handshake, HeartHandshake, ListChecks, PencilLine, Plus, Star, Syringe, X, type IconNode } from 'lucide';
+import { api, ApiError, type Listing, type ListingPhoto, type ListingShelter, type ListingSummary, type ManyChange, type PetForm, type PetStatus, type WithdrawReason } from '../api';
 import { ageMonths, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { failText, t, type Key } from '../i18n';
@@ -7,6 +7,7 @@ import { petChanged, placePet } from '../store';
 import { age, canvas, miniFrame } from '../ui/canvas';
 import { openOutcome, outcomeButton } from '../ui/outcome';
 import { PhotoError, preparePhoto, toBase64, type PreparedPhoto } from '../ui/photos';
+import { closeSheet, openSheet } from '../ui/sheet';
 import { toast } from '../ui/toast';
 import { navigate } from '../nav';
 
@@ -57,6 +58,11 @@ export async function renderListings(root: HTMLElement, shelterId: string, slug:
   for (const p of pets) counts[tabOf(p.status)]++;
   const shown = pets.filter((p) => tabOf(p.status) === tab);
   const empty = tab === 'active' ? t('listing.empty') : t(`listing.empty.${tab}`);
+  // Choosing several is for the Activos tab (ended ones are relisted one by one), with two or more there.
+  const canPick = canAdd && tab === 'active' && shown.length > 1;
+  if (picking && (picking.shelterId !== shelterId || !canPick)) picking = null;
+  if (picking) for (const id of [...picking.ids]) if (!shown.some((p) => p.id === id)) picking.ids.delete(id);
+  const chosen = picking?.ids ?? new Set<string>();
   mount(
     root,
     html`
@@ -77,14 +83,16 @@ export async function renderListings(root: HTMLElement, shelterId: string, slug:
                 )}
             </nav>`
           : ''}
-        ${shown.length ? html`<ul class="listings">${shown.map((p) => row(p, base, canAdd))}</ul>` : html`<p class="passed__empty">${empty}</p>`}
+        ${picking ? html`<div class="many-slot" data-many-slot>${manyBar(chosen.size, shown.length)}</div>` : canPick ? html`<button class="text-button listings__pick" type="button" data-pick-start>${icon(ListChecks, 18)}${t('many.start')}</button>` : ''}
+        ${shown.length ? html`<ul class="listings">${shown.map((p) => (picking ? pickRow(p, chosen.has(p.id)) : row(p, base, canAdd)))}</ul>` : html`<p class="passed__empty">${empty}</p>`}
       </section>`,
   );
   const show = (k: Tab) => {
     history.replaceState(null, '', `${base}?ver=${SLUG[k]}`);
     void renderListings(root, shelterId, SLUG[k]);
   };
-  $$<HTMLButtonElement>('[data-tab]', root).forEach((b) => b.addEventListener('click', () => show(b.dataset.tab as Tab)));
+  const redraw = () => void renderListings(root, shelterId, SLUG[tab]);
+  $$<HTMLButtonElement>('[data-tab]', root).forEach((b) => b.addEventListener('click', () => ((picking = null), show(b.dataset.tab as Tab))));
   // Ending or relisting moves the animal to another tab; follow it there.
   $$<HTMLButtonElement>('[data-outcome]', root).forEach((b) =>
     b.addEventListener('click', () => {
@@ -92,35 +100,219 @@ export async function renderListings(root: HTMLElement, shelterId: string, slug:
       openOutcome(p, shelter.id, (change) => show(tabOf(change.pet.status)));
     }),
   );
+  // "En proceso" in one tap, without opening the animal.
+  $$<HTMLButtonElement>('[data-quick]', root).forEach((b) =>
+    b.addEventListener('click', async () => {
+      const p = pets.find((x) => x.id === b.dataset.quick)!;
+      const reserved = p.status === 'available';
+      b.disabled = true;
+      try {
+        await api.setAvailability(p.id, { reserved });
+        petChanged(p.id);
+        toast(t(reserved ? 'listing.reservedOn' : 'listing.reservedOff', { name: p.name }));
+        redraw();
+      } catch (err) {
+        b.disabled = false;
+        toast(failText(err));
+      }
+    }),
+  );
+
+  // Choosing several, then one change for all of them.
+  root.querySelector('[data-pick-start]')?.addEventListener('click', () => ((picking = { shelterId, ids: new Set() }), redraw()));
+  const slot = root.querySelector<HTMLElement>('[data-many-slot]');
+  if (!slot || !picking) return;
+  const ids = picking.ids;
+  const bindBar = () => {
+    $('[data-pick-cancel]', slot).addEventListener('click', () => ((picking = null), redraw()));
+    $('[data-pick-all]', slot).addEventListener('click', () => {
+      const all = ids.size < shown.length;
+      ids.clear();
+      if (all) shown.forEach((p) => ids.add(p.id));
+      redraw();
+    });
+    $('[data-pick-act]', slot).addEventListener('click', () => {
+      const these = shown.filter((p) => ids.has(p.id));
+      if (these.length) openMany(shelter.id, these, () => ((picking = null), redraw()));
+    });
+  };
+  bindBar();
+  // Ticking one only redraws the bar: the list (and the keyboard's place in it) stays put.
+  $$<HTMLInputElement>('[data-pick-id]', root).forEach((box) =>
+    box.addEventListener('change', () => {
+      if (box.checked) ids.add(box.dataset.pickId!);
+      else ids.delete(box.dataset.pickId!);
+      box.closest('.listing-item')!.classList.toggle('is-picked', box.checked);
+      mount(slot, manyBar(ids.size, shown.length));
+      bindBar();
+    }),
+  );
 }
 
 function row(p: ListingSummary, base: string, canChange: boolean): Raw {
-  const bits = [t(`listing.species.${p.species}`), t(`sex.${p.sex}`), age(p)];
   const ends = canChange && p.status !== 'draft' && p.status !== 'in_review';
+  const live = p.status === 'available' || p.status === 'reserved';
   return html`
     <li class="listing-item">
       <a class="listing-row" href="${base}/${encodeURIComponent(p.id)}" aria-label="${t('listing.editPet', { name: p.name })}">
-        ${miniFrame(p, 'sm')}
-        <span class="listing-row__text">
-          <strong class="listing-row__name">${p.name}</strong>
-          <span class="listing-row__meta">${bits.join(' · ')}</span>
-          ${p.openRequests ? html`<span class="listing-row__meta">${t(p.openRequests === 1 ? 'listing.requests1' : 'listing.requestsN', { n: p.openRequests })}</span>` : ''}
-        </span>
-        ${petChip(p)}
+        ${rowBody(p)}
       </a>
-      ${ends ? html`<div class="listing-item__actions">${outcomeButton(p, true)}</div>` : ''}
+      ${ends
+        ? html`<div class="listing-item__actions">
+            ${canChange && live ? html`<button class="button button--outline button--small" type="button" data-quick="${p.id}">${icon(p.status === 'available' ? Handshake : Eye, 16)}${t(p.status === 'available' ? 'many.quickReserve' : 'many.quickRelease')}</button>` : ''}
+            ${outcomeButton(p, true)}
+          </div>`
+        : ''}
     </li>`;
+}
+
+const rowBody = (p: ListingSummary): Raw => html`
+  ${miniFrame(p, 'sm')}
+  <span class="listing-row__text">
+    <strong class="listing-row__name">${p.name}</strong>
+    <span class="listing-row__meta">${[t(`listing.species.${p.species}`), t(`sex.${p.sex}`), age(p)].join(' · ')}</span>
+    ${p.openRequests ? html`<span class="listing-row__meta">${t(p.openRequests === 1 ? 'listing.requests1' : 'listing.requestsN', { n: p.openRequests })}</span>` : ''}
+  </span>
+  ${petChip(p)}`;
+
+// ---------- Several at once (PAT-33) ----------
+
+/** The animals chosen on the Activos tab. Kept outside the page so a redraw (any store update) keeps them. */
+let picking: { shelterId: string; ids: Set<string> } | null = null;
+
+const pickRow = (p: ListingSummary, on: boolean): Raw => html`
+  <li class="listing-item${on ? ' is-picked' : ''}">
+    <label class="listing-row listing-row--pick">
+      <input class="listing-row__box" type="checkbox" data-pick-id="${p.id}" ${on ? 'checked' : ''} aria-label="${p.name}" />
+      ${rowBody(p)}
+    </label>
+  </li>`;
+
+const manyBar = (n: number, total: number): Raw => html`
+  <div class="many-bar" data-many-bar role="region" aria-label="${t('many.start')}">
+    <span class="many-bar__count" role="status">${t(n === 1 ? 'many.chosen1' : 'many.chosenN', { n })}</span>
+    <button class="button button--primary button--small" type="button" data-pick-act ${n ? '' : 'disabled'}>${t('many.change')}</button>
+    <span class="many-bar__links">
+      <button class="text-button" type="button" data-pick-all>${t(n === total ? 'many.none' : 'many.all')}</button>
+      <button class="text-button" type="button" data-pick-cancel>${t('request.cancel')}</button>
+    </span>
+  </div>`;
+
+type ManyAction = 'reserved' | 'available' | 'adopted' | 'withdrawn' | 'health';
+const MANY: { action: ManyAction; glyph: IconNode }[] = [
+  { action: 'reserved', glyph: Handshake },
+  { action: 'available', glyph: Eye },
+  { action: 'adopted', glyph: HeartHandshake },
+  { action: 'withdrawn', glyph: EyeOff },
+  { action: 'health', glyph: Syringe },
+];
+/** "un animal", "3 animales". */
+const animals = (n: number) => t(n === 1 ? 'many.one' : 'many.some', { n });
+const WITHDRAW: WithdrawReason[] = ['familia_original', 'salud', 'fallecio', 'otro'];
+
+/** The sheet: which change, then (for some) one more question, then the change for all of them. */
+function openMany(shelterId: string, pets: ListingSummary[], done: () => void) {
+  const n = pets.length;
+  const dialog = openSheet(
+    t('many.title', { what: animals(n) }),
+    html`<div class="outcome__choices">
+      ${MANY.map(
+        ({ action, glyph }) =>
+          html`<button class="outcome__choice" type="button" data-many="${action}">${icon(glyph, 24)}<span><strong>${t(`many.${action}`)}</strong><small>${t(`many.${action}Hint`)}</small></span></button>`,
+      )}
+    </div>`,
+  );
+  $$<HTMLButtonElement>('[data-many]', dialog).forEach((b) =>
+    b.addEventListener('click', () => {
+      const action = b.dataset.many as ManyAction;
+      if (action === 'reserved' || action === 'available') return void apply({ ids: pets.map((p) => p.id), action });
+      step(action);
+    }),
+  );
+
+  const step = (action: 'adopted' | 'withdrawn' | 'health') => {
+    // Those with open requests may have gone home with one of those families: one at a time, the shelter picks it.
+    const asked = pets.filter((p) => p.openRequests > 0);
+    const body =
+      action === 'adopted'
+        ? html`<p>${t(n - asked.length === 1 ? 'many.adoptedNote1' : 'many.adoptedNoteN', { n: n - asked.length })}</p>
+            ${asked.length ? html`<p class="portal-card__reason">${t('many.adoptedSkip', { names: asked.map((p) => p.name).join(', ') })}</p>` : ''}`
+        : action === 'withdrawn'
+          ? html`<fieldset class="question"><legend>${t('outcome.withdrawWhy')}</legend>
+                <div class="segmented segmented--wrap">${WITHDRAW.map((r) => html`<label><input type="radio" name="reason" value="${r}" /><span>${t(`outcome.reason.${r}`)}</span></label>`)}</div>
+              </fieldset>
+              <p class="muted">${t('many.withdrawnNote')}</p>`
+          : html`<p class="muted">${t('many.healthNote')}</p>
+              <div class="checks">
+                <label class="check"><input type="checkbox" name="vaccinated" /><span>${t('listing.vaccinated')}</span></label>
+                <label class="check"><input type="checkbox" name="sterilized" /><span>${t('listing.sterilized')}</span></label>
+                <label class="check"><input type="checkbox" name="dewormed" /><span>${t('listing.dewormed')}</span></label>
+              </div>`;
+    const sheet = openSheet(
+      t(`many.${action}Title`, { what: animals(n) }),
+      html`<form class="outcome__form" id="many-form" novalidate>${body}<p class="form-error" role="alert" hidden data-error></p></form>`,
+      {
+        footer: html`<button class="button button--ghost" type="button" data-cancel>${t('request.cancel')}</button>
+          <button class="button button--primary" type="submit" form="many-form" ${action === 'adopted' && asked.length === n ? 'disabled' : ''}>${t(`many.${action}Confirm`)}</button>`,
+      },
+    );
+    $('[data-cancel]', sheet).addEventListener('click', () => closeSheet());
+    $<HTMLFormElement>('#many-form', sheet).addEventListener('submit', (e) => {
+      e.preventDefault();
+      const f = new FormData(e.currentTarget as HTMLFormElement);
+      const error = $('[data-error]', sheet);
+      const ids = pets.map((p) => p.id);
+      if (action === 'adopted') return void apply({ ids, action });
+      if (action === 'withdrawn') {
+        const reason = f.get('reason') as WithdrawReason | null;
+        if (!reason) return ((error.textContent = t('outcome.pickReason')), (error.hidden = false));
+        return void apply({ ids, action, reason });
+      }
+      const health = Object.fromEntries((['vaccinated', 'sterilized', 'dewormed'] as const).filter((k) => f.get(k) === 'on').map((k) => [k, true]));
+      if (!Object.keys(health).length) return ((error.textContent = t('many.pickHealth')), (error.hidden = false));
+      void apply({ ids, action, health });
+    });
+  };
+
+  const apply = async (change: ManyChange) => {
+    $$<HTMLButtonElement>('button', dialog).forEach((b) => (b.disabled = true)); // one sheet, whichever step it's on
+    try {
+      const r = await api.changeMany(shelterId, change);
+      r.changed.forEach((id) => petChanged(id));
+      closeSheet();
+      const asked = r.skipped.filter((s) => s.why === 'has_requests').length;
+      const other = r.skipped.length - asked;
+      toast(
+        [
+          t(r.changed.length === 1 ? 'many.done1' : 'many.doneN', { n: r.changed.length }),
+          asked ? t('many.skippedAsked', { n: asked }) : '',
+          other ? t('many.skippedOther', { n: other }) : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+      );
+      done();
+    } catch (err) {
+      closeSheet();
+      toast(failText(err));
+    }
+  };
 }
 
 // ---------- The form ----------
 
-export async function renderListingForm(root: HTMLElement, shelterId: string, petId: string | null) {
+export async function renderListingForm(root: HTMLElement, shelterId: string, petId: string | null, copyOf: string | null = null) {
   mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
   try {
     if (petId) {
       const { shelter, pet } = await api.listing(petId);
       if (shelter.id !== shelterId) throw new ApiError('not_found', {});
       form(root, shelter, pet);
+    } else if (copyOf) {
+      // A littermate: the same details to start from, but its own name and photos.
+      const { shelter, pet } = await api.listing(copyOf);
+      if (shelter.id !== shelterId || shelter.status === 'suspended') throw new ApiError('not_found', {});
+      form(root, shelter, null, pet);
     } else {
       const { shelter } = await api.shelterPets(shelterId);
       if (shelter.status === 'suspended') throw new ApiError('not_found', {});
@@ -166,8 +358,8 @@ const MAX_PHOTOS = 5;
 /** A photo in the form: already on the server (`id`), or prepared on this phone and sent on save. */
 type Item = { id?: string; url: string; thumb: string | null; focus: string; prepared?: PreparedPhoto };
 
-function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | null) {
-  const v: PetForm = existing ? { ...BLANK, ...existing } : { ...BLANK };
+function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | null, copyOf: Listing | null = null) {
+  const v: PetForm = existing ? { ...BLANK, ...existing } : copyOf ? { ...BLANK, ...copyOf, name: '' } : { ...BLANK };
   const months = ageMonths(v.birthDate || null);
   const draft = !existing || existing.status === 'draft';
   const canPublish = shelter.status === 'verified';
@@ -188,7 +380,11 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
       <section class="portal portal--listing" aria-labelledby="portal-title">
         <a class="text-button portal__back" href="${list}">${t('listing.back')}</a>
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${existing ? existing.name : t('listing.newTitle')}</h1>
+        ${copyOf ? html`<p class="portal-card__reason">${t('listing.copyNote', { name: copyOf.name })}</p>` : ''}
         ${existing ? html`<p class="listing-status" data-status-line>${statusLine(existing)}</p>` : ''}
+        ${existing && shelter.status !== 'suspended'
+          ? html`<a class="button button--outline button--small listing-copy" href="${list}/nuevo?desde=${encodeURIComponent(existing.id)}">${icon(Copy, 16)}${t('listing.copy')}</a>`
+          : ''}
         ${existing && ['available', 'reserved'].includes(existing.status) ? availability(existing) : ''}
         ${existing && ['available', 'reserved', 'adopted', 'withdrawn'].includes(existing.status) ? ending(existing) : ''}
         <form class="portal-form listing-form" id="pet-form" novalidate>

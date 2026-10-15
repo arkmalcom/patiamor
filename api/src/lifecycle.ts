@@ -111,6 +111,94 @@ lifecycle.post('/pets/:id/relist', async (c) => {
   return result(c, pet.id, 0);
 });
 
+// ---------- Several at once (PAT-33) ----------
+
+/** At most this many animals per change: a litter, or a morning's clean-up. */
+export const BULK_MAX = 100;
+const BULK_ACTIONS = ['reserved', 'available', 'adopted', 'withdrawn', 'health'] as const;
+type BulkAction = (typeof BULK_ACTIONS)[number];
+const HEALTH = ['vaccinated', 'sterilized', 'dewormed'] as const;
+
+type BulkPet = { id: string; status: string; open_requests: number };
+
+/** Why an animal can't take this change, or null when it can. */
+function bulkProblem(action: BulkAction, p: BulkPet): string | null {
+  if (action === 'health') return null;
+  if (!live(p.status)) return 'not_live';
+  if (action === 'reserved' && p.status === 'reserved') return 'already';
+  if (action === 'available' && p.status === 'available') return 'already';
+  // Its family may have come through Patiamor: marking it here would tell them another family took it.
+  // One at a time, the shelter picks the request.
+  if (action === 'adopted' && p.open_requests > 0) return 'has_requests';
+  return null;
+}
+
+// { ids, action: 'reserved' | 'available' | 'adopted' | 'withdrawn' | 'health', reason?, health? }: the same
+// changes as one at a time, for many of the shelter's animals in one request. Those that can't take it
+// come back in `skipped` with why; the rest change together.
+lifecycle.post('/shelters/:id/pets/bulk', async (c) => {
+  const shelterId = c.req.param('id');
+  if (!(await roleIn(c, shelterId))) return c.json({ error: 'not_found' }, 404);
+  const db = c.env.DB;
+  const shelter = await db.prepare('SELECT status FROM shelters WHERE id = ?').bind(shelterId).first<{ status: string }>();
+  if (!shelter) return c.json({ error: 'not_found' }, 404);
+  if (shelter.status === 'suspended') return c.json({ error: 'shelter_suspended' }, 409);
+
+  const b = await c.req.json<{ ids?: unknown; action?: string; reason?: string; health?: Record<string, unknown> }>().catch(() => ({}) as { ids?: unknown; action?: string; reason?: string; health?: Record<string, unknown> });
+  const action = BULK_ACTIONS.find((a) => a === b.action);
+  if (!action) return c.json({ error: 'invalid_action' }, 400);
+  const ids = Array.isArray(b.ids) ? [...new Set(b.ids.filter((x): x is string => typeof x === 'string'))] : [];
+  if (!ids.length || ids.length > BULK_MAX) return c.json({ error: 'invalid_ids', max: BULK_MAX }, 400);
+  if (action === 'withdrawn' && !WITHDRAW_REASONS.includes(b.reason as never)) return c.json({ error: 'reason_required' }, 400);
+  // Health only marks what's been done: undoing one is rare enough to do in the animal's form.
+  const health = HEALTH.filter((k) => b.health?.[k] === true);
+  if (action === 'health' && !health.length) return c.json({ error: 'invalid_health' }, 400);
+
+  const { results: pets } = await db
+    .prepare('SELECT id, status, open_requests FROM pets WHERE shelter_id = ? AND id IN (SELECT value FROM json_each(?))')
+    .bind(shelterId, JSON.stringify(ids))
+    .all<BulkPet>();
+  const skipped = [
+    ...ids.filter((id) => !pets.some((p) => p.id === id)).map((id) => ({ id, why: 'not_found' })),
+    ...pets.flatMap((p) => {
+      const why = bulkProblem(action, p);
+      return why ? [{ id: p.id, why }] : [];
+    }),
+  ];
+  const changed = pets.filter((p) => !bulkProblem(action, p)).map((p) => p.id);
+  if (!changed.length) return c.json({ changed, skipped, closed: 0 });
+
+  const these = JSON.stringify(changed);
+  const now = nowIso();
+  let closed = 0;
+  if (action === 'reserved' || action === 'available') {
+    await db.prepare('UPDATE pets SET status = ?, updated_at = ? WHERE id IN (SELECT value FROM json_each(?))').bind(action, now, these).run();
+  } else if (action === 'adopted') {
+    // None has open requests (see bulkProblem), so there are none to close.
+    await db
+      .prepare("UPDATE pets SET status = 'adopted', adopted_at = ?, adopted_request_id = NULL, updated_at = ? WHERE id IN (SELECT value FROM json_each(?))")
+      .bind(now, now, these)
+      .run();
+  } else if (action === 'withdrawn') {
+    const [ended] = await db.batch([
+      db
+        .prepare(`UPDATE adoption_requests SET status = 'closed', closed_reason = ?, updated_at = ? WHERE pet_id IN (SELECT value FROM json_each(?)) AND status IN ${OPEN_STATUSES} RETURNING id`)
+        .bind(AUTO.withdrawn, now, these),
+      db
+        .prepare("UPDATE pets SET status = 'withdrawn', withdrawn_at = ?, withdrawn_reason = ?, updated_at = ? WHERE id IN (SELECT value FROM json_each(?))")
+        .bind(now, b.reason, now, these),
+    ]);
+    closed = ended.results.length;
+  } else {
+    await db
+      .prepare(`UPDATE pets SET ${health.map((k) => `${k} = 1`).join(', ')}, updated_at = ? WHERE id IN (SELECT value FROM json_each(?))`)
+      .bind(now, these)
+      .run();
+  }
+  forgetCatalogVersion();
+  return c.json({ changed, skipped, closed });
+});
+
 /** Part of the morning job: 90 days after an adoption, every photo but the main one leaves R2. The
  *  main one stays for the shelter's records and the "¡Ya encontró hogar!" page. Sample photos that
  *  ship with the app ("static:" keys) aren't in R2 and are left alone. */
