@@ -128,6 +128,10 @@ Never edit a migration that has already been applied to staging or production; w
 2. List the migrations it will apply (`cf d1 migrations list DB --remote`, a read-only check).
 3. Note the current version ID for rollback (`cf versions list`).
 
+Two things differ between the deploys by design:
+- **Admins.** Each workflow promotes the emails in a GitHub secret to admin before deploying. Staging uses `STAGING_ADMIN_EMAILS` (a repo secret). Production uses `ADMIN_EMAILS` (a secret on the `production` environment). Both only add or keep admins, never remove them.
+- **Demo labels.** Staging's build sets `VITE_DEMO=1`, which shows the "Demo" tag and the "Datos de ejemplo… ficticios" note (`DEMO` in `web/src/data.ts`; local dev shows them too). Production's build must not set it, or real shelters would be called fictional.
+
 A manual `CF_APPROVED=1 cf deploy` is only for emergencies, and only with an explicit yes.
 
 **Rollback** (ask first): `cf rollback <version-id>` reverts code only. Data changes are undone with a new migration, or with D1 Time Travel as a last resort (`references/d1.md`).

@@ -1,6 +1,6 @@
 import { ArrowLeft, Check, CircleHelp, Clock, Heart, HeartHandshake, House, Mail, Send, Share2, User, X } from 'lucide';
 import { api, ApiError, type GonePet } from '../api';
-import { companionKey, CONTACT_EMAIL, frameFor, type Companion, type PetDetail, type PetSummary } from '../data';
+import { companionKey, CONTACT_EMAIL, DEMO, frameFor, type Companion, type PetDetail, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, t, away } from '../i18n';
 import { activeRequestFor, cachePets, petCache, placePet, state, takeChanged, update } from '../store';
@@ -122,7 +122,7 @@ function body(pet: PetDetail, km: number): Raw {
     <section class="profile__section shelter">
       <h2 class="section-title">${t('profile.lister')}</h2>
       ${lister(pet, km)}
-      <p class="sample-note">${t('app.sampleNote')}</p>
+      ${DEMO ? html`<p class="sample-note">${t('app.sampleNote')}</p>` : ''}
     </section>
     ${canStart(pet) ? ready(pet) : ''}`;
 }

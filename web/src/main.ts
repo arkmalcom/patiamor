@@ -21,6 +21,7 @@ import { bindSlots, renderList, slots } from './views/list';
 import { renderPortal, type PortalView } from './views/portal';
 import { renderProfile } from './views/profile';
 import { renderSearch } from './views/search';
+import { DEMO } from './data';
 
 upgradeHashLink();
 
@@ -84,7 +85,7 @@ mount(
     ${landscape}
     <a class="skip-link" href="#view">Saltar al contenido</a>
     <header class="topbar">
-      <a class="wordmark" href="/" aria-label="${t('app.name')}, ${t('nav.explore')}">${t('app.name')}<span class="wordmark__demo">${t('app.demo')}</span></a>
+      <a class="wordmark" href="/" aria-label="${t('app.name')}, ${t('nav.explore')}">${t('app.name')}${DEMO ? html`<span class="wordmark__demo">${t('app.demo')}</span>` : ''}</a>
       <nav class="topnav" aria-label="Principal">
         <a href="/" data-nav="deck">${t('nav.explore')}</a>
         <a href="/buscar" data-nav="search">${t('nav.search')}</a>

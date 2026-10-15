@@ -5,6 +5,7 @@ import { t } from '../i18n';
 import { setUser, state } from '../store';
 import { renderAuth } from '../ui/auth';
 import { toast } from '../ui/toast';
+import { DEMO } from '../data';
 
 export function renderAccount(root: HTMLElement) {
   const user = state.user;
@@ -36,7 +37,7 @@ export function renderAccount(root: HTMLElement) {
             <a class="button button--ink" href="/refugio">${user?.shelters?.length ? t('account.shelterPortal') : t('account.shelterCta')}</a>
           </div>
         </div>
-        <p class="sample-note">${t('app.sampleNote')}</p>
+        ${DEMO ? html`<p class="sample-note">${t('app.sampleNote')}</p>` : ''}
       </section>`,
   );
   const authRoot = root.querySelector<HTMLElement>('[data-auth]');

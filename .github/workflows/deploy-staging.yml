@@ -40,6 +40,9 @@ jobs:
 
       - name: Build web
         run: npm run build --prefix web
+        env:
+          # Staging runs on sample data: show the "Demo" tag and the "Datos de ejemplo" note (web/src/data.ts).
+          VITE_DEMO: '1'
 
       - name: Type-check API
         run: npm run typecheck --prefix api

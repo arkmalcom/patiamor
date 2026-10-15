@@ -1,6 +1,6 @@
 import { Check, LocateFixed, MapPin, Minus, Plus, Search, X } from 'lucide';
 import { api } from '../api';
-import { frameFor, type AgeGroup, type Companion, type Energy, type Place, type Sex, type Size } from '../data';
+import { DEMO, frameFor, type AgeGroup, type Companion, type Energy, type Place, type Sex, type Size } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { animals, away, formatKm, kmLabel, t, type Key } from '../i18n';
 
@@ -230,7 +230,7 @@ export function radiusPanel(mode: 'sheet' | 'inline'): Raw {
             </fieldset>`,
         )}
       </div>
-      ${mode === 'inline' ? html`<p class="sample-note">${t('app.sampleNote')}</p>` : ''}
+      ${mode === 'inline' && DEMO ? html`<p class="sample-note">${t('app.sampleNote')}</p>` : ''}
     </div>`;
 }
 

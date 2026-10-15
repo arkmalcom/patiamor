@@ -92,3 +92,7 @@ export function ageGroup(months: number | null): AgeGroup | null {
 
 /** Placeholder address for the multi-adoption CTA. Replace before launch. */
 export const CONTACT_EMAIL = 'hola@patiamor.com';
+/** A build on sample data (local development, and staging's build sets VITE_DEMO): shows the "Demo" tag and
+ *  the "Datos de ejemplo… ficticios" note. Production never sets it, so real shelters are never called
+ *  fictional; a forgotten flag only hides the labels on staging. */
+export const DEMO = import.meta.env.DEV || import.meta.env.VITE_DEMO === '1';
