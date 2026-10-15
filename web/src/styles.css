@@ -1396,6 +1396,12 @@ html[data-route='profile'] .tabbar { display: none; }
 .portal-decide { display: grid; gap: 10px; width: 100%; }
 .portal-decide .field[hidden] { display: none; }
 .portal-decide__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* "Verificado por Patiamor" (PAT-2): on a request in the shelter's inbox, and on the admin's page. */
+.verified-badge { display: inline-flex; align-items: center; gap: 5px; width: fit-content; font-size: 0.85rem; font-weight: 800; color: var(--hoja-deep); }
+.verified-badge .icon { flex: none; color: var(--hoja); }
+.adopter-find { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.adopter-find .field { flex: 1 1 240px; }
 .account__shelters { display: grid; gap: 2px; font-weight: 700; }
 /* The sign-in fills the card, so its controls share the card's edges instead of stopping halfway. */
 .portal-card__auth { justify-self: stretch; }

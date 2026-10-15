@@ -1,4 +1,4 @@
-import { House, Mail, MessageCircle, Phone } from 'lucide';
+import { BadgeCheck, House, Mail, MessageCircle, Phone } from 'lucide';
 import { api, type CloseReason, type InboxRequest } from '../api';
 import { frameFor, type PetSummary } from '../data';
 import { $$, html, icon, mount, type Raw } from '../dom';
@@ -160,10 +160,12 @@ function card(r: InboxRequest, shelter: string, shelterId: string): Raw {
           <span class="request-card__who">
             <strong>${t('inbox.wants', { who: r.contact.name, pet: pet.name })}</strong>
             <span class="request-card__meta">${when(r.createdAt)}${pet.status === 'reserved' ? html` · ${t('inbox.petReserved', { pet: pet.name })}` : pet.requestsPaused ? html` · ${t('inbox.petPaused')}` : ''}</span>
+            ${r.verified ? html`<span class="verified-badge">${icon(BadgeCheck, 15)}${t('verified.badge')}</span>` : ''}
           </span>
           ${chip(r.status)}
         </summary>
         <div class="request-card__body">
+          ${r.verified ? html`<p class="muted verified-note">${t('verified.inboxNote', { who: first })}</p>` : ''}
           ${open && r.contact.pref ? contactButtons(r, shelter, first) : ''}
           ${r.status === 'withdrawn' ? html`<p class="portal-card__reason"><strong>${t('inbox.withdrew')}</strong> «${t(`request.withdraw.${r.closedReason as 'situacion'}`)}»</p>` : ''}
           ${r.status === 'closed' ? html`<p class="muted">${closedText(r)}</p>` : ''}

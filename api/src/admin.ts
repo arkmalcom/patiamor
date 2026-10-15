@@ -12,8 +12,8 @@ import { loadKnown, lookAlikes } from './owners';
 import { insertShelter, MAX_OWNED, readApplication } from './portal';
 import { OPEN_STATUSES, PAUSED_SQL, requestsRestricted, WITHDRAW_WINDOW_DAYS } from './requests';
 
-// Admin tools. For now: the shelter verification queue (PAT-13). Every decision is written to
-// admin_actions; the full console (PAT-14) builds on this.
+// Admin tools: the console's queues (PAT-13, PAT-14) and verifying adopters (PAT-2). Every decision is
+// written to admin_actions.
 
 const STATUSES = ['pending', 'verified', 'rejected', 'suspended'] as const;
 /** Which decision is allowed from which status. */
@@ -180,6 +180,90 @@ admin.post('/paused/:userId/clear', async (c) => {
     await sendPauseClearedEmail(c.env, user.email, { note, exploreUrl: appOrigin(c) }).catch((err) => console.error('pause cleared email failed', err));
   }
   return c.json({ cleared: { id: userId } });
+});
+
+// ---------- Verified adopters (PAT-2) ----------
+
+type AdopterRow = {
+  id: string; name: string | null; email: string; phone: string | null; created_at: string;
+  adopter_verified_at: string | null; adopter_verified_note: string | null; verified_by: string | null;
+};
+const ADOPTER_SQL = `SELECT u.id, u.name, u.email, u.phone, u.created_at, u.adopter_verified_at, u.adopter_verified_note,
+    coalesce(v.name, v.email) AS verified_by
+  FROM users u LEFT JOIN users v ON v.id = u.adopter_verified_by`;
+
+/** People as the admin sees them: who they are, the badge if they have it, and their requests so far. */
+async function adopterViews(db: D1Database, rows: AdopterRow[]) {
+  const ids = JSON.stringify(rows.map((r) => r.id));
+  const { results: history } = await db
+    .prepare(
+      `SELECT user_id, sum(status IN ${OPEN_STATUSES}) AS open, sum(status = 'adopted') AS adopted, sum(status = 'withdrawn' AND updated_at > ?) AS withdrawn
+         FROM adoption_requests WHERE user_id IN (SELECT value FROM json_each(?)) GROUP BY user_id`,
+    )
+    .bind(isoIn(-WITHDRAW_WINDOW_DAYS * 24 * 60 * 60 * 1000), ids)
+    .all<{ user_id: string; open: number; adopted: number; withdrawn: number }>();
+  return rows.map((r) => {
+    const h = history.find((x) => x.user_id === r.id);
+    return {
+      id: r.id,
+      who: { name: r.name, email: r.email, phone: r.phone },
+      since: r.created_at,
+      verified: r.adopter_verified_at ? { at: r.adopter_verified_at, by: r.verified_by, note: r.adopter_verified_note } : null,
+      requests: { open: h?.open ?? 0, adopted: h?.adopted ?? 0, withdrawn90: h?.withdrawn ?? 0 },
+    };
+  });
+}
+
+// Everyone with the badge, most recent first, to look over or take one back.
+admin.get('/adopters', async (c) => {
+  const db = c.env.DB;
+  const { results } = await db.prepare(`${ADOPTER_SQL} WHERE u.adopter_verified_at IS NOT NULL ORDER BY u.adopter_verified_at DESC LIMIT 200`).all<AdopterRow>();
+  return c.json({ adopters: await adopterViews(db, results) });
+});
+
+// One person by their account email (exactly), to verify them. Nobody is created: they need an account to
+// ask for an animal anyway.
+admin.get('/adopters/lookup', async (c) => {
+  const email = normalizeEmail(c.req.query('email') ?? '');
+  if (!isEmail(email)) return c.json({ error: 'invalid_email' }, 400);
+  const db = c.env.DB;
+  const row = await db.prepare(`${ADOPTER_SQL} WHERE u.email = ?`).bind(email).first<AdopterRow>();
+  return c.json({ adopter: row ? (await adopterViews(db, [row]))[0] : null });
+});
+
+// Give the badge, saying how you know them (admins read it; shelters only see the badge).
+admin.post('/adopters/:id/verify', async (c) => {
+  const id = c.req.param('id');
+  const adminUser = c.get('user')!;
+  const b = await c.req.json<{ note?: string }>().catch(() => ({}) as { note?: string });
+  const note = (b.note ?? '').trim().slice(0, 500);
+  if (!note) return c.json({ error: 'reason_required' }, 400);
+  const db = c.env.DB;
+  const user = await db.prepare('SELECT adopter_verified_at FROM users WHERE id = ?').bind(id).first<{ adopter_verified_at: string | null }>();
+  if (!user) return c.json({ error: 'not_found' }, 404);
+  if (user.adopter_verified_at) return c.json({ error: 'already_verified' }, 409);
+  await db.batch([
+    db.prepare('UPDATE users SET adopter_verified_at = ?, adopter_verified_by = ?, adopter_verified_note = ? WHERE id = ?').bind(nowIso(), adminUser.id, note, id),
+    db.prepare("INSERT INTO admin_actions (id, admin_id, action, subject_type, subject_id, note) VALUES (?, ?, 'adopter.verify', 'user', ?, ?)").bind(crypto.randomUUID(), adminUser.id, id, note),
+  ]);
+  return c.json({ adopter: { id, verified: true } });
+});
+
+// Take the badge back (the reason, if any, stays in admin_actions).
+admin.post('/adopters/:id/unverify', async (c) => {
+  const id = c.req.param('id');
+  const adminUser = c.get('user')!;
+  const b = await c.req.json<{ note?: string }>().catch(() => ({}) as { note?: string });
+  const note = (b.note ?? '').trim().slice(0, 500) || null;
+  const db = c.env.DB;
+  const user = await db.prepare('SELECT adopter_verified_at FROM users WHERE id = ?').bind(id).first<{ adopter_verified_at: string | null }>();
+  if (!user) return c.json({ error: 'not_found' }, 404);
+  if (!user.adopter_verified_at) return c.json({ error: 'not_verified' }, 409);
+  await db.batch([
+    db.prepare('UPDATE users SET adopter_verified_at = NULL, adopter_verified_by = NULL, adopter_verified_note = NULL WHERE id = ?').bind(id),
+    db.prepare("INSERT INTO admin_actions (id, admin_id, action, subject_type, subject_id, note) VALUES (?, ?, 'adopter.unverify', 'user', ?, ?)").bind(crypto.randomUUID(), adminUser.id, id, note),
+  ]);
+  return c.json({ adopter: { id, verified: false } });
 });
 
 // ---------- Requests to be a shelter owner ----------

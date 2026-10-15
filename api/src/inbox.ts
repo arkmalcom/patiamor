@@ -31,7 +31,7 @@ type Row = {
   experience: string | null; visit: string | null; message: string | null; distance_km: number | null; travel: string | null;
   contact_name: string; contact_email: string; contact_phone: string | null; contact_pref: string;
   pet_id: string; pet_name: string; pet_species: string; pet_status: string; requests_paused: number; open_requests: number;
-  cover: string | null; thumb: string | null; focus: string | null;
+  cover: string | null; thumb: string | null; focus: string | null; adopter_verified_at: string | null;
 };
 
 const isOpen = (status: string) => ['sent', 'seen', 'contacted', 'visit'].includes(status);
@@ -50,6 +50,8 @@ function view(r: Row) {
     message: r.message,
     // The adopter agreed to share these with this shelter for this request, while it's open.
     contact: open ? { name: r.contact_name, email: r.contact_email, phone: r.contact_phone, pref: r.contact_pref } : { name: r.contact_name },
+    // Someone at Patiamor has checked this person out or knows them (PAT-2). Only the fact, not how.
+    verified: r.adopter_verified_at !== null,
     pet: {
       id: r.pet_id,
       name: r.pet_name,
@@ -66,9 +68,10 @@ const SELECT = `SELECT r.id, r.status, r.created_at, r.updated_at, r.seen_at, r.
     r.answer_space, r.answer_time, r.answer_cost, r.home, r.other_pets, r.kids, r.experience, r.visit, r.message, r.distance_km, r.travel,
     r.contact_name, r.contact_email, r.contact_phone, r.contact_pref,
     d.id AS pet_id, d.name AS pet_name, d.species AS pet_species, d.status AS pet_status, d.requests_paused, d.open_requests,
-    ph.r2_key AS cover, ph.thumb_key AS thumb, ph.focus
+    ph.r2_key AS cover, ph.thumb_key AS thumb, ph.focus, u.adopter_verified_at
   FROM adoption_requests r
   JOIN pets d ON d.id = r.pet_id
+  JOIN users u ON u.id = r.user_id
   LEFT JOIN pet_photos ph ON ph.pet_id = d.id AND ph.position = (SELECT min(position) FROM pet_photos WHERE pet_id = d.id)`;
 
 /** The request, if this person is a member of the shelter whose animal it's for. */

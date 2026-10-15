@@ -1,5 +1,5 @@
 import { BadgeCheck, CircleAlert, CirclePause, Clock, House, Mail, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, UserCheck, Users, UsersRound } from 'lucide';
-import { api, ApiError, type AdminBulk, type AdminOwnerRequest, type AdminPaused, type AdminShelter, type BulkStatus, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
+import { api, ApiError, type AdminAdopter, type AdminBulk, type AdminOwnerRequest, type AdminPaused, type AdminShelter, type BulkStatus, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
 import { CONTACT_EMAIL, type Place } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, failText, t, type Key } from '../i18n';
@@ -21,6 +21,7 @@ export type PortalView =
   | { view: 'editar'; id: string }
   | { view: 'adminHub' }
   | { view: 'adminPaused' }
+  | { view: 'adminAdopters'; email: string | null }
   | { view: 'adminShelters'; status: ShelterStatus }
   | { view: 'adminBulk'; status: BulkStatus }
   | { view: 'adminOwners'; status: BulkStatus }
@@ -49,6 +50,7 @@ export function renderPortal(root: HTMLElement, route: PortalView) {
   if (route.view === 'editar') return void edit(root, route.id);
   if (route.view === 'adminHub') return void adminHub(root);
   if (route.view === 'adminPaused') return void adminPausedQueue(root);
+  if (route.view === 'adminAdopters') return void adminAdopters(root, route.email);
   if (route.view === 'adminShelters') return void adminQueue(root, route.status);
   if (route.view === 'adminBulk') return void adminBulkQueue(root, route.status);
   if (route.view === 'adminOwners') return void adminOwnersQueue(root, route.status);
@@ -444,6 +446,7 @@ async function adminHub(root: HTMLElement) {
         <h2 class="section-title">${t('admin.tools')}</h2>
         <div class="admin-tools">
           <a class="button button--outline button--small" href="/refugio/admin/registrar">${icon(Plus, 16)}${t('owners.admin.registerLink')}</a>
+          <a class="button button--outline button--small" href="/refugio/admin/adoptantes">${icon(BadgeCheck, 16)}${t('admin.adoptersLink')}</a>
           <div class="portal-digest">
             <button class="button button--outline button--small" type="button" data-digest>${t('portal.admin.digest')}</button>
             <p class="muted">${t('portal.admin.digestNote')}</p>
@@ -588,6 +591,110 @@ function pausedCard(r: AdminPaused): Raw {
           <button class="button button--primary button--small" type="submit">${icon(BadgeCheck, 16)}${t('paused.clear')}</button>
         </div>
       </form>
+    </li>`;
+}
+
+// ---------- Verified adopters (admins, PAT-2) ----------
+
+/** Look someone up by their account email and give or take back "Verificado por Patiamor"; below, everyone
+ *  who has it. The email lives in the address (?correo=), so a re-render keeps the person on screen. */
+async function adminAdopters(root: HTMLElement, email: string | null) {
+  if (!state.user?.isAdmin) return mount(root, html`<section class="portal"><p class="loading-note">${t('portal.notFound')}</p></section>`);
+  mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
+  let found: AdminAdopter | null = null;
+  let list: AdminAdopter[];
+  try {
+    [found, list] = await Promise.all([email ? api.adminFindAdopter(email).catch(() => null) : Promise.resolve(null), api.adminAdopters()]);
+  } catch {
+    return mount(root, html`<p class="loading-note" role="alert">${t('auth.err.network')}</p>`);
+  }
+  const others = list.filter((a) => a.id !== found?.id);
+  mount(
+    root,
+    html`
+      <section class="portal portal--admin" aria-labelledby="portal-title">
+        <a class="text-button portal__back" href="/refugio/admin">${t('admin.title')}</a>
+        <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('verified.title')}</h1>
+        <p class="portal__lede">${t('verified.lede')}</p>
+        <form class="adopter-find" data-find role="search">
+          <label class="field">
+            <span class="field__label">${t('verified.findLabel')}</span>
+            <input class="field__input" type="email" name="email" inputmode="email" autocomplete="off" required value="${email ?? ''}" />
+          </label>
+          <button class="button button--primary button--small" type="submit">${t('verified.find')}</button>
+        </form>
+        ${email ? (found ? html`<ul class="portal-list">${adopterCard(found)}</ul>` : html`<p class="passed__empty">${t('verified.notFound')}</p>`) : ''}
+        <h2 class="section-title">${t('verified.listTitle')}</h2>
+        ${others.length ? html`<ul class="portal-list">${others.map(adopterCard)}</ul>` : list.length ? '' : html`<p class="passed__empty">${t('verified.empty')}</p>`}
+      </section>`,
+  );
+  $('[data-find]', root).addEventListener('submit', (e) => {
+    e.preventDefault();
+    const value = String(new FormData(e.currentTarget as HTMLFormElement).get('email') ?? '').trim();
+    navigate(`/refugio/admin/adoptantes?correo=${encodeURIComponent(value)}`);
+  });
+  $$<HTMLFormElement>('[data-adopter]', root).forEach((f) =>
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const note = String(new FormData(f).get('note') ?? '').trim();
+      const giving = f.dataset.action === 'verify';
+      if (giving && !note) {
+        $<HTMLTextAreaElement>('textarea[name=note]', f).focus();
+        return toast(t('verified.needNote'));
+      }
+      $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = true));
+      try {
+        if (giving) await api.adminVerifyAdopter(f.dataset.adopter!, note);
+        else await api.adminUnverifyAdopter(f.dataset.adopter!, note || undefined);
+        toast(t(giving ? 'verified.doneGive' : 'verified.doneRemove'));
+        void adminAdopters(root, email);
+      } catch (err) {
+        $$<HTMLButtonElement>('button', f).forEach((b) => (b.disabled = false));
+        toast(failText(err));
+      }
+    }),
+  );
+}
+
+function adopterCard(a: AdminAdopter): Raw {
+  const row = (label: Key, value: Raw | string | null | undefined) => (value ? html`<div><dt>${t(label)}</dt><dd>${value}</dd></div>` : '');
+  const v = a.verified;
+  return html`
+    <li class="portal-card">
+      <div class="portal-card__head">
+        <span class="shelter__mark" aria-hidden="true">${icon(v ? BadgeCheck : UserCheck, 22)}</span>
+        <div>
+          <h2 class="portal-card__name">${a.who.name ?? a.who.email}</h2>
+          <span class="portal-card__place">${t('verified.since', { date: formatDate(a.since.slice(0, 10)) })}</span>
+        </div>
+      </div>
+      <dl class="portal-facts">
+        ${row('owners.admin.contact', html`${emailParts(a.who.email)}${a.who.phone ? html`<br /><a href="${waLink(a.who.phone)}" target="_blank" rel="noopener">${icon(MessageCircle, 15)} ${showPhone(a.who.phone)}</a>` : ''}`)}
+        ${row('verified.requests', t('verified.requestsValue', { open: a.requests.open, adopted: a.requests.adopted, withdrawn: a.requests.withdrawn90 }))}
+      </dl>
+      ${v
+        ? html`
+            <p class="verified-badge">${icon(BadgeCheck, 15)}${t('verified.given', { date: formatDate(v.at.slice(0, 10)), who: v.by ?? '—' })}</p>
+            ${v.note ? html`<blockquote class="request-card__message">${v.note}</blockquote>` : ''}
+            <form class="portal-decide" data-adopter="${a.id}" data-action="unverify">
+              <label class="field">
+                <span class="field__label">${t('verified.removeNote')}</span>
+                <textarea class="field__input field__input--area" name="note" rows="2" maxlength="500"></textarea>
+              </label>
+              <div class="portal-decide__actions">
+                <button class="button button--outline button--small" type="submit">${t('verified.remove')}</button>
+              </div>
+            </form>`
+        : html`
+            <form class="portal-decide" data-adopter="${a.id}" data-action="verify">
+              <label class="field">
+                <span class="field__label">${t('verified.noteLabel')}</span>
+                <textarea class="field__input field__input--area" name="note" rows="2" maxlength="500" placeholder="${t('verified.notePlaceholder')}"></textarea>
+              </label>
+              <div class="portal-decide__actions">
+                <button class="button button--primary button--small" type="submit">${icon(BadgeCheck, 16)}${t('verified.give')}</button>
+              </div>
+            </form>`}
     </li>`;
 }
 

@@ -47,6 +47,16 @@ export interface AdminPaused {
   open: number;
   adopted: number;
 }
+/** A person as an admin sees them when verifying adopters (PAT-2). */
+export interface AdminAdopter {
+  id: string;
+  who: { name: string | null; email: string; phone: string | null };
+  /** When they made their account. */
+  since: string;
+  /** The badge, with who gave it and how they know the person (admins only). */
+  verified: { at: string; by: string | null; note: string | null } | null;
+  requests: { open: number; adopted: number; withdrawn90: number };
+}
 /** A shelter or another request that may be the same one, for the admin to check before approving. */
 export interface LookAlike {
   kind: 'shelter' | 'request';
@@ -231,6 +241,8 @@ export interface InboxRequest {
   about: { home: string | null; otherPets: string[]; kids: string | null; experience: string | null; visit: string | null; distanceKm: number | null; travel: 'si' | 'pensando' | null };
   message: string | null;
   contact: { name: string; email?: string; phone?: string | null; pref?: ContactPref };
+  /** "Verificado por Patiamor": an admin has checked this person out or knows them. */
+  verified: boolean;
   pet: { id: string; name: string; species: string; status: PetStatus; requestsPaused: boolean; openRequests: number; photo: { url: string | null; thumb: string | null; focus: string } };
 }
 
@@ -314,6 +326,10 @@ export const api = {
   adminSummary: () => call<{ shelters: number; owners: number; bulk: number; paused: number }>('/api/admin/summary'),
   adminPaused: () => call<{ paused: AdminPaused[] }>('/api/admin/paused').then((r) => r.paused),
   adminClearPause: (userId: string, note?: string) => call<{ cleared: { id: string } }>(`/api/admin/paused/${encodeURIComponent(userId)}/clear`, 'POST', { note }),
+  adminAdopters: () => call<{ adopters: AdminAdopter[] }>('/api/admin/adopters').then((r) => r.adopters),
+  adminFindAdopter: (email: string) => call<{ adopter: AdminAdopter | null }>(`/api/admin/adopters/lookup?email=${encodeURIComponent(email)}`).then((r) => r.adopter),
+  adminVerifyAdopter: (id: string, note: string) => call<{ adopter: { id: string; verified: boolean } }>(`/api/admin/adopters/${encodeURIComponent(id)}/verify`, 'POST', { note }),
+  adminUnverifyAdopter: (id: string, note?: string) => call<{ adopter: { id: string; verified: boolean } }>(`/api/admin/adopters/${encodeURIComponent(id)}/unverify`, 'POST', { note }),
   adminShelters: (status: ShelterStatus) => call<{ shelters: AdminShelter[] }>(`/api/admin/shelters?status=${status}`).then((r) => r.shelters),
   adminBulk: (status: BulkStatus) => call<{ requests: AdminBulk[] }>(`/api/admin/bulk?status=${status}`).then((r) => r.requests),
   adminBulkDecision: (id: string, action: 'approve' | 'decline', note?: string) =>
