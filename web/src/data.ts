@@ -1,5 +1,6 @@
 // Shapes returned by the Patiamor API, plus small helpers. Pets, shelters and places live in D1;
 // staging is seeded with fictional sample data (api/seeds/staging.sql).
+import { BRAND } from './brand';
 
 export type Species = 'perro' | 'gato';
 /** What the user is browsing: one species or both. */
@@ -90,8 +91,8 @@ export function ageGroup(months: number | null): AgeGroup | null {
   return 'mayor';
 }
 
-/** Placeholder address for the multi-adoption CTA. Replace before launch. */
-export const CONTACT_EMAIL = 'hola@patiamor.com';
+/** The public contact address (brand.ts): for mailto links. In text, strings say {contact}. */
+export const CONTACT_EMAIL = BRAND.contactEmail;
 /** A build on sample data (local development, and staging's build sets VITE_DEMO): shows the "Demo" tag and
  *  the "Datos de ejemplo… ficticios" note. Production never sets it, so real shelters are never called
  *  fictional; a forgotten flag only hides the labels on staging. */

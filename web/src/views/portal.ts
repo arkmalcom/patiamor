@@ -709,7 +709,7 @@ function rulesPage(root: HTMLElement, next: string | null) {
         <a class="text-button portal__back" href="/refugio">${t('portal.back')}</a>
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('rules.title')}</h1>
         <p class="portal__lede">${t('rules.lede')}</p>
-        <ol class="rules__list">${RULES.map((k) => html`<li><strong>${t(`${k}.title`)}</strong> ${t(k, { cap: pesos(2000), email: 'hola@patiamor.com' })}</li>`)}</ol>
+        <ol class="rules__list">${RULES.map((k) => html`<li><strong>${t(`${k}.title`)}</strong> ${t(k, { cap: pesos(2000) })}</li>`)}</ol>
         <p class="portal-card__reason">${t('rules.enforced')}</p>
         <button class="button button--primary" type="button" data-accept>${t('rules.accept')}</button>
       </section>`,

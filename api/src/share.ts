@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import type { AppContext } from './env';
 import { cachedProfile } from './pets';
+import { BRAND } from '../../web/src/brand';
 
 // Link previews (PAT-32). WhatsApp, Facebook, Instagram and the like read a page's meta tags without
 // running its script, so for /mascota/<id> the Worker writes the animal's name, a line about it and its
@@ -33,7 +34,7 @@ const escape = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0
 function card(body: { pet?: Pet; error?: string }): { title: string; description: string; photo: Photo } | null {
   const pet = body.pet;
   if (!pet) return null;
-  const more = 'Hay más perros y gatos esperando familia cerca de ti en Patiamor.';
+  const more = `Hay más perros y gatos esperando familia cerca de ti en ${BRAND.name}.`;
   if (pet.status === 'adopted') return { title: `¡${pet.name} ya encontró hogar!`, description: more, photo: pet.photo };
   if (pet.status === 'withdrawn') return { title: `${pet.name} ya no está disponible`, description: more, photo: pet.photo };
   const kind = (SPECIES[pet.species] ?? SPECIES.perro)[pet.sex === 'hembra' ? 1 : 0];
@@ -56,7 +57,7 @@ export async function petPage(c: C) {
   const meta = (key: 'property' | 'name', name: string, content: string) => `<meta ${key}="${name}" content="${escape(content)}" />`;
   const tags = [
     meta('property', 'og:type', 'website'),
-    meta('property', 'og:site_name', 'Patiamor'),
+    meta('property', 'og:site_name', BRAND.name),
     meta('property', 'og:locale', 'es_DO'),
     meta('property', 'og:title', about.title),
     meta('property', 'og:description', about.description),
@@ -66,7 +67,7 @@ export async function petPage(c: C) {
   ].join('');
 
   const out = new HTMLRewriter()
-    .on('title', { element: (e) => void e.setInnerContent(`${about.title} · Patiamor`) })
+    .on('title', { element: (e) => void e.setInnerContent(`${about.title} · ${BRAND.name}`) })
     .on('meta[name="description"]', { element: (e) => void e.setAttribute('content', about.description) })
     .on('meta[property^="og:"]', { element: (e) => void e.remove() }) // the defaults, replaced below
     .on('head', { element: (e) => void e.append(tags, { html: true }) })

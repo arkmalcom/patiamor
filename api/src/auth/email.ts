@@ -1,3 +1,4 @@
+import { BRAND } from '../../../web/src/brand';
 import type { Env } from '../env';
 import { isoIn } from './crypto';
 
@@ -10,7 +11,7 @@ const shell = (rows: string) => `<!doctype html><html lang="es"><head><meta char
   <body style="margin:0;background:#e3f1f4;font-family:Arial,Helvetica,sans-serif;color:#1d2340">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
     <table role="presentation" width="100%" style="max-width:440px;background:#ffffff;border-radius:16px;border:10px solid #1e7f49" cellpadding="0" cellspacing="0">
-      <tr><td style="padding:28px 28px 8px;font-size:26px;font-weight:bold">Patiamor</td></tr>
+      <tr><td style="padding:28px 28px 8px;font-size:26px;font-weight:bold">${escape(BRAND.name)}</td></tr>
       ${rows}
     </table>
   </td></tr></table></body></html>`;
@@ -19,9 +20,9 @@ const button = (href: string, label: string) =>
   `<a href="${escape(href)}" style="display:inline-block;background:#c8285f;color:#ffffff;text-decoration:none;font-weight:bold;padding:14px 26px;border-radius:999px">${escape(label)}</a>`;
 
 function renderSignIn(code: string, link: string): Message {
-  const subject = `Tu código para entrar a Patiamor: ${code}`;
+  const subject = `Tu código para entrar a ${BRAND.name}: ${code}`;
   const text = [
-    `Tu código para entrar a Patiamor es: ${code}`,
+    `Tu código para entrar a ${BRAND.name} es: ${code}`,
     '',
     `O entra directamente con este enlace: ${link}`,
     '',
@@ -31,7 +32,7 @@ function renderSignIn(code: string, link: string): Message {
       <tr><td style="padding:0 28px;font-size:16px;line-height:1.5">Usa este código para entrar:</td></tr>
       <tr><td style="padding:16px 28px;font-size:36px;font-weight:bold;letter-spacing:8px;font-family:'Courier New',monospace">${escape(code)}</td></tr>
       <tr><td style="padding:0 28px 8px;font-size:16px;line-height:1.5">O entra con un toque:</td></tr>
-      <tr><td style="padding:8px 28px 24px">${button(link, 'Entrar a Patiamor')}</td></tr>
+      <tr><td style="padding:8px 28px 24px">${button(link, `Entrar a ${BRAND.name}`)}</td></tr>
       <tr><td style="padding:0 28px 28px;font-size:13px;line-height:1.5;color:#4a5275">El código y el enlace vencen en 15 minutos. Si no pediste entrar, ignora este correo.</td></tr>`);
   return { subject, text, html };
 }
@@ -60,7 +61,7 @@ type ShelterOutcome = ShelterDecision | 'kept';
 function renderShelterDecision(o: { shelter: string; decision: ShelterOutcome; reason: string | null; portalUrl: string }): Message {
   const copy = {
     verified: {
-      subject: `${o.shelter} ya está verificado en Patiamor`,
+      subject: `${o.shelter} ya está verificado en ${BRAND.name}`,
       lede: `¡Listo! Verificamos a ${o.shelter}. Ya puedes publicar a tus animales y aparecerán con el sello de refugio verificado.`,
     },
     rejected: {
@@ -68,7 +69,7 @@ function renderShelterDecision(o: { shelter: string; decision: ShelterOutcome; r
       lede: `Revisamos la solicitud de ${o.shelter} y por ahora no pudimos verificarla. Puedes corregirla y enviarla de nuevo desde el portal.`,
     },
     suspended: {
-      subject: `${o.shelter} está suspendido en Patiamor`,
+      subject: `${o.shelter} está suspendido en ${BRAND.name}`,
       lede: `Suspendimos a ${o.shelter} y sus animales ya no se muestran. Si crees que es un error, pide una revisión desde el portal.`,
     },
     kept: {
@@ -121,7 +122,7 @@ function renderBulkDecision(o: { decision: BulkDecision; animals: number; note: 
 
 /** To the admins: someone asks to be allowed to register a shelter. */
 function renderOwnerAdmin(o: { who: string; shelter: string; adminUrl: string }): Message {
-  const lede = `${o.who} pide poder registrar «${o.shelter}» en Patiamor.`;
+  const lede = `${o.who} pide poder registrar «${o.shelter}» en ${BRAND.name}.`;
   const text = [lede, '', `Revisa la solicitud (hay parecidos si ya conocemos el refugio): ${o.adminUrl}`].join('\n');
   const html = shell(`
       <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">${escape(lede)}</td></tr>
@@ -137,12 +138,12 @@ function renderListingReview(o: { pet: string; kind: 'held' | 'down'; note: stri
       ? {
           subject: `Estamos revisando la publicación de ${o.pet}`,
           lede: `Varias personas reportaron la publicación de ${o.pet}, así que la ocultamos mientras la revisamos. Sus solicitudes abiertas siguen como estaban.`,
-          more: 'Una persona del equipo de Patiamor la revisará pronto. Si crees que es un error, o quieres contarnos algo, responde a este correo o escríbenos a hola@patiamor.com.',
+          more: `Una persona del equipo de ${BRAND.name} la revisará pronto. Si crees que es un error, o quieres contarnos algo, responde a este correo o escríbenos a ${BRAND.contactEmail}.`,
         }
       : {
           subject: `Retiramos la publicación de ${o.pet}`,
-          lede: `Revisamos la publicación de ${o.pet} y la retiramos de Patiamor: no cumple las reglas para publicar.`,
-          more: 'Sus solicitudes abiertas se cerraron. Si crees que es un error, escríbenos a hola@patiamor.com.',
+          lede: `Revisamos la publicación de ${o.pet} y la retiramos de ${BRAND.name}: no cumple las reglas para publicar.`,
+          more: `Sus solicitudes abiertas se cerraron. Si crees que es un error, escríbenos a ${BRAND.contactEmail}.`,
         };
   const note = o.note ? `Motivo: ${o.note}` : '';
   const text = [copy.lede, note, copy.more, '', `Ver la publicación: ${o.url}`].filter((l, i) => l || i === 3).join('\n');
@@ -169,7 +170,7 @@ function renderReviewAdmin(o: { who: string; shelter: string; adminUrl: string }
 function renderOwnerDecision(o: { decision: BulkDecision; note: string | null; portalUrl: string }): Message {
   const copy = {
     approved: {
-      subject: 'Ya puedes registrar tu refugio en Patiamor',
+      subject: `Ya puedes registrar tu refugio en ${BRAND.name}`,
       lede: 'Aprobamos tu solicitud. Ya puedes registrar tu refugio desde el portal; después lo verificamos y tus animales aparecerán a quienes viven cerca.',
       cta: 'Registrar mi refugio',
     },
@@ -196,7 +197,7 @@ function renderPauseCleared(o: { note: string | null; exploreUrl: string }): Mes
       <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">${escape(lede)}</td></tr>
       ${o.note ? `<tr><td style="padding:8px 28px;font-size:16px;line-height:1.5">${escape(o.note)}</td></tr>` : ''}
       <tr><td style="padding:16px 28px 28px">${button(o.exploreUrl, 'Ver quién espera')}</td></tr>`);
-  return { subject: 'Ya puedes volver a enviar solicitudes en Patiamor', text, html };
+  return { subject: `Ya puedes volver a enviar solicitudes en ${BRAND.name}`, text, html };
 }
 
 const listOf = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} y ${names.at(-1)}`);
@@ -204,7 +205,7 @@ const listOf = (names: string[]) => (names.length < 2 ? names.join('') : `${name
 /** The shelter's morning summary: new requests since the last one, and how many are still unopened. */
 function renderDigest(o: { shelter: string; fresh: number; pets: string[]; unopened: number; inboxUrl: string }): Message {
   const what = o.fresh === 1 ? `1 solicitud nueva para ${o.pets[0]}` : `${o.fresh} solicitudes nuevas para ${listOf(o.pets)}`;
-  const subject = `${o.shelter}: ${o.fresh === 1 ? '1 solicitud nueva' : `${o.fresh} solicitudes nuevas`} en Patiamor`;
+  const subject = `${o.shelter}: ${o.fresh === 1 ? '1 solicitud nueva' : `${o.fresh} solicitudes nuevas`} en ${BRAND.name}`;
   const waiting = o.unopened > o.fresh ? `En total tienes ${o.unopened} sin abrir.` : '';
   const text = [`Buenos días. ${sentenceCase(what)}.`, waiting, '', `Míralas y responde desde el portal: ${o.inboxUrl}`, '', 'Te escribimos una vez al día, solo cuando hay solicitudes nuevas.']
     .filter((l, i) => l || i === 2 || i === 4)
@@ -222,7 +223,7 @@ function renderAvailable(o: { pets: { name: string; url: string }[] }): Message 
   const names = listOf(o.pets.map((p) => p.name));
   const one = o.pets.length === 1;
   const subject = one ? `${names} vuelve a recibir solicitudes` : `${names} vuelven a recibir solicitudes`;
-  const lede = one ? `${names} vuelve a recibir solicitudes en Patiamor. Nos pediste que te avisáramos.` : `${names} vuelven a recibir solicitudes en Patiamor. Nos pediste que te avisáramos.`;
+  const lede = one ? `${names} vuelve a recibir solicitudes en ${BRAND.name}. Nos pediste que te avisáramos.` : `${names} vuelven a recibir solicitudes en ${BRAND.name}. Nos pediste que te avisáramos.`;
   const text = [lede, '', ...o.pets.map((p) => `${p.name}: ${p.url}`)].join('\n');
   const html = shell(`
       <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">${escape(lede)}</td></tr>

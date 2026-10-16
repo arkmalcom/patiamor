@@ -1,6 +1,6 @@
 import { Camera, Copy, Eye, EyeOff, Handshake, HeartHandshake, ListChecks, PencilLine, Plus, Star, Syringe, X, type IconNode } from 'lucide';
 import { api, ApiError, type Listing, type ListingPhoto, type ListingReview, type ListingShelter, type ListingSummary, type ManyChange, type PetForm, type PetStatus, type WithdrawReason } from '../api';
-import { ageMonths, CONTACT_EMAIL, type PetSummary } from '../data';
+import { ageMonths, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { failText, pesos, t, type Key } from '../i18n';
 import { moneyWords } from '../money';
@@ -473,7 +473,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
               <label class="field">
                 <span class="field__label">${t('profile.fee')} <span class="muted">(${t('request.optional')})</span></span>
                 <span class="money"><span class="money__unit" aria-hidden="true">RD$</span><input class="field__input" name="fee" type="number" inputmode="numeric" min="0" max="${Math.max(shelter.feeCapDop, existing?.adoptionFeeDop ?? 0)}" step="1" value="${v.adoptionFeeDop ?? ''}" aria-describedby="fee-hint" /></span>
-                <span class="field__hint" id="fee-hint">${t('listing.feeHint', { cap: pesos(shelter.feeCapDop), email: CONTACT_EMAIL })}</span>
+                <span class="field__hint" id="fee-hint">${t('listing.feeHint', { cap: pesos(shelter.feeCapDop) })}</span>
               </label>
               <label class="field">
                 <span class="field__label">${t('listing.inCareSince')} <span class="muted">(${t('request.optional')})</span></span>
@@ -708,7 +708,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
     const fail = (code: string) => {
       const known = code.startsWith('thumb_') ? 'invalid_image' : code === 'invalid_dimensions' ? 'invalid_image' : code;
       error.textContent = (ERRORS as readonly string[]).includes(known)
-        ? t(`listing.err.${known as (typeof ERRORS)[number]}`, { cap: pesos(shelter.feeCapDop), email: CONTACT_EMAIL })
+        ? t(`listing.err.${known as (typeof ERRORS)[number]}`, { cap: pesos(shelter.feeCapDop) })
         : failText(known);
       error.hidden = false;
       progress.textContent = '';

@@ -148,7 +148,7 @@ function openFull(pet: PetSummary) {
 
 /** New requests are paused after several withdrawals, until Patiamor has checked in. */
 function openRestricted() {
-  const body = html`<div class="request-done"><p>${t('request.restrictedBody', { email: CONTACT_EMAIL })}</p></div>`;
+  const body = html`<div class="request-done"><p>${t('request.restrictedBody')}</p></div>`;
   const dialog = openSheet(t('request.restrictedTitle'), body, {
     footer: html`<a class="button button--ink" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(t('request.restrictedSubject'))}">${icon(Mail, 18)}${t('full.manyCta')}</a>`,
   });

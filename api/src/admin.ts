@@ -9,6 +9,7 @@ import { runDigest } from './digest';
 import type { AppContext } from './env';
 import { placeById } from './places';
 import { loadKnown, lookAlikes } from './owners';
+import { BRAND } from '../../web/src/brand';
 import { DEFAULT_FEE_CAP_DOP, MAX_FEE_DOP } from './listings';
 import { endReview, tellOwners } from './moderation';
 import { photoUrl } from './pets';
@@ -482,7 +483,7 @@ admin.post('/shelters', async (c) => {
   await db.prepare('UPDATE users SET shelter_owner_at = coalesce(shelter_owner_at, ?) WHERE id = ?').bind(now, owner.id).run();
   const { id, slug } = await insertShelter(db, app, owner.id, { status: 'verified', adminId: adminUser.id });
   await db.batch([
-    db.prepare("UPDATE shelter_owner_requests SET status = 'approved', decision_note = 'Registrado por Patiamor.', decided_by = ?, decided_at = ? WHERE user_id = ? AND status = 'pending'").bind(adminUser.id, now, owner.id),
+    db.prepare("UPDATE shelter_owner_requests SET status = 'approved', decision_note = ?, decided_by = ?, decided_at = ? WHERE user_id = ? AND status = 'pending'").bind(`Registrado por ${BRAND.name}.`, adminUser.id, now, owner.id),
     db.prepare("INSERT INTO admin_actions (id, admin_id, action, subject_type, subject_id, note) VALUES (?, ?, 'shelter.register_for', 'shelter', ?, ?)").bind(crypto.randomUUID(), adminUser.id, id, `owner=${ownerEmail}`),
   ]);
   if (await hasEmailBudget(db, 'shelter_decision')) {

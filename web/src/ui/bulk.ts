@@ -1,6 +1,5 @@
 import { Check, Send } from 'lucide';
 import { ApiError, api, type BulkForm, type BulkRequest, type BulkSpecies } from '../api';
-import { CONTACT_EMAIL } from '../data';
 import { $, html, icon, type Raw } from '../dom';
 import { failText, t, type Key } from '../i18n';
 import { here } from '../nav';
@@ -27,7 +26,7 @@ const showPhone = (p: string | null | undefined) => {
 export function openBulk() {
   if (!state.signedIn) return showAuth();
   if (state.user?.requestsRestricted) {
-    openSheet(t('request.restrictedTitle'), html`<div class="request-done"><p>${t('request.restrictedBody', { email: CONTACT_EMAIL })}</p></div>`);
+    openSheet(t('request.restrictedTitle'), html`<div class="request-done"><p>${t('request.restrictedBody')}</p></div>`);
     return;
   }
   // One waiting at a time: say so, rather than let them fill a form that will be refused.
