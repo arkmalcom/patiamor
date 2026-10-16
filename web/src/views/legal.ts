@@ -22,8 +22,10 @@ export function renderLegal(root: HTMLElement, doc: LegalDoc) {
       <article class="legal" aria-labelledby="legal-title">
         <button class="text-button legal__back" type="button" data-back>${icon(ArrowLeft, 18)}${t('legal.back')}</button>
         <h1 class="page-title" id="legal-title" tabindex="-1" data-focus>${title}</h1>
-        <div class="legal__text">${blocks.map(block)}</div>
-        <p class="legal__other"><a href="${doc === 'privacidad' ? '/terminos' : '/privacidad'}">${t(doc === 'privacidad' ? 'legal.terminos' : 'legal.privacidad')}</a></p>
+        <div class="legal__text">
+          ${blocks.map(block)}
+          <p class="legal__other"><a href="${doc === 'privacidad' ? '/terminos' : '/privacidad'}">${t(doc === 'privacidad' ? 'legal.terminos' : 'legal.privacidad')}</a></p>
+        </div>
       </article>`,
   );
   $('[data-back]', root).addEventListener('click', () => (history.length > 1 && document.referrer.startsWith(location.origin) ? history.back() : location.assign('/')));
