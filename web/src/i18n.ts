@@ -1069,7 +1069,7 @@ export const es = {
   'listing.copyNote': 'Copiamos los datos de {name}. Ponle su propio nombre y sus fotos, y revisa el sexo y la historia antes de guardar.',
   'portal.admin.digest': 'Enviar ahora el resumen de la mañana',
   'portal.admin.digestNote': 'Se envía solo cada día a las 8:00. Incluye solo lo nuevo, así que enviarlo ahora no duplica nada.',
-  'portal.admin.digestDone': 'Listo: {digests} resúmenes a refugios y {alerts} avisos «Avísame».',
+  'portal.admin.digestDone': 'Listo: {digests} resúmenes a refugios, {alerts} avisos «Avísame» y {closed} avisos de solicitudes terminadas.',
   'portal.admin.digestDeferred': ' El resto sale mañana: se acabó el presupuesto de correos de hoy.',
   'err.rate_limited': 'Vas muy rápido. Espera un minuto y vuelve a intentarlo.',
   'auth.err.rate_limited': 'Demasiados intentos seguidos. Espera un minuto y vuelve a intentarlo.',

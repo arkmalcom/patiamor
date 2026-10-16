@@ -1,5 +1,5 @@
-import { nowIso } from './auth/crypto';
-import { hasEmailBudget, sendAvailableEmail, sendDigestEmail } from './auth/email';
+import { isoIn, nowIso } from './auth/crypto';
+import { hasEmailBudget, sendAvailableEmail, sendClosedEmail, sendDigestEmail, type ClosedNotice, type ClosedOutcome } from './auth/email';
 import type { Env } from './env';
 import { REQUEST_CAP, VISIBLE } from './pets';
 
@@ -8,13 +8,32 @@ import { REQUEST_CAP, VISIBLE } from './pets';
 // asked "Avísame" hear once when a pet takes requests again. Everything draws on the shared daily email
 // budget, which always keeps room for sign-in codes; what doesn't fit goes out the next morning, and
 // shelters see every request in the portal meanwhile.
+//
+// People who asked to adopt are emailed only when a request ends without a home for them (the shelter moved
+// on, the animal went to another family or left Patiamor), at most once a morning however many ended. Good
+// news needs no email: the shelter has already told them (owner decision, 2026-10-16).
 
-export type DigestResult = { shelters: number; digestEmails: number; alertEmails: number; deferred: boolean };
+export type DigestResult = { shelters: number; digestEmails: number; alertEmails: number; closedEmails: number; deferred: boolean };
+
+/** A request that ended more than this long ago isn't announced any more (the job was down, or the budget ran out). */
+const NOTICE_DAYS = 3;
+/** How each way a request can close reads to the adopter: the shelter's own reasons stay with the shelter. */
+const OUTCOME: Record<string, ClosedOutcome> = { adoptado: 'found_home', retirado: 'gone' };
+
+/** What the adopter is told about one request that ended: how it ended and who was involved, never the
+ *  shelter's own reason, and never a private lister's name. */
+export function noticeFor(r: { closed_reason: string | null; pet: string; lister: string | null; lister_kind: string | null }): ClosedNotice {
+  return {
+    pet: r.pet,
+    outcome: OUTCOME[r.closed_reason ?? ''] ?? 'moved_on',
+    lister: r.lister && r.lister_kind !== 'private' ? r.lister : 'La persona que lo publicó',
+  };
+}
 
 export async function runDigest(env: Env, origin = env.APP_ORIGIN ?? ''): Promise<DigestResult> {
   const db = env.DB;
   const started = nowIso();
-  const result: DigestResult = { shelters: 0, digestEmails: 0, alertEmails: 0, deferred: false };
+  const result: DigestResult = { shelters: 0, digestEmails: 0, alertEmails: 0, closedEmails: 0, deferred: false };
 
   // Shelters with unopened requests no summary has mentioned yet, and how many are unopened in total.
   const { results: shelters } = await db
@@ -79,6 +98,37 @@ export async function runDigest(env: Env, origin = env.APP_ORIGIN ?? ''): Promis
         )
         .catch((err) => console.error('availability email failed', userId, err));
       result.alertEmails++;
+    }
+  }
+  // Requests that ended without a home for this person. 'devuelto' (an adoption undone) isn't announced.
+  if (!result.deferred) {
+    await db
+      .prepare("UPDATE adoption_requests SET closed_notified_at = ? WHERE status = 'closed' AND closed_notified_at IS NULL AND (updated_at < ? OR coalesce(closed_reason, '') = 'devuelto')")
+      .bind(started, isoIn(-NOTICE_DAYS * 24 * 60 * 60 * 1000))
+      .run();
+    const { results: closed } = await db
+      .prepare(
+        `SELECT r.id, r.user_id, r.closed_reason, u.email, d.name AS pet, s.name AS lister, s.kind AS lister_kind
+           FROM adoption_requests r JOIN users u ON u.id = r.user_id JOIN pets d ON d.id = r.pet_id LEFT JOIN shelters s ON s.id = d.shelter_id
+          WHERE r.status = 'closed' AND r.closed_notified_at IS NULL ORDER BY r.updated_at LIMIT 500`,
+      )
+      .all<{ id: string; user_id: string; closed_reason: string | null; email: string; pet: string; lister: string | null; lister_kind: string | null }>();
+    const people = new Map<string, { email: string; ids: string[]; notices: ClosedNotice[] }>();
+    for (const r of closed) {
+      const person = people.get(r.user_id) ?? { email: r.email, ids: [], notices: [] };
+      person.ids.push(r.id);
+      person.notices.push(noticeFor(r));
+      people.set(r.user_id, person);
+    }
+    for (const [, person] of people) {
+      if (!(await hasEmailBudget(db, 'request_closed'))) {
+        result.deferred = true; // they stay unmarked: tomorrow, if still within a few days
+        break;
+      }
+      await sendClosedEmail(env, person.email, { notices: person.notices, listUrl: `${origin}/lista`, exploreUrl: origin || '/' })
+        .then(() => db.prepare('UPDATE adoption_requests SET closed_notified_at = ? WHERE id IN (SELECT value FROM json_each(?))').bind(started, JSON.stringify(person.ids)).run())
+        .catch((err) => console.error('closed request email failed', person.email, err));
+      result.closedEmails++;
     }
   }
   if (result.deferred) console.warn('morning job: daily email budget reached; the rest goes out tomorrow', result);

@@ -246,6 +246,28 @@ function renderAvailable(o: { pets: { name: string; url: string }[] }): Message 
   return { subject, text, html };
 }
 
+/** What happened to a request that ended without a home for this person. The shelter's own reason is never shared. */
+export type ClosedOutcome = 'moved_on' | 'found_home' | 'gone';
+export type ClosedNotice = { pet: string; outcome: ClosedOutcome; lister: string };
+
+/** "Novedades": requests that ended, in one email per person (PAT-6). Only bad news: good news, they already know. */
+function renderClosed(o: { notices: ClosedNotice[]; listUrl: string; exploreUrl: string }): Message {
+  const line = (n: ClosedNotice) =>
+    n.outcome === 'found_home' ? `${n.pet} encontró un hogar.` : n.outcome === 'gone' ? `${n.pet} ya no está disponible.` : `${n.lister} siguió adelante con otra familia para ${n.pet}.`;
+  const one = o.notices.length === 1;
+  const subject = one ? `Novedades de tu solicitud para ${o.notices[0].pet}` : 'Novedades de tus solicitudes';
+  const lede = one ? line(o.notices[0]) : 'Algunas de tus solicitudes terminaron:';
+  const more = 'Gracias por considerarlos: hay más animales esperando familia cerca de ti.';
+  const text = [lede, ...(one ? [] : o.notices.map((n) => `- ${line(n)}`)), '', more, `Ver más animales: ${o.exploreUrl}`, `Mi lista: ${o.listUrl}`].join('\n');
+  const html = shell(`
+      <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">${escape(lede)}</td></tr>
+      ${one ? '' : `<tr><td style="padding:4px 28px 8px;font-size:16px;line-height:1.6">${o.notices.map((n) => escape(line(n))).join('<br>')}</td></tr>`}
+      <tr><td style="padding:8px 28px;font-size:16px;line-height:1.5">${escape(more)}</td></tr>
+      <tr><td style="padding:16px 28px 8px">${button(o.exploreUrl, 'Ver más animales')}</td></tr>
+      <tr><td style="padding:0 28px 28px;font-size:13px;line-height:1.5;color:#4a5275">Puedes ver todas tus solicitudes en <a href="${escape(o.listUrl)}" style="color:#2d4fc9">Mi lista</a>.</td></tr>`);
+  return { subject, text, html };
+}
+
 const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Resend's free tier allows 100 emails a day (and 3,000 a month) across the whole account. */
@@ -261,7 +283,7 @@ export function isQuotaError(status: number, body: string): boolean {
   }
 }
 
-export type EmailKind = 'signin' | 'request_sent' | 'shelter_decision' | 'digest' | 'available' | 'bulk_admin' | 'bulk_decision' | 'owner_admin' | 'owner_decision' | 'pause_cleared' | 'review_admin' | 'listing_review';
+export type EmailKind = 'signin' | 'request_sent' | 'shelter_decision' | 'digest' | 'available' | 'bulk_admin' | 'bulk_decision' | 'owner_admin' | 'owner_decision' | 'pause_cleared' | 'review_admin' | 'listing_review' | 'request_closed';
 
 // One budget for every email (email_log, migration 0007). Sign-in codes may use all of it; everything
 // else stops short, so a busy day of confirmations can never lock people out of signing in.
@@ -334,6 +356,9 @@ export const sendPauseClearedEmail = (env: Env, to: string, o: { note: string | 
 
 export const sendDigestEmail = (env: Env, to: string, o: { shelter: string; fresh: number; pets: string[]; unopened: number; inboxUrl: string }) =>
   send(env, 'digest', to, renderDigest(o), `shelter=${o.shelter} fresh=${o.fresh} unopened=${o.unopened}`);
+
+export const sendClosedEmail = (env: Env, to: string, o: { notices: ClosedNotice[]; listUrl: string; exploreUrl: string }) =>
+  send(env, 'request_closed', to, renderClosed(o), `closed=${o.notices.map((n) => `${n.pet}:${n.outcome}`).join('|')}`);
 
 export const sendAvailableEmail = (env: Env, to: string, o: { pets: { name: string; url: string }[] }) =>
   send(env, 'available', to, renderAvailable(o), `pets=${o.pets.map((p) => p.name).join('|')}`);

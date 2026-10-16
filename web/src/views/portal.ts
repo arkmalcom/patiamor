@@ -550,7 +550,7 @@ async function adminHub(root: HTMLElement) {
     b.disabled = true;
     try {
       const r = await api.runDigest();
-      toast(t('portal.admin.digestDone', { digests: r.digestEmails, alerts: r.alertEmails }) + (r.deferred ? t('portal.admin.digestDeferred') : ''));
+      toast(t('portal.admin.digestDone', { digests: r.digestEmails, alerts: r.alertEmails, closed: r.closedEmails }) + (r.deferred ? t('portal.admin.digestDeferred') : ''));
     } catch (err) {
       toast(failText(err));
     }

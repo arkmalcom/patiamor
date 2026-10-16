@@ -399,7 +399,7 @@ export const api = {
   markAdopted: (petId: string, requestId?: string) => call<PetChange>(`/api/portal/pets/${encodeURIComponent(petId)}/adopted`, 'POST', { requestId }),
   withdrawPet: (petId: string, reason: WithdrawReason) => call<PetChange>(`/api/portal/pets/${encodeURIComponent(petId)}/withdraw`, 'POST', { reason }),
   relistPet: (petId: string) => call<PetChange>(`/api/portal/pets/${encodeURIComponent(petId)}/relist`, 'POST', {}),
-  runDigest: () => call<{ shelters: number; digestEmails: number; alertEmails: number; deferred: boolean }>('/api/admin/digest', 'POST', {}),
+  runDigest: () => call<{ shelters: number; digestEmails: number; alertEmails: number; closedEmails: number; deferred: boolean }>('/api/admin/digest', 'POST', {}),
   /** How many of each kind of request are waiting for an admin. */
   adminSummary: () => call<{ shelters: number; owners: number; bulk: number; paused: number; reports: number }>('/api/admin/summary'),
   adminPaused: () => call<{ paused: AdminPaused[] }>('/api/admin/paused').then((r) => r.paused),
