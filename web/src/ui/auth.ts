@@ -4,6 +4,7 @@ import { $, html, icon, mount, raw } from '../dom';
 import { t, type Key } from '../i18n';
 import { setUser } from '../store';
 import { humanCheck } from './human';
+import { legalLinks } from './legal-links';
 
 // Sign-in: Google, or one email carrying a 6-digit code plus a one-tap link. Then the name, if we lack it.
 
@@ -64,6 +65,7 @@ export function renderAuth(root: HTMLElement, opts: AuthOpts) {
             <button class="button button--ink button--block" type="submit">${icon(Mail, 18)}<span>${t('auth.sendCode')}</span></button>
           </form>
           <p class="sample-note">${t('auth.privacy')}</p>
+          ${legalLinks('legal.signIn', true)}
         </div>`,
     );
     $('[data-google]', root).addEventListener('click', () => opts.beforeRedirect?.());

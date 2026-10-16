@@ -38,6 +38,7 @@ app.use('/api/*', async (c, next) => {
 app.use('/api/*', async (c, next) => {
   await next();
   if (!c.res.headers.has('Cache-Control')) c.res.headers.set('Cache-Control', 'no-store');
+  c.res.headers.set('X-Content-Type-Options', 'nosniff'); // an answer is only ever read as what it says it is
 });
 
 // Public reads are the same for everyone, so they skip the session lookup (a D1 read per request).

@@ -19,3 +19,17 @@
   Cache-Control: public, max-age=86400
 /manifest.webmanifest
   Cache-Control: public, max-age=86400
+
+# Every page and file: the browser protections a public site with sign-in should have.
+# - The page can't be framed (clickjacking) or have its type guessed, and doesn't tell other sites which page you came from.
+# - The Content-Security-Policy lets the page run only its own scripts, plus Cloudflare Turnstile, the check on
+#   sign-in (https://developers.cloudflare.com/turnstile/reference/content-security-policy/). Inline styles are
+#   allowed because the app sets styles on elements (the photo framing); inline scripts are not.
+#   Photos are served by the Worker from the same address, and previews of photos about to be uploaded are blob: URLs.
+# - Permissions: only the location button (the person's own area) is allowed to ask for anything.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(self), camera=(), microphone=(), payment=(), usb=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'

@@ -16,6 +16,7 @@ import { api, ApiError } from './api';
 import { here, isAppPath, navigate, startNavigation, upgradeHashLink } from './nav';
 import { errorText } from './ui/auth';
 import { renderAccount } from './views/account';
+import { renderLegal, type LegalDoc } from './views/legal';
 import { renderDeck } from './views/deck';
 import { bindSlots, renderList, slots } from './views/list';
 import { renderPortal, type PortalView } from './views/portal';
@@ -25,7 +26,7 @@ import { DEMO } from './data';
 
 upgradeHashLink();
 
-type Route = { name: 'deck' } | { name: 'profile'; id: string } | { name: 'search'; q: string } | { name: 'list' } | { name: 'account' } | ({ name: 'portal' } & PortalView);
+type Route = { name: 'deck' } | { name: 'profile'; id: string } | { name: 'search'; q: string } | { name: 'list' } | { name: 'account' } | { name: 'legal'; doc: LegalDoc } | ({ name: 'portal' } & PortalView);
 
 /** The route for an in-app path (here()): "/mascota/luna", "/refugio/x/animales?ver=adoptados"… */
 function parse(where: string): Route {
@@ -71,6 +72,7 @@ function parse(where: string): Route {
   if (a === 'buscar') return { name: 'search', q: new URLSearchParams(query).get('q') ?? '' };
   if (a === 'lista') return { name: 'list' };
   if (a === 'cuenta') return { name: 'account' };
+  if (a === 'privacidad' || a === 'terminos') return { name: 'legal', doc: a };
   return { name: 'deck' };
 }
 
@@ -189,6 +191,8 @@ function render(route = parse(here())) {
       return renderList(view, { openProfile, explore });
     case 'account':
       return renderAccount(view);
+    case 'legal':
+      return renderLegal(view, route.doc);
     case 'portal':
       return renderPortal(view, route);
   }

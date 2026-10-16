@@ -37,6 +37,8 @@ Email sign-in (`/api/auth/email/start`) requires a Turnstile token (`api/src/aut
 - `TURNSTILE_SITE_KEY`, public, in that environment's `vars` in `wrangler.jsonc`. Unset, the check is off.
 - `TURNSTILE_SECRET`, a secret, so ask first. Set it before adding the site key: with the key and no secret, email sign-in refuses everyone (fail closed, never skipped).
 
+The site's Content-Security-Policy (`web/public/_headers`) allows scripts and frames from `https://challenges.cloudflare.com` and nothing else outside the site itself. A new third-party script, frame, font or image source needs its address added there, or the browser blocks it. Check by walking the app locally and watching for "Content Security Policy" messages in the console.
+
 Widgets are made in the dashboard (Turnstile → Add widget, mode Managed). Each lists the hostnames it works on. Locally and in tests, use Cloudflare's test keys (site `1x00000000000000000000AA`, secret `1x0000000000000000000000000000000AA`); they're in `.dev.vars.example` and `vitest.config.ts`.
 
 The app uses real paths (/mascota/<id>, /lista…), not hash routes. `assets.not_found_handling: single-page-application` serves the app for any path without running the Worker. `run_worker_first` lists `/api/*` and `/mascota/*`: the Worker writes link-preview tags into pet pages (`api/src/share.ts`). Keep other page paths off that list, since each Worker run counts against the free plan's 100,000 requests a day while static assets are free.

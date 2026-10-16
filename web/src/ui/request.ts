@@ -27,6 +27,7 @@ import { listerLabel, miniFrame } from './canvas';
 import { closeSheet, openSheet } from './sheet';
 import { toast } from './toast';
 import { here, navigate } from '../nav';
+import { legalLinks } from './legal-links';
 
 // Adoption requests. Liking a pet opens its full profile; "Quiero adoptar" in its bar opens this one form: the reflection questions, how to reach the adopter, consent, and
 // optionally more for the lister. Each request takes one of Mi lista's 3 slots until it ends or is
@@ -221,6 +222,7 @@ function openForm(pet: PetSummary) {
         <input type="checkbox" name="consent" />
         <span>${t('request.consent', { email: user?.email ?? '', lister })}</span>
       </label>
+      ${legalLinks('legal.send', true)}
       <p class="form-error" role="alert" hidden data-error></p>
     </form>`;
   const footer = html`

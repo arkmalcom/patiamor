@@ -1,9 +1,10 @@
-import { Globe, House, LogOut } from 'lucide';
+import { Globe, House, LogOut, Scale } from 'lucide';
 import { api } from '../api';
 import { html, icon, mount } from '../dom';
 import { t } from '../i18n';
 import { setUser, state } from '../store';
 import { renderAuth } from '../ui/auth';
+import { legalLinks } from '../ui/legal-links';
 import { toast } from '../ui/toast';
 import { DEMO } from '../data';
 
@@ -36,6 +37,10 @@ export function renderAccount(root: HTMLElement) {
               : ''}
             <a class="button button--ink" href="/refugio">${user?.shelters?.length ? t('account.shelterPortal') : t('account.shelterCta')}</a>
           </div>
+        </div>
+        <div class="account__row">
+          ${icon(Scale, 20)}
+          <span><strong>${t('legal.account')}</strong>${legalLinks()}</span>
         </div>
         ${DEMO ? html`<p class="sample-note">${t('app.sampleNote')}</p>` : ''}
       </section>`,

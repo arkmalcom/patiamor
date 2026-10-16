@@ -1,10 +1,6 @@
 # Términos de uso de Patiamor
 
-> **BORRADOR para revisión.** No está publicado. Lo que va entre corchetes `[así]` falta por decidir. Antes de publicarlo, debe leerlo alguien que conozca el derecho dominicano.
->
-> **Para el abogado:** Patiamor es por ahora un proyecto personal sin personalidad jurídica: la fundación todavía no existe, así que el texto dice «Patiamor» donde iría quien ofrece el servicio. ¿Qué implica eso para estos términos, la limitación de responsabilidad y la jurisdicción?
-
-**Última actualización:** [fecha de publicación]
+**Última actualización:** 16 de octubre de 2026
 
 Estos términos explican las reglas para usar Patiamor (patiamor.com). Al crear una cuenta o usar Patiamor, los aceptas. Si no estás de acuerdo, no uses Patiamor. Sobre cómo tratamos tus datos, lee la [Política de privacidad](./privacidad.md).
 
@@ -66,11 +62,11 @@ En la medida que lo permita la ley, no respondemos por:
 - la conducta de las personas que se conocen a través de Patiamor;
 - las interrupciones del servicio.
 
-Conoce siempre al animal y a la persona o el refugio antes de una adopción, y si algo te parece raro, avísanos. [Revisar con un abogado el alcance de esta limitación según el derecho dominicano.]
+Conoce siempre al animal y a la persona o el refugio antes de una adopción, y si algo te parece raro, avísanos.
 
 ## Cambios
 
-Podemos cambiar estos términos. Si el cambio es importante, lo avisaremos en Patiamor [y por correo] antes de que se aplique. Si sigues usando Patiamor después, aceptas la nueva versión.
+Podemos cambiar estos términos. Si el cambio es importante, lo avisaremos en Patiamor antes de que se aplique. Si sigues usando Patiamor después, aceptas la nueva versión.
 
 ## Ley aplicable
 

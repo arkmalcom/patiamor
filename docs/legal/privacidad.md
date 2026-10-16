@@ -1,12 +1,6 @@
 # Política de privacidad de Patiamor
 
-> **BORRADOR para revisión.** No está publicado. Lo que va entre corchetes `[así]` falta por decidir. Antes de publicarlo, debe leerlo alguien que conozca la Ley 172-13 de la República Dominicana.
->
-> **Para el abogado:**
-> - Patiamor es por ahora un proyecto personal sin personalidad jurídica: la fundación todavía no existe, así que el texto dice «Patiamor» donde iría el responsable. ¿Hace falta nombrar a una persona física mientras tanto?
-> - El plazo de 10 días hábiles para responder está tomado de fuentes secundarias sobre la ley. Confirmar el artículo, y si aplica también a la supresión y a la oposición.
-
-**Última actualización:** [fecha de publicación]
+**Última actualización:** 16 de octubre de 2026
 
 Patiamor es una plataforma gratuita para encontrar perros y gatos en adopción en la República Dominicana. Une a personas que quieren adoptar con refugios y rescatistas. Esta política explica qué datos tuyos guardamos, para qué, con quién los compartimos y qué puedes pedirnos. La escribimos en lenguaje sencillo a propósito.
 
@@ -59,10 +53,10 @@ Las fichas de los animales (fotos, historia, salud, compatibilidad, zona) son p�
 
 ## Cuánto tiempo guardamos tus datos
 
-- **Tu cuenta y tus solicitudes:** mientras tengas cuenta en Patiamor, o hasta que nos pidas borrarlas. Tú ves las solicitudes terminadas en «Mi lista» durante 30 días, y el refugio las ve en su bandeja durante 90 días. Después dejan de mostrarse, pero quedan en nuestro registro. [Decidir si se borran o anonimizan pasado un tiempo, por ejemplo 2 años.]
+- **Tu cuenta y tus solicitudes:** mientras tengas cuenta en Patiamor, o hasta que nos pidas borrarlas. Tú ves las solicitudes terminadas en «Mi lista» durante 30 días, y el refugio las ve en su bandeja durante 90 días. Después dejan de mostrarse, pero quedan en nuestro registro mientras exista tu cuenta.
 - **Las sesiones:** 90 días sin usar Patiamor.
 - **Los códigos para entrar:** caducan a los 15 minutos.
-- **Las decisiones del equipo de Patiamor** (verificaciones, pausas, aprobaciones): se guardan en un registro interno mientras exista la cuenta afectada. [Confirmar.]
+- **Las decisiones del equipo de Patiamor** (verificaciones, pausas, aprobaciones): se guardan en un registro interno mientras exista la cuenta afectada.
 
 ## Lo que puedes pedirnos
 
@@ -86,7 +80,7 @@ Las conexiones con Patiamor van cifradas (HTTPS). Los códigos y las sesiones se
 
 ## Cambios a esta política
 
-Si cambiamos algo importante, lo avisaremos en Patiamor [y por correo] antes de que empiece a aplicarse. La fecha de arriba indica la última versión.
+Si cambiamos algo importante, lo avisaremos en Patiamor antes de que empiece a aplicarse. La fecha de arriba indica la última versión.
 
 ## Contacto
 

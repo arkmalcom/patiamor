@@ -1931,3 +1931,13 @@ html[data-route='profile'] .toast-region { bottom: calc(96px + env(safe-area-ins
 .review-text p { margin-top: 8px; }
 .rules__list { display: grid; gap: 12px; padding-left: 22px; line-height: 1.5; }
 .rules .button { justify-self: start; }
+
+/* The privacy policy and the terms (/privacidad, /terminos), and the links to them. */
+.legal { width: 100%; max-width: 720px; margin: 0 auto; padding: 8px 20px 48px; display: grid; gap: 14px; }
+.legal__back { justify-self: start; display: inline-flex; align-items: center; gap: 6px; }
+.legal__text { display: grid; gap: 12px; line-height: 1.6; }
+.legal__text h2 { font-family: var(--font-display); font-weight: 400; font-size: 1.45rem; line-height: 1.15; margin-top: 12px; }
+.legal__text ul { display: grid; gap: 8px; padding-left: 22px; margin: 0; }
+.legal__other { margin-top: 8px; }
+.legal-links { font-size: 0.9rem; color: var(--ink-2); margin: 0; }
+.legal-links a { color: inherit; text-decoration: underline; }
