@@ -13,7 +13,7 @@ import { BRAND } from '../../web/src/brand';
 import { DEFAULT_FEE_CAP_DOP, MAX_FEE_DOP } from './listings';
 import { endReview, tellOwners } from './moderation';
 import { photoUrl } from './pets';
-import { insertShelter, MAX_OWNED, readApplication } from './portal';
+import { insertPrivateLister, insertShelter, MAX_OWNED, readApplication } from './portal';
 import { OPEN_STATUSES, PAUSED_SQL, requestsRestricted, WITHDRAW_WINDOW_DAYS } from './requests';
 
 // Admin tools: the console's queues (PAT-13, PAT-14) and verifying adopters (PAT-2). Every decision is
@@ -53,7 +53,7 @@ admin.get('/summary', async (c) => {
 admin.get('/shelters', async (c) => {
   const status = STATUSES.includes(c.req.query('status') as never) ? c.req.query('status')! : 'pending';
   const { results } = await c.env.DB.prepare(
-    `SELECT s.id, s.name, s.slug, s.description, s.place_id, s.phone, s.email, s.website, s.visit_hours, s.status, s.status_reason, s.created_at, s.fee_cap_dop,
+    `SELECT s.id, s.name, s.slug, s.description, s.place_id, s.phone, s.email, s.website, s.visit_hours, s.status, s.status_reason, s.created_at, s.fee_cap_dop, s.kind,
             v.id AS review_id, v.message AS review_message, v.created_at AS review_at,
             a.contact_name, a.contact_phone, a.rnc, a.address, a.social, a.history, a.reference_name, a.reference_contact, a.reference_kind, a.more_references, a.submitted_at,
             (SELECT group_concat(u.email, ', ') FROM shelter_members m JOIN users u ON u.id = m.user_id WHERE m.shelter_id = s.id AND m.role = 'owner') AS owners
@@ -71,6 +71,7 @@ admin.get('/shelters', async (c) => {
       id: r.id,
       name: r.name,
       slug: r.slug,
+      kind: r.kind as 'shelter' | 'private',
       feeCapDop: r.fee_cap_dop === null ? DEFAULT_FEE_CAP_DOP : Number(r.fee_cap_dop),
       feeCapRaised: r.fee_cap_dop !== null,
       review: r.review_id ? { id: r.review_id, message: r.review_message, createdAt: r.review_at } : null,
@@ -399,7 +400,7 @@ admin.post('/adopters/:id/unverify', async (c) => {
 
 type OwnerQueueRow = {
   id: string; user_id: string; shelter_name: string; zone: string; phone: string; link: string | null; about: string; status: string;
-  decision_note: string | null; created_at: string; decided_at: string | null; name: string | null; email: string;
+  decision_note: string | null; created_at: string; decided_at: string | null; name: string | null; email: string; kind: string; place_id: string | null;
 };
 
 // The queue, each with the shelters and other requests it might duplicate (same or overlapping name, same
@@ -409,7 +410,7 @@ admin.get('/owners', async (c) => {
   const db = c.env.DB;
   const { results } = await db
     .prepare(
-      `SELECT r.id, r.user_id, r.shelter_name, r.zone, r.phone, r.link, r.about, r.status, r.decision_note, r.created_at, r.decided_at, u.name, u.email
+      `SELECT r.id, r.user_id, r.shelter_name, r.zone, r.phone, r.link, r.about, r.status, r.decision_note, r.created_at, r.decided_at, r.kind, r.place_id, u.name, u.email
          FROM shelter_owner_requests r JOIN users u ON u.id = r.user_id WHERE r.status = ?
         ORDER BY r.created_at ${status === 'pending' ? 'ASC' : 'DESC'} LIMIT 100`,
     )
@@ -419,6 +420,8 @@ admin.get('/owners', async (c) => {
   return c.json({
     requests: results.map((r) => ({
       id: r.id,
+      kind: r.kind as 'shelter' | 'private',
+      place: r.place_id ? (placeById(r.place_id) ?? null) : null,
       status: r.status,
       shelterName: r.shelter_name,
       zone: r.zone,
@@ -428,7 +431,7 @@ admin.get('/owners', async (c) => {
       decidedAt: r.decided_at,
       note: r.decision_note,
       who: { name: r.name, email: r.email, phone: r.phone },
-      lookAlikes: lookAlikes(known, { id: r.id, shelterName: r.shelter_name, phone: r.phone }),
+      lookAlikes: lookAlikes(known, { id: r.id, shelterName: r.shelter_name, phone: r.phone, kind: r.kind }),
     })),
   });
 });
@@ -445,20 +448,26 @@ admin.post('/owners/:id/decision', async (c) => {
 
   const db = c.env.DB;
   const row = await db
-    .prepare('SELECT r.status, r.user_id, u.email FROM shelter_owner_requests r JOIN users u ON u.id = r.user_id WHERE r.id = ?')
+    .prepare('SELECT r.status, r.user_id, r.kind, r.place_id, r.phone, u.email, u.name FROM shelter_owner_requests r JOIN users u ON u.id = r.user_id WHERE r.id = ?')
     .bind(id)
-    .first<{ status: string; user_id: string; email: string }>();
+    .first<{ status: string; user_id: string; kind: string; place_id: string | null; phone: string; email: string; name: string | null }>();
   if (!row) return c.json({ error: 'not_found' }, 404);
   if (row.status !== 'pending') return c.json({ error: 'invalid_transition' }, 409);
 
   const now = nowIso();
+  // Approving a shelter owner lets them register a shelter; approving a private person creates their lister
+  // profile at once (verified: the admin has already got to know them), so they can list straight away.
+  if (decision === 'approved' && row.kind === 'private') {
+    const has = await db.prepare("SELECT 1 FROM shelter_members m JOIN shelters s ON s.id = m.shelter_id WHERE m.user_id = ? AND s.kind = 'private'").bind(row.user_id).first();
+    if (!has && row.place_id) await insertPrivateLister(db, { id: row.user_id, name: row.name, email: row.email }, { placeId: row.place_id, phone: row.phone, adminId: adminUser.id });
+  }
   await db.batch([
     db.prepare("UPDATE shelter_owner_requests SET status = ?, decision_note = ?, decided_by = ?, decided_at = ? WHERE id = ? AND status = 'pending'").bind(decision, note, adminUser.id, now, id),
-    ...(decision === 'approved' ? [db.prepare('UPDATE users SET shelter_owner_at = coalesce(shelter_owner_at, ?) WHERE id = ?').bind(now, row.user_id)] : []),
+    ...(decision === 'approved' && row.kind !== 'private' ? [db.prepare('UPDATE users SET shelter_owner_at = coalesce(shelter_owner_at, ?) WHERE id = ?').bind(now, row.user_id)] : []),
     db.prepare("INSERT INTO admin_actions (id, admin_id, action, subject_type, subject_id, note) VALUES (?, ?, ?, 'owner_request', ?, ?)").bind(crypto.randomUUID(), adminUser.id, `owner.${b.action}`, id, note),
   ]);
   if (await hasEmailBudget(db, 'owner_decision')) {
-    await sendOwnerDecisionEmail(c.env, row.email, { decision, note, portalUrl: `${appOrigin(c)}/refugio` }).catch((err) => console.error('owner decision email failed', err));
+    await sendOwnerDecisionEmail(c.env, row.email, { decision, note, portalUrl: `${appOrigin(c)}/refugio`, kind: row.kind as 'shelter' | 'private' }).catch((err) => console.error('owner decision email failed', err));
   }
   return c.json({ request: { id, status: decision } });
 });
@@ -476,7 +485,7 @@ admin.post('/shelters', async (c) => {
 
   const db = c.env.DB;
   const owner = await userForEmail(db, ownerEmail, app.contactName);
-  const owned = await db.prepare("SELECT count(*) AS n FROM shelter_members WHERE user_id = ? AND role = 'owner'").bind(owner.id).first<{ n: number }>();
+  const owned = await db.prepare("SELECT count(*) AS n FROM shelter_members m JOIN shelters s ON s.id = m.shelter_id WHERE m.user_id = ? AND m.role = 'owner' AND s.kind = 'shelter'").bind(owner.id).first<{ n: number }>();
   if ((owned?.n ?? 0) >= MAX_OWNED) return c.json({ error: 'too_many_shelters' }, 409);
 
   const now = nowIso();

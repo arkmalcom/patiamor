@@ -26,11 +26,12 @@ const MIN_AGE_DAYS = 56;
 export const DEFAULT_FEE_CAP_DOP = 2_000;
 /** No cap goes above this (migration 0019 checks it too). */
 export const MAX_FEE_DOP = 50_000;
-/** The shelter's cap: its own if an admin set one, otherwise the default. */
-export const feeCap = (s: { fee_cap_dop: number | null }) => s.fee_cap_dop ?? DEFAULT_FEE_CAP_DOP;
+/** The shelter's cap: its own if an admin set one, otherwise the default. A private lister can't ask for a
+ *  fee at all (owner decision, 2026-10-16), so their cap is zero. */
+export const feeCap = (s: { fee_cap_dop: number | null; kind?: string }) => (s.kind === 'private' ? 0 : (s.fee_cap_dop ?? DEFAULT_FEE_CAP_DOP));
 /** Animals a shelter can have that aren't adopted: generous for a verified shelter, small for one still
  *  in review (drafts only), so an unverified account can't fill the database. */
-const MAX_PETS = { verified: 300, other: 30 };
+const MAX_PETS = { verified: 300, other: 30, private: 10 };
 const MIN_STORY = 20;
 
 const oneOf = <T extends readonly string[]>(list: T, v: unknown): v is T[number] => list.includes(v as T[number]);
@@ -75,6 +76,7 @@ function readPet(b: Record<string, unknown>, cap: number, keptFee: number | null
   else if (!oneOf(SIZES, pet.size)) error = 'invalid_size';
   else if (!oneOf(ENERGIES, pet.energy)) error = 'invalid_energy';
   else if (fee !== null && !(Number.isInteger(fee) && fee >= 0 && fee <= MAX_FEE_DOP)) error = 'invalid_fee';
+  else if (fee !== null && cap === 0) error = 'fee_not_allowed'; // a private lister: no fee at all, not even 0
   else if (fee !== null && fee > cap && fee !== keptFee) error = 'fee_over_cap';
   else if (pet.inCareSince && !isDate(pet.inCareSince, pet.birthDate)) error = 'invalid_in_care_since';
   return { pet, error };
@@ -96,9 +98,9 @@ export function publishProblem(shelterStatus: string, pet: { birthDate: string; 
 async function writableShelter(c: C, shelterId: string) {
   const role = await roleIn(c, shelterId);
   if (!role) return { error: 'not_found' as const, status: 404 as const };
-  const s = await c.env.DB.prepare('SELECT id, name, status, place_id, fee_cap_dop FROM shelters WHERE id = ?')
+  const s = await c.env.DB.prepare('SELECT id, name, status, place_id, fee_cap_dop, kind FROM shelters WHERE id = ?')
     .bind(shelterId)
-    .first<{ id: string; name: string; status: string; place_id: string; fee_cap_dop: number | null }>();
+    .first<{ id: string; name: string; status: string; place_id: string; fee_cap_dop: number | null; kind: string }>();
   if (!s) return { error: 'not_found' as const, status: 404 as const };
   if (s.status === 'suspended') return { error: 'shelter_suspended' as const, status: 409 as const };
   return { shelter: s, role };
@@ -117,14 +119,14 @@ listings.get('/shelters/:id/pets', async (c) => {
   const role = await roleIn(c, id);
   if (!role) return c.json({ error: 'not_found' }, 404);
   const db = c.env.DB;
-  const s = await db.prepare('SELECT id, name, status, place_id, fee_cap_dop FROM shelters WHERE id = ?').bind(id).first<{ id: string; name: string; status: string; place_id: string; fee_cap_dop: number | null }>();
+  const s = await db.prepare('SELECT id, name, status, place_id, fee_cap_dop, kind FROM shelters WHERE id = ?').bind(id).first<{ id: string; name: string; status: string; place_id: string; fee_cap_dop: number | null; kind: string }>();
   if (!s) return c.json({ error: 'not_found' }, 404);
   const { results } = await db
     .prepare(`SELECT ${SUMMARY_COLUMNS}, d.updated_at FROM pets d ${PET_JOINS} WHERE d.shelter_id = ? ORDER BY d.updated_at DESC LIMIT 500`)
     .bind(id)
     .all<SummaryRow & { updated_at: string }>();
   return c.json({
-    shelter: { id: s.id, name: s.name, status: s.status, place: placeById(s.place_id) ?? null, role, feeCapDop: feeCap(s) },
+    shelter: { id: s.id, name: s.name, status: s.status, place: placeById(s.place_id) ?? null, role, feeCapDop: feeCap(s), kind: s.kind },
     pets: results.map((r) => ({ ...summary(r), openRequests: r.open_requests, updatedAt: r.updated_at })),
   });
 });
@@ -142,8 +144,11 @@ listings.post('/shelters/:id/pets', async (c) => {
   const problem = publish ? publishProblem(w.shelter.status, pet, 0) : null;
   if (problem) return c.json({ error: problem }, 409);
 
-  const count = await c.env.DB.prepare("SELECT count(*) AS n FROM pets WHERE shelter_id = ? AND status != 'adopted'").bind(w.shelter.id).first<{ n: number }>();
-  if ((count?.n ?? 0) >= (w.shelter.status === 'verified' ? MAX_PETS.verified : MAX_PETS.other)) return c.json({ error: 'too_many_pets' }, 409);
+  // A private lister's limit counts the animals they have up now; a shelter's counts everything not adopted, as before.
+  const counted = w.shelter.kind === 'private' ? "status NOT IN ('adopted', 'withdrawn')" : "status != 'adopted'";
+  const count = await c.env.DB.prepare(`SELECT count(*) AS n FROM pets WHERE shelter_id = ? AND ${counted}`).bind(w.shelter.id).first<{ n: number }>();
+  const limit = w.shelter.kind === 'private' ? MAX_PETS.private : w.shelter.status === 'verified' ? MAX_PETS.verified : MAX_PETS.other;
+  if ((count?.n ?? 0) >= limit) return c.json({ error: 'too_many_pets', max: limit }, 409);
 
   const id = crypto.randomUUID();
   const now = nowIso();
@@ -188,14 +193,14 @@ listings.get('/pets/:id', async (c) => {
   const found = await petForMember(c, c.req.param('id'));
   if (!found) return c.json({ error: 'not_found' }, 404);
   const { row: r } = found;
-  const s = await c.env.DB.prepare('SELECT id, name, status, place_id, fee_cap_dop FROM shelters WHERE id = ?')
+  const s = await c.env.DB.prepare('SELECT id, name, status, place_id, fee_cap_dop, kind FROM shelters WHERE id = ?')
     .bind(r.shelter_id)
-    .first<{ id: string; name: string; status: string; place_id: string; fee_cap_dop: number | null }>();
+    .first<{ id: string; name: string; status: string; place_id: string; fee_cap_dop: number | null; kind: string }>();
   const { results: photos } = await c.env.DB.prepare('SELECT id, r2_key, thumb_key, focus FROM pet_photos WHERE pet_id = ? ORDER BY position')
     .bind(r.id)
     .all<{ id: string; r2_key: string; thumb_key: string | null; focus: string }>();
   return c.json({
-    shelter: { id: s!.id, name: s!.name, status: s!.status, place: placeById(s!.place_id) ?? null, role: found.role, feeCapDop: feeCap(s!) },
+    shelter: { id: s!.id, name: s!.name, status: s!.status, place: placeById(s!.place_id) ?? null, role: found.role, feeCapDop: feeCap(s!), kind: s!.kind },
     pet: {
       id: r.id,
       species: r.species,

@@ -29,11 +29,11 @@ Patiamor es una plataforma gratuita que ayuda a que perros y gatos que buscan fa
 - Retirar una solicitud es posible, pero debería ser algo raro. Si retiras tres en 90 días, no podrás enviar solicitudes nuevas hasta que hablemos contigo.
 - La marca «Verificado por Patiamor» la da el equipo de Patiamor cuando conoce a una persona o habló con ella. No es un derecho ni garantiza nada, y podemos quitarla.
 
-## Si publicas animales (refugios y rescatistas)
+## Si publicas animales (refugios, rescatistas y particulares)
 
-Para publicar, tu refugio tiene que ser aprobado y verificado por el equipo de Patiamor. Al publicar, te comprometes a:
+Para publicar, tu refugio tiene que ser aprobado y verificado por el equipo de Patiamor. Si no eres un refugio sino una persona que busca familia para sus animales (por ejemplo, una camada), puedes pedir publicar como **particular**: el equipo te conoce y aprueba a ti, no a cada publicación. Las familias te ven como «Particular» y tu zona, sin tu nombre, y tú ves los datos de contacto de quien te envía una solicitud mientras esté abierta. Un particular no puede pedir ninguna cuota ni dinero, y puede tener hasta 10 animales publicados a la vez. Al publicar, te comprometes a:
 
-- **No vender animales.** Patiamor es solo para adopciones. No se permiten la venta, la cría con fines comerciales, los «depósitos» para reservar ni el intercambio por dinero o bienes. Una cuota de adopción es aceptable solo si cubre gastos reales del animal (vacunas, esterilización, cuidados) y se indica en su ficha. La cuota puede ser de **hasta RD$2,000**. Si un refugio necesita cobrar más (por ejemplo, por una cirugía que pagó), debe hablarlo antes con el equipo de Patiamor, que puede subir el límite para ese refugio.
+- **No vender animales.** Patiamor es solo para adopciones. No se permiten la venta, la cría con fines comerciales, los «depósitos» para reservar ni el intercambio por dinero o bienes. Una cuota de adopción es aceptable solo para los refugios, y solo si cubre gastos reales del animal (vacunas, esterilización, cuidados) y se indica en su ficha. La cuota puede ser de **hasta RD$2,000**. Si un refugio necesita cobrar más (por ejemplo, por una cirugía que pagó), debe hablarlo antes con el equipo de Patiamor, que puede subir el límite para ese refugio.
 - Publicar solo animales que están bajo tu cuidado, de al menos 8 semanas de edad.
 - Describir a cada animal con honestidad: su salud, su carácter y con quién se lleva bien, hasta donde lo sepas.
 - Usar fotos que sean tuyas o que tengas permiso de usar.

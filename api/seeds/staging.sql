@@ -148,3 +148,24 @@ UPDATE shelters SET status = 'verified' WHERE verified_at IS NOT NULL AND status
 
 -- Shelter owners are approved to register shelters (migration 0017 did this for owners that existed then).
 UPDATE users SET shelter_owner_at = coalesce(shelter_owner_at, '2026-10-01T00:00:00Z') WHERE id IN (SELECT user_id FROM shelter_members WHERE role = 'owner');
+
+-- Private listers (migration 0021): a person outside any shelter is a one-person row in shelters of kind
+-- 'private', approved by an admin. The sample private animals belong to two of them, so adoption requests
+-- for those animals reach someone's inbox. Adopters only ever see "Particular" and the area.
+INSERT OR IGNORE INTO shelters (id, slug, name, place_id, phone, status, verified_at, kind) VALUES
+  ('seed-particular-reyes', 'particular-familia-reyes',   'Particular · Familia Reyes',  'ensanche-naco-distrito-nacional', '+18095550110', 'verified', '2026-10-01T15:00:00Z', 'private'),
+  ('seed-particular-rosa',  'particular-rosa-hernandez',  'Particular · Rosa Hernández', 'los-mina-norte-santo-domingo',    '+18095550111', 'verified', '2026-09-20T14:00:00Z', 'private');
+INSERT OR IGNORE INTO shelter_members (shelter_id, user_id, role) VALUES
+  ('seed-particular-reyes', 'seed-private-approved', 'owner'),
+  ('seed-particular-rosa',  'seed-private-gatos',    'owner');
+UPDATE pets SET shelter_id = 'seed-particular-reyes' WHERE listed_by = 'seed-private-approved' AND shelter_id IS NULL;
+UPDATE pets SET shelter_id = 'seed-particular-rosa'  WHERE listed_by = 'seed-private-gatos'    AND shelter_id IS NULL;
+UPDATE litters SET shelter_id = 'seed-particular-reyes' WHERE listed_by = 'seed-private-approved' AND shelter_id IS NULL;
+UPDATE litters SET shelter_id = 'seed-particular-rosa'  WHERE listed_by = 'seed-private-gatos'    AND shelter_id IS NULL;
+-- Pedro Almonte is a private person still waiting for approval: a request to review in the admin queue,
+-- instead of the first listings that used to wait in review (an approved person lists freely now).
+-- ('in_review' now always has a reason: reports or money language. The old sample ones were drafts waiting.)
+UPDATE pets SET status = 'draft' WHERE status = 'in_review' AND review_reason IS NULL;
+INSERT OR IGNORE INTO shelter_owner_requests (id, user_id, shelter_name, zone, phone, about, consent_at, kind, place_id) VALUES
+  ('seed-request-pedro', 'seed-private-new', 'Particular', 'Gazcue, Distrito Nacional', '+18095550112',
+   'Tengo una perra con cuatro cachorros y busco familias cercanas que los cuiden bien. (Datos de ejemplo.)', '2026-10-15T12:00:00Z', 'private', 'gazcue-distrito-nacional');

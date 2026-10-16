@@ -36,7 +36,7 @@ export const SUMMARY_COLUMNS = `d.id, d.species, d.name, d.sex, d.birth_date, d.
   d.good_with_kids, d.good_with_dogs, d.good_with_cats, d.vaccinated, d.sterilized, d.dewormed, d.litter_id, d.status,
   d.open_requests, d.requests_paused,
   p.id AS place_id, p.name AS place_name, p.municipality, p.province, p.lat, p.lng,
-  s.id AS shelter_id, s.name AS shelter_name,
+  s.id AS shelter_id, s.name AS shelter_name, s.kind AS shelter_kind,
   (SELECT json_object('key', ph.r2_key, 'thumb', ph.thumb_key, 'focus', ph.focus, 'count', (SELECT count(*) FROM pet_photos n WHERE n.pet_id = d.id))
      FROM pet_photos ph WHERE ph.pet_id = d.id ORDER BY ph.position LIMIT 1) AS cover`;
 // One lookup for the cover photo, not one per column: D1 bills every row read, and this runs per pet. The
@@ -52,7 +52,7 @@ export interface SummaryRow {
   good_with_kids: Bool; good_with_dogs: Bool; good_with_cats: Bool; vaccinated: number; sterilized: number; dewormed: number;
   litter_id: string | null; status: string; open_requests: number; requests_paused: number;
   place_id: string; place_name: string; municipality: string; province: string; lat: number; lng: number;
-  shelter_id: string | null; shelter_name: string | null; cover: string | null;
+  shelter_id: string | null; shelter_name: string | null; shelter_kind: string | null; cover: string | null;
 }
 
 const bool = (v: Bool) => (v === null ? null : v === 1);
@@ -82,8 +82,9 @@ export function summary(r: SummaryRow) {
             ? ('busy' as const)
             : ('open' as const),
     place: { id: r.place_id, name: r.place_name, municipality: r.municipality, province: r.province, lat: r.lat, lng: r.lng },
-    // Verified shelters show their name; everyone else is "Particular" (never a person's name).
-    lister: r.shelter_id ? { type: 'shelter' as const, id: r.shelter_id, name: r.shelter_name } : { type: 'private' as const },
+    // Verified shelters show their name; a private lister (a one-person row in shelters) is "Particular",
+    // never a person's name or id.
+    lister: r.shelter_id && r.shelter_kind !== 'private' ? { type: 'shelter' as const, id: r.shelter_id, name: r.shelter_name } : { type: 'private' as const },
     // The thumbnail (about 480 px) is for small frames; sample photos have none, so lists fall back to the full one.
     photo: { url: photoUrl(cover?.key ?? null), thumb: photoUrl(cover?.thumb ?? null), focus: cover?.focus ?? '50% 40%', count: cover?.count ?? 0 },
   };
@@ -205,7 +206,7 @@ async function profile(db: D1Database, id: string): Promise<{ body: unknown; sta
         story: row.story,
         needs: JSON.parse(row.needs || '[]') as string[],
         inCareSince: row.in_care_since,
-        adoptionFeeDop: row.shelter_id ? row.adoption_fee_dop : null,
+        adoptionFeeDop: row.shelter_id && row.shelter_kind !== 'private' ? row.adoption_fee_dop : null,
         photos: photos.map((p) => ({ url: photoUrl(p.r2_key), focus: p.focus })),
         lister:
           base.lister.type === 'shelter'

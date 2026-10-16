@@ -355,7 +355,7 @@ function monthsAgo(months: number): string {
 }
 
 const ERRORS = [
-  'invalid_species', 'invalid_name', 'invalid_sex', 'invalid_birth_date', 'invalid_size', 'invalid_energy', 'invalid_fee', 'fee_over_cap',
+  'invalid_species', 'invalid_name', 'invalid_sex', 'invalid_birth_date', 'invalid_size', 'invalid_energy', 'invalid_fee', 'fee_over_cap', 'fee_not_allowed',
   'invalid_in_care_since', 'shelter_not_verified', 'too_young', 'story_required', 'shelter_suspended',
   'photo_required', 'photos_full', 'upload_limit', 'storage_full', 'image_too_large', 'invalid_image', 'duplicate_photo', 'last_photo', 'too_many_pets',
 ] as const;
@@ -470,13 +470,17 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
                 <textarea class="field__input field__input--area" name="needs" rows="3" maxlength="420">${v.needs.join('\n')}</textarea>
                 <span class="field__hint">${t('listing.needsHint')}</span>
               </label>
+              ${shelter.kind === 'private'
+                ? html`<p class="muted">${t('lister.noFee')}</p>`
+                : html`
               <label class="field">
                 <span class="field__label">${t('profile.fee')} <span class="muted">(${t('request.optional')})</span></span>
                 <span class="money"><span class="money__unit" aria-hidden="true">RD$</span><input class="field__input" name="fee" type="number" inputmode="numeric" min="0" max="${Math.max(shelter.feeCapDop, existing?.adoptionFeeDop ?? 0)}" step="1" value="${v.adoptionFeeDop ?? ''}" aria-describedby="fee-hint" /></span>
                 <span class="field__hint" id="fee-hint">${t('listing.feeHint', { cap: pesos(shelter.feeCapDop) })}</span>
               </label>
+              `}
               <label class="field">
-                <span class="field__label">${t('listing.inCareSince')} <span class="muted">(${t('request.optional')})</span></span>
+                <span class="field__label">${t(shelter.kind === 'private' ? 'lister.inCareSince' : 'listing.inCareSince')} <span class="muted">(${t('request.optional')})</span></span>
                 <input class="field__input" name="inCareSince" type="date" max="${today()}" value="${v.inCareSince ?? ''}" />
               </label>
             </fieldset>

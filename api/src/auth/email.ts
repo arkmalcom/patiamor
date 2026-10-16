@@ -121,14 +121,14 @@ function renderBulkDecision(o: { decision: BulkDecision; animals: number; note: 
 }
 
 /** To the admins: someone asks to be allowed to register a shelter. */
-function renderOwnerAdmin(o: { who: string; shelter: string; adminUrl: string }): Message {
-  const lede = `${o.who} pide poder registrar «${o.shelter}» en ${BRAND.name}.`;
+function renderOwnerAdmin(o: { who: string; shelter: string; adminUrl: string; kind?: 'shelter' | 'private' }): Message {
+  const lede = o.kind === 'private' ? `${o.who} pide poder publicar animales como particular en ${BRAND.name}.` : `${o.who} pide poder registrar «${o.shelter}» en ${BRAND.name}.`;
   const text = [lede, '', `Revisa la solicitud (hay parecidos si ya conocemos el refugio): ${o.adminUrl}`].join('\n');
   const html = shell(`
       <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">${escape(lede)}</td></tr>
       <tr><td style="padding:8px 28px;font-size:16px;line-height:1.5">Contáctala para conocerla y confirmar los datos del refugio; después puedes aprobarla o registrar el refugio tú.</td></tr>
       <tr><td style="padding:16px 28px 28px">${button(o.adminUrl, 'Revisar la solicitud')}</td></tr>`);
-  return { subject: `Solicitud de dueño de refugio: ${o.shelter}`, text, html };
+  return { subject: o.kind === 'private' ? `Solicitud para publicar como particular: ${o.who}` : `Solicitud de dueño de refugio: ${o.shelter}`, text, html };
 }
 
 /** To a shelter's owners: one of its listings was hidden after reports, or taken down by Patiamor. */
@@ -167,19 +167,33 @@ function renderReviewAdmin(o: { who: string; shelter: string; adminUrl: string }
 }
 
 /** To the person, when an admin has decided on their request to be a shelter owner. */
-function renderOwnerDecision(o: { decision: BulkDecision; note: string | null; portalUrl: string }): Message {
-  const copy = {
-    approved: {
-      subject: `Ya puedes registrar tu refugio en ${BRAND.name}`,
-      lede: 'Aprobamos tu solicitud. Ya puedes registrar tu refugio desde el portal; después lo verificamos y tus animales aparecerán a quienes viven cerca.',
-      cta: 'Registrar mi refugio',
-    },
-    declined: {
-      subject: 'Sobre tu solicitud para registrar un refugio',
-      lede: 'Revisamos tu solicitud y por ahora no pudimos aprobarla.',
-      cta: 'Ir al portal',
-    },
-  }[o.decision];
+function renderOwnerDecision(o: { decision: BulkDecision; note: string | null; portalUrl: string; kind?: 'shelter' | 'private' }): Message {
+  const copy =
+    o.kind === 'private'
+      ? {
+          approved: {
+            subject: `Ya puedes publicar animales en ${BRAND.name}`,
+            lede: 'Aprobamos tu solicitud. Ya puedes publicar a tus animales desde el portal, sin esperar más revisiones. Las familias te verán como «Particular», sin tu nombre.',
+            cta: 'Publicar un animal',
+          },
+          declined: {
+            subject: 'Sobre tu solicitud para publicar animales',
+            lede: 'Revisamos tu solicitud y por ahora no pudimos aprobarla.',
+            cta: 'Ir al portal',
+          },
+        }[o.decision]
+      : {
+          approved: {
+            subject: `Ya puedes registrar tu refugio en ${BRAND.name}`,
+            lede: 'Aprobamos tu solicitud. Ya puedes registrar tu refugio desde el portal; después lo verificamos y tus animales aparecerán a quienes viven cerca.',
+            cta: 'Registrar mi refugio',
+          },
+          declined: {
+            subject: 'Sobre tu solicitud para registrar un refugio',
+            lede: 'Revisamos tu solicitud y por ahora no pudimos aprobarla.',
+            cta: 'Ir al portal',
+          },
+        }[o.decision];
   const note = o.note ? (o.decision === 'declined' ? `Motivo: ${o.note}` : o.note) : '';
   const text = [copy.lede, note, '', `Portal de refugios: ${o.portalUrl}`].filter((l, i) => l || i === 2).join('\n');
   const html = shell(`
@@ -309,10 +323,10 @@ export const sendListingReviewEmail = (env: Env, to: string, o: { pet: string; k
 export const sendReviewAdminEmail = (env: Env, to: string, o: { who: string; shelter: string; adminUrl: string }) =>
   send(env, 'review_admin', to, renderReviewAdmin(o), `who=${o.who} shelter=${o.shelter}`);
 
-export const sendOwnerAdminEmail = (env: Env, to: string, o: { who: string; shelter: string; adminUrl: string }) =>
+export const sendOwnerAdminEmail = (env: Env, to: string, o: { who: string; shelter: string; adminUrl: string; kind?: 'shelter' | 'private' }) =>
   send(env, 'owner_admin', to, renderOwnerAdmin(o), `who=${o.who} shelter=${o.shelter}`);
 
-export const sendOwnerDecisionEmail = (env: Env, to: string, o: { decision: BulkDecision; note: string | null; portalUrl: string }) =>
+export const sendOwnerDecisionEmail = (env: Env, to: string, o: { decision: BulkDecision; note: string | null; portalUrl: string; kind?: 'shelter' | 'private' }) =>
   send(env, 'owner_decision', to, renderOwnerDecision(o), `decision=${o.decision}`);
 
 export const sendPauseClearedEmail = (env: Env, to: string, o: { note: string | null; exploreUrl: string }) =>

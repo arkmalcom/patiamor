@@ -6,6 +6,7 @@ import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, failText, pesos, t, type Key } from '../i18n';
 import { bulkWhat } from '../ui/bulk';
 import { setUser, state } from '../store';
+import { openListerRequest } from '../ui/lister';
 import { openOwnerRequest } from '../ui/owner';
 import { renderAuth } from '../ui/auth';
 import { renderInbox } from './inbox';
@@ -97,9 +98,10 @@ async function home(root: HTMLElement) {
     shelters = await api.myShelters();
     if (state.user?.isAdmin) waiting = Object.values(await api.adminSummary()).reduce((a, n) => a + n, 0);
     // Where a request to be a shelter owner stands may have changed since the app opened (an admin decided).
-    if (state.user && !state.user.shelterOwner) {
+    if (state.user && (!state.user.shelterOwner || state.user.listerRequest)) {
       const me = await api.me();
-      if (me && JSON.stringify([me.shelterOwner, me.ownerRequest]) !== JSON.stringify([state.user.shelterOwner, state.user.ownerRequest])) return setUser(me); // redraws
+      const key = (u: { shelterOwner?: boolean; ownerRequest?: unknown; listerRequest?: unknown }) => JSON.stringify([u.shelterOwner, u.ownerRequest, u.listerRequest]);
+      if (me && key(me) !== key(state.user)) return setUser(me); // redraws
     }
   } catch {
     return mount(root, html`<p class="loading-note" role="alert">${t('auth.err.network')}</p>`);
@@ -122,12 +124,35 @@ async function home(root: HTMLElement) {
             ? html`<a class="button ${shelters.length ? 'button--outline' : 'button--primary'} portal__new" href="/refugio/registro">${icon(Plus, 20)}${t('portal.register')}</a>`
             : ''
           : ownerCard()}
+        ${shelters.some((s) => s.kind === 'private') ? '' : listerCard()}
       </section>`,
   );
   root.querySelector('[data-owner]')?.addEventListener('click', openOwnerRequest);
+  root.querySelector('[data-lister]')?.addEventListener('click', openListerRequest);
   $$<HTMLButtonElement>('[data-review]', root).forEach((b) =>
     b.addEventListener('click', () => openReview(shelters.find((x) => x.id === b.dataset.review)!, () => void home(root))),
   );
+}
+
+/** For a person with animals to rehome and no shelter: ask to list as a "Particular", or where the request stands. */
+function listerCard(): Raw {
+  const r = state.user?.listerRequest;
+  if (!r) {
+    return html`
+      <section class="many bulk-prompt" aria-labelledby="lister-card-title">
+        <h2 class="many__title" id="lister-card-title">${t('lister.card.title')}</h2>
+        <p>${t('lister.card.body')}</p>
+        <button class="button button--outline" type="button" data-lister>${t('lister.card.cta')}</button>
+      </section>`;
+  }
+  return html`
+    <section class="bulk-card bulk-card--${r.status}" aria-labelledby="lister-card-title" role="status">
+      <h2 class="bulk-card__title" id="lister-card-title">${t(`lister.status.${r.status}`)}</h2>
+      <p>${t(`lister.status.${r.status}.body`)}</p>
+      ${r.note ? html`<p class="bulk-card__note"><strong>${t('bulk.status.reason')}:</strong> ${r.note}</p>` : ''}
+      <p class="bulk-card__date">${t('request.sentOn', { date: formatDate(r.createdAt.slice(0, 10)) })}</p>
+      ${r.status === 'declined' ? html`<button class="text-button" type="button" data-lister>${t('owner.again')}</button>` : ''}
+    </section>`;
 }
 
 /** For someone not yet approved: ask for access, or where the request stands. */
@@ -203,10 +228,11 @@ function openReview(shelter: PortalShelter, done: () => void) {
 
 function shelterCard(s: PortalShelter): Raw {
   const animals = `/refugio/${encodeURIComponent(s.id)}/animales`;
+  const mine = s.kind === 'private';
   const next: Record<ShelterStatus, Raw> = {
     pending: html`<p>${t('portal.pendingBody')}</p><a class="button button--outline button--small" href="${animals}">${t('listing.prepare')}</a>`,
     verified: html`
-      <p>${t('portal.verifiedBody')}</p>
+      <p>${t(mine ? 'lister.verifiedBody' : 'portal.verifiedBody')}</p>
       <div class="portal-card__actions">
         <a class="button button--primary button--small" href="/refugio/${encodeURIComponent(s.id)}/solicitudes">${t('inbox.open')}${s.newRequests ? html` <span class="portal-card__count">${s.newRequests}</span>` : ''}</a>
         <a class="button button--outline button--small" href="${animals}">${t('listing.open')}</a>
@@ -226,13 +252,13 @@ function shelterCard(s: PortalShelter): Raw {
       <div class="portal-card__head">
         <span class="shelter__mark" aria-hidden="true">${icon(House, 22)}</span>
         <div>
-          <h2 class="portal-card__name">${s.name}</h2>
+          <h2 class="portal-card__name">${mine ? t('lister.myListings') : s.name}</h2>
           ${where(s.place)}
         </div>
         ${statusChip(s.status)}
       </div>
       ${next[s.status]}
-      <p class="portal-card__role">${icon(Users, 15)}${t(`portal.role.${s.role}`)}${s.submittedAt ? html` · ${t('portal.sentOn', { date: formatDate(s.submittedAt.slice(0, 10)) })}` : ''}</p>
+      ${mine ? '' : html`<p class="portal-card__role">${icon(Users, 15)}${t(`portal.role.${s.role}`)}${s.submittedAt ? html` · ${t('portal.sentOn', { date: formatDate(s.submittedAt.slice(0, 10)) })}` : ''}</p>`}
     </li>`;
 }
 
@@ -965,7 +991,7 @@ function ownerRequestCard(r: AdminOwnerRequest): Raw {
       <div class="portal-card__head">
         <span class="shelter__mark" aria-hidden="true">${icon(UserCheck, 22)}</span>
         <div>
-          <h2 class="portal-card__name">${t('owners.admin.wants', { who, shelter: r.shelterName })}</h2>
+          <h2 class="portal-card__name">${t(r.kind === 'private' ? 'owners.admin.wantsPrivate' : 'owners.admin.wants', { who, shelter: r.shelterName })}</h2>
           <span class="portal-card__place">${t('bulk.admin.sent')} ${formatDate(r.createdAt.slice(0, 10))}</span>
         </div>
       </div>
@@ -992,7 +1018,7 @@ function ownerRequestCard(r: AdminOwnerRequest): Raw {
             <div class="portal-decide__actions">
               <button class="button button--primary button--small" type="submit" value="approve">${icon(BadgeCheck, 16)}${t('bulk.admin.approve')}</button>
               <button class="button button--outline button--small" type="submit" value="decline">${t('bulk.admin.decline')}</button>
-              <a class="button button--ghost button--small" href="${register}">${t('owners.admin.register')}</a>
+              ${r.kind === 'private' ? '' : html`<a class="button button--ghost button--small" href="${register}">${t('owners.admin.register')}</a>`}
             </div>
           </form>`
         : r.note
@@ -1128,14 +1154,16 @@ function adminCard(s: AdminShelter): Raw {
               ${row('portal.form.social', a.social.length ? html`${a.social.map((l) => html`<a href="${l}" target="_blank" rel="noopener noreferrer">${l.replace(/^https?:\/\//, '')}</a><br />`)}` : null)}
               ${row('portal.form.reference', html`${a.references.map((r) => html`${r.name} · ${r.contact} (${t(`portal.form.kind.${r.kind}`)})<br />`)}`)}
               ${row('portal.admin.sent', a.submittedAt ? formatDate(a.submittedAt.slice(0, 10)) : null)}`
-          : html`<div><dt>${t('portal.admin.noApplication')}</dt><dd>—</dd></div>`}
+          : s.kind === 'private'
+            ? html`<div><dt>${t('owners.admin.contact')}</dt><dd>${s.publicPhone ? html`<a href="${waLink(s.publicPhone)}" target="_blank" rel="noopener">${icon(MessageCircle, 15)} ${showPhone(s.publicPhone)}</a>` : '—'}</dd></div>`
+            : html`<div><dt>${t('portal.admin.noApplication')}</dt><dd>—</dd></div>`}
         ${row('portal.form.visitHours', s.visitHours)}
-        ${row('portal.form.publicPhone', s.publicPhone ? showPhone(s.publicPhone) : null)}
+        ${s.kind === 'private' ? '' : row('portal.form.publicPhone', s.publicPhone ? showPhone(s.publicPhone) : null)}
         ${row('portal.form.email', s.email)}
         ${row('portal.form.website', s.website)}
       </dl>
       ${a?.history ? html`<div class="portal-history"><h3 class="form-subsection__title">${t('portal.form.history')}</h3><p>${a.history}</p></div>` : ''}
-      ${s.status === 'verified' || s.status === 'suspended'
+      ${(s.status === 'verified' || s.status === 'suspended') && s.kind !== 'private'
         ? html`<form class="fee-cap" data-fee-cap="${s.id}">
             <label class="field">
               <span class="field__label">${t('fee.admin.label')}</span>
@@ -1145,7 +1173,7 @@ function adminCard(s: AdminShelter): Raw {
             <button class="button button--outline button--small" type="submit">${t('fee.admin.save')}</button>
           </form>`
         : ''}
-      <p class="muted portal-checklist">${t('portal.admin.checklist')}</p>
+      ${s.kind === 'private' ? html`<p class="muted portal-checklist">${t('lister.admin.note')}</p>` : html`<p class="muted portal-checklist">${t('portal.admin.checklist')}</p>`}
       <form class="portal-decide" data-decide="${s.id}">
         <label class="field" hidden>
           <span class="field__label">${t('portal.admin.reasonLabel')}</span>

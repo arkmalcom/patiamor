@@ -116,13 +116,13 @@ portal.use('*', async (c, next) => {
 // The person's shelters and where each stands.
 portal.get('/shelters', async (c) => {
   const { results } = await c.env.DB.prepare(
-    `SELECT s.id, s.name, s.slug, s.status, s.status_reason, s.place_id, m.role, a.submitted_at,
+    `SELECT s.id, s.name, s.slug, s.status, s.status_reason, s.place_id, s.kind, m.role, a.submitted_at,
             (SELECT count(*) FROM adoption_requests r JOIN pets d ON d.id = r.pet_id WHERE d.shelter_id = s.id AND r.status = 'sent') AS new_requests
        FROM shelter_members m JOIN shelters s ON s.id = m.shelter_id LEFT JOIN shelter_applications a ON a.shelter_id = s.id
       WHERE m.user_id = ? ORDER BY s.created_at`,
   )
     .bind(c.get('user')!.id)
-    .all<{ id: string; name: string; slug: string; status: string; status_reason: string | null; place_id: string; role: Role; submitted_at: string | null; new_requests: number }>();
+    .all<{ id: string; name: string; slug: string; status: string; status_reason: string | null; place_id: string; kind: string; role: Role; submitted_at: string | null; new_requests: number }>();
   // For suspended ones, their latest request to lift it, so the card says where it stands.
   const suspended = JSON.stringify(results.filter((r) => r.status === 'suspended').map((r) => r.id));
   const { results: reviews } = await c.env.DB.prepare(
@@ -138,6 +138,7 @@ portal.get('/shelters', async (c) => {
       id: r.id,
       name: r.name,
       slug: r.slug,
+      kind: r.kind as 'shelter' | 'private',
       status: r.status,
       statusReason: r.status_reason,
       place: placeById(r.place_id) ?? null,
@@ -195,7 +196,7 @@ portal.post('/shelters', async (c) => {
   if (error) return c.json({ error }, 400);
 
   const db = c.env.DB;
-  const owned = await db.prepare("SELECT count(*) AS n FROM shelter_members WHERE user_id = ? AND role = 'owner'").bind(user.id).first<{ n: number }>();
+  const owned = await db.prepare("SELECT count(*) AS n FROM shelter_members m JOIN shelters s ON s.id = m.shelter_id WHERE m.user_id = ? AND m.role = 'owner' AND s.kind = 'shelter'").bind(user.id).first<{ n: number }>();
   if ((owned?.n ?? 0) >= MAX_OWNED) return c.json({ error: 'too_many_shelters' }, 409);
   const [today, queue] = await db.batch<{ n: number }>([
     db.prepare("SELECT count(*) AS n FROM shelter_members WHERE user_id = ? AND role = 'owner' AND created_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-1 day')").bind(user.id),
@@ -235,6 +236,25 @@ export async function insertShelter(db: D1Database, app: ReturnType<typeof readA
       )
       .bind(id, app.contactName, app.contactPhone, app.rnc, app.address, JSON.stringify(app.social), app.history, app.referenceName, app.referenceContact, app.referenceKind, JSON.stringify(app.moreReferences), verified ? now : null, verified ? (opts.adminId ?? null) : null),
     db.prepare("INSERT INTO shelter_members (shelter_id, user_id, role) VALUES (?, ?, 'owner')").bind(id, ownerId),
+  ]);
+  return { id, slug };
+}
+
+/** A private lister: one person, one row in shelters of kind 'private', verified because an admin approved them
+ *  (owners.ts, admin.ts). The name is for admins only ("Particular · Ana"); adopters see "Particular" and the area. */
+export async function insertPrivateLister(db: D1Database, user: { id: string; name: string | null; email: string }, o: { placeId: string; phone: string; adminId: string }) {
+  const base = slugify(`particular ${user.name ?? user.email.split('@')[0]}`);
+  const { results: taken } = await db.prepare("SELECT slug FROM shelters WHERE slug = ? OR slug LIKE ? || '-%'").bind(base, base).all<{ slug: string }>();
+  const used = new Set(taken.map((t) => t.slug));
+  let slug = base;
+  for (let i = 2; used.has(slug); i++) slug = `${base}-${i}`;
+  const id = crypto.randomUUID();
+  const now = nowIso();
+  await db.batch([
+    db
+      .prepare("INSERT INTO shelters (id, slug, name, place_id, phone, status, verified_at, kind) VALUES (?, ?, ?, ?, ?, 'verified', ?, 'private')")
+      .bind(id, slug, `Particular · ${user.name ?? user.email}`, o.placeId, o.phone, now),
+    db.prepare("INSERT INTO shelter_members (shelter_id, user_id, role) VALUES (?, ?, 'owner')").bind(id, user.id),
   ]);
   return { id, slug };
 }

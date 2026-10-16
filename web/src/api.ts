@@ -16,6 +16,8 @@ export interface Me {
   shelterOwner?: boolean;
   /** Their request to be a shelter owner: the one waiting, or decided in the last 30 days. */
   ownerRequest?: OwnerRequest | null;
+  /** Their request to list as a private person (no shelter): the same. */
+  listerRequest?: OwnerRequest | null;
   /** They've read the rules for listing (shown before their first animal). */
   listerRules?: boolean;
 }
@@ -23,12 +25,22 @@ export interface Me {
 /** A request to be allowed to register a shelter. An admin gets to know the person and approves. */
 export interface OwnerRequest {
   id: string;
+  /** A shelter's owner, or a private person who rehomes animals (they have no shelter name). */
+  kind: 'shelter' | 'private';
   shelterName: string;
   zone: string;
   status: 'pending' | 'approved' | 'declined';
   createdAt: string;
   decidedAt: string | null;
   note: string | null;
+}
+/** A private person asking to list (no shelter): where they are, and who. */
+export interface ListerForm {
+  placeId: string;
+  phone: string;
+  link: string;
+  about: string;
+  consent: boolean;
 }
 export interface OwnerForm {
   shelterName: string;
@@ -68,6 +80,8 @@ export interface LookAlike {
   who?: string;
 }
 export interface AdminOwnerRequest extends OwnerRequest {
+  /** Where a private person says they are. */
+  place: Place | null;
   link: string | null;
   about: string;
   who: { name: string | null; email: string; phone: string };
@@ -91,6 +105,8 @@ export interface PortalShelter {
   statusReason: string | null;
   place: Place | null;
   role: 'owner' | 'maintainer';
+  /** A shelter, or a private person's one-person profile ("Particular"). */
+  kind: 'shelter' | 'private';
   submittedAt?: string | null;
   /** Requests no one at the shelter has opened yet. */
   newRequests?: number;
@@ -189,6 +205,7 @@ export interface ListingShelter {
   status: ShelterStatus;
   place: Place | null;
   role: 'owner' | 'maintainer';
+  kind: 'shelter' | 'private';
   /** The most it may ask as an adoption fee: RD$2,000 unless an admin raised it. */
   feeCapDop: number;
 }
@@ -403,6 +420,7 @@ export const api = {
   adminBulk: (status: BulkStatus) => call<{ requests: AdminBulk[] }>(`/api/admin/bulk?status=${status}`).then((r) => r.requests),
   adminBulkDecision: (id: string, action: 'approve' | 'decline', note?: string) =>
     call<{ bulk: { id: string; status: BulkStatus } }>(`/api/admin/bulk/${encodeURIComponent(id)}/decision`, 'POST', { action, note }),
+  sendListerRequest: (form: ListerForm) => call<{ request: OwnerRequest }>('/api/portal/owner-request', 'POST', { ...form, kind: 'private' }).then((r) => r.request),
   sendOwnerRequest: (form: OwnerForm) => call<{ request: OwnerRequest }>('/api/portal/owner-request', 'POST', form).then((r) => r.request),
   adminOwners: (status: BulkStatus) => call<{ requests: AdminOwnerRequest[] }>(`/api/admin/owners?status=${status}`).then((r) => r.requests),
   adminOwnerDecision: (id: string, action: 'approve' | 'decline', note?: string) =>

@@ -128,7 +128,8 @@ app.get('/api/me', async (c) => {
     .first<{ phone: string | null; contact_pref: string | null; lister_rules_at: string | null }>();
   const restricted = await requestsRestricted(c.env.DB, user.id);
   const ownerRequest = isShelterOwner(user) ? null : await latestOwnerRequest(c.env.DB, user.id);
-  return c.json({ user: { ...publicUser(user), phone: contact?.phone ?? null, contactPref: contact?.contact_pref ?? null, requestsRestricted: restricted, shelters, shelterOwner: isShelterOwner(user), ownerRequest, listerRules: !!contact?.lister_rules_at } });
+  const listerRequest = await latestOwnerRequest(c.env.DB, user.id, 'private');
+  return c.json({ user: { ...publicUser(user), phone: contact?.phone ?? null, contactPref: contact?.contact_pref ?? null, requestsRestricted: restricted, shelters, shelterOwner: isShelterOwner(user), ownerRequest, listerRequest, listerRules: !!contact?.lister_rules_at } });
 });
 
 // "Entendido" on the rules for listing (PAT-16): shown once per person, before their first animal.

@@ -137,6 +137,7 @@ function ready(pet: PetDetail): Raw {
       <h2 class="section-title" id="ready-title">${t('profile.ready.title')}</h2>
       <p>${t('profile.ready.body', { lister: listerName(pet), name: pet.name })}</p>
       ${beforeYouStart(pet)}
+      ${pet.lister.type === 'private' ? html`<p class="muted">${t('profile.ready.private')}</p>` : ''}
       ${state.user?.requestsRestricted
         ? html`<div class="withdraw-warning">
             <p>${t('profile.ready.restricted')}</p>

@@ -209,9 +209,9 @@ requests.post('/', async (c) => {
   const db = c.env.DB;
   if (await requestsRestricted(db, user.id)) return c.json({ error: 'restricted' }, 403);
   const pet = await db
-    .prepare(`SELECT d.name, d.status, d.open_requests, d.requests_paused, s.name AS shelter_name, COALESCE(s.place_id, d.place_id) AS place_id FROM pets d LEFT JOIN shelters s ON s.id = d.shelter_id WHERE d.id = ? AND ${VIEWABLE}`)
+    .prepare(`SELECT d.name, d.status, d.open_requests, d.requests_paused, s.name AS shelter_name, s.kind AS shelter_kind, COALESCE(s.place_id, d.place_id) AS place_id FROM pets d LEFT JOIN shelters s ON s.id = d.shelter_id WHERE d.id = ? AND ${VIEWABLE}`)
     .bind(b.petId)
-    .first<{ name: string; status: string; open_requests: number; requests_paused: number; shelter_name: string | null; place_id: string }>();
+    .first<{ name: string; status: string; open_requests: number; requests_paused: number; shelter_name: string | null; shelter_kind: string | null; place_id: string }>();
   if (!pet) return c.json({ error: 'not_found' }, 404);
   // How far, if the app said where they browse from. Far away, they must say whether they can come.
   const petPlace = placeById(pet.place_id);
@@ -250,7 +250,7 @@ requests.post('/', async (c) => {
   if (await hasEmailBudget(db, 'request_sent')) {
     await sendRequestSentEmail(c.env, user.email, {
       pet: pet.name,
-      lister: pet.shelter_name ?? 'la persona que lo publicó',
+      lister: pet.shelter_name && pet.shelter_kind !== 'private' ? pet.shelter_name : 'la persona que lo publicó',
       listUrl: `${appOrigin(c)}/lista`,
     }).catch((err) => console.error('request confirmation email failed', err));
   } else console.warn('daily email budget reached: request confirmation not sent');
