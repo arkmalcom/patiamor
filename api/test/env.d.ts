@@ -13,9 +13,3 @@ declare global {
   }
 }
 export {};
-
-// The legal texts are imported as raw text in tests (Vite's ?raw).
-declare module '*.md?raw' {
-  const text: string;
-  export default text;
-}
