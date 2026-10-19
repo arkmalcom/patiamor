@@ -6,7 +6,13 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
-  "vars": { "ENVIRONMENT": "production", "APP_ORIGIN": "https://patiamor.com", "EMAIL_FROM": "Patiamor <hola@patiamor.com>" },
+  // TURNSTILE_SITE_KEY: the public key of the "patiamor.com" Turnstile widget (its secret is TURNSTILE_SECRET, set before the key goes live).
+  "vars": {
+    "ENVIRONMENT": "production",
+    "APP_ORIGIN": "https://patiamor.com",
+    "EMAIL_FROM": "Patiamor <hola@patiamor.com>",
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFbsDPF5D7UP5b68"
+  },
   "assets": {
     "directory": "../web/dist",
     "binding": "ASSETS",
