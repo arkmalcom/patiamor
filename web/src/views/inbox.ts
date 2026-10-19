@@ -6,6 +6,7 @@ import { formatDate, failText, t, type Key } from '../i18n';
 import { photo } from '../ui/canvas';
 import { openOutcome } from '../ui/outcome';
 import { toast } from '../ui/toast';
+import { state } from '../store';
 
 // A shelter's requests (/refugio/<id>/solicitudes, PAT-5). Shelters reach adopters through their own
 // WhatsApp, phone or email from here, and mark each step; adopters see every step in their list.
@@ -39,10 +40,13 @@ export async function renderInbox(root: HTMLElement, shelterId: string, slug: st
   mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
   let requests: InboxRequest[];
   let shelterName = '';
+  let privateLister = false;
   try {
     const [list, shelters] = await Promise.all([api.shelterRequests(shelterId), api.myShelters()]);
     requests = list;
-    shelterName = shelters.find((s) => s.id === shelterId)?.name ?? '';
+    const mine = shelters.find((s) => s.id === shelterId);
+    shelterName = mine?.kind === 'private' ? t('lister.myListings') : (mine?.name ?? '');
+    privateLister = mine?.kind === 'private';
   } catch {
     return mount(root, html`<section class="portal"><p class="loading-note" role="alert">${t('portal.notFound')}</p><a class="button button--outline" href="/refugio">${t('portal.back')}</a></section>`);
   }
@@ -72,7 +76,7 @@ export async function renderInbox(root: HTMLElement, shelterId: string, slug: st
               (k) => html`<button class="list-tabs__tab" type="button" data-tab="${k}" aria-current="${k === current ? 'page' : 'false'}">${t(`inbox.tab.${k}`)}${counts[k] && k !== 'cerradas' ? html` <span class="list-tabs__count">${counts[k]}</span>` : ''}</button>`,
             )}
           </nav>
-          ${shown.length ? html`<ul class="inbox__list">${shown.map((r) => card(r, shelterName, shelterId))}</ul>` : html`<p class="passed__empty">${t(`inbox.empty.${current}`)}</p>`}
+          ${shown.length ? html`<ul class="inbox__list">${shown.map((r) => card(r, shelterName, shelterId, privateLister))}</ul>` : html`<p class="passed__empty">${t(`inbox.empty.${current}`)}</p>`}
         </section>`,
     );
     $$<HTMLButtonElement>('[data-tab]', root).forEach((b) => b.addEventListener('click', () => (go(b.dataset.tab as Tab), draw())));
@@ -148,7 +152,7 @@ export async function renderInbox(root: HTMLElement, shelterId: string, slug: st
 
 const chip = (status: string): Raw => html`<span class="status-chip status-chip--req-${status}" data-chip>${t(`inbox.status.${status as 'sent'}`)}</span>`;
 
-function card(r: InboxRequest, shelter: string, shelterId: string): Raw {
+function card(r: InboxRequest, shelter: string, shelterId: string, privateLister: boolean): Raw {
   const open = TAB_OF[r.status] !== 'cerradas';
   const pet = r.pet;
   const first = r.contact.name.split(/\s+/)[0];
@@ -166,7 +170,7 @@ function card(r: InboxRequest, shelter: string, shelterId: string): Raw {
         </summary>
         <div class="request-card__body">
           ${r.verified ? html`<p class="muted verified-note">${t('verified.inboxNote', { who: first })}</p>` : ''}
-          ${open && r.contact.pref ? contactButtons(r, shelter, first) : ''}
+          ${open && r.contact.pref ? contactButtons(r, shelter, first, privateLister) : ''}
           ${r.status === 'withdrawn' ? html`<p class="portal-card__reason"><strong>${t('inbox.withdrew')}</strong> «${t(`request.withdraw.${r.closedReason as 'situacion'}`)}»</p>` : ''}
           ${r.status === 'closed' ? html`<p class="muted">${closedText(r)}</p>` : ''}
           ${r.message ? html`<blockquote class="request-card__message">${r.message}</blockquote>` : ''}
@@ -201,9 +205,13 @@ const answer = (label: Key, value: string) =>
   html`<div><dt>${t(label)}</dt><dd>${value === 'si' ? t('inbox.answer.si') : html`<span class="request-card__thinking">${t('inbox.answer.pensando')}</span>`}</dd></div>`;
 
 /** The adopter's preferred channel first and largest; the others as plain links. */
-function contactButtons(r: InboxRequest, shelter: string, first: string): Raw {
+function contactButtons(r: InboxRequest, shelter: string, first: string, privateLister: boolean): Raw {
   const c = r.contact;
-  const text = t('inbox.waText', { name: first, shelter, pet: r.pet.name });
+  // A private lister writes on their own behalf, by their own name; the profile's admin-only name is never used.
+  const lister = state.user?.name?.trim();
+  const text = privateLister
+    ? t(lister ? 'inbox.waTextPrivate' : 'inbox.waTextPrivateAnon', { name: first, lister: lister ?? '', pet: r.pet.name })
+    : t('inbox.waText', { name: first, shelter, pet: r.pet.name });
   const options = {
     whatsapp: c.phone ? { href: `https://wa.me/${digits(c.phone)}?text=${encodeURIComponent(text)}`, label: t('inbox.contact.whatsapp'), glyph: MessageCircle, external: true } : null,
     llamada: c.phone ? { href: `tel:${c.phone}`, label: t('inbox.contact.call', { phone: showPhone(c.phone) }), glyph: Phone, external: false } : null,

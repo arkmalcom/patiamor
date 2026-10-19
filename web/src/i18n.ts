@@ -945,6 +945,8 @@ export const es = {
   'inbox.contact.whatsapp': 'Escribir por WhatsApp',
   'inbox.contact.call': 'Llamar al {phone}',
   'inbox.contact.email': 'Escribir un correo',
+  'inbox.waTextPrivate': 'Hola, {name}. Te escribimos de parte de {lister} sobre la adopción de «{pet}» en {app}.',
+  'inbox.waTextPrivateAnon': 'Hola, {name}. Te escribimos sobre la adopción de «{pet}» en {app}.',
   'inbox.waText': 'Hola, {name}. Te escribimos de {shelter} por tu solicitud para conocer a {pet} en {app}.',
   'inbox.mailSubject': 'Tu solicitud para conocer a {pet}',
   'inbox.q.space': 'Espacio en casa',
