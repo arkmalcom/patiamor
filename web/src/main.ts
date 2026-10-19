@@ -17,6 +17,7 @@ import { here, isAppPath, navigate, startNavigation, upgradeHashLink } from './n
 import { errorText } from './ui/auth';
 import { renderAccount } from './views/account';
 import { renderLegal, type LegalDoc } from './views/legal';
+import { legalLinks } from './ui/legal-links';
 import { renderDeck } from './views/deck';
 import { bindSlots, renderList, slots } from './views/list';
 import { renderPortal, type PortalView } from './views/portal';
@@ -73,6 +74,7 @@ function parse(where: string): Route {
   if (a === 'lista') return { name: 'list' };
   if (a === 'cuenta') return { name: 'account' };
   if (a === 'privacidad' || a === 'terminos') return { name: 'legal', doc: a };
+  if (a === 'en' && (b === 'privacy' || b === 'terms')) return { name: 'legal', doc: b };
   return { name: 'deck' };
 }
 
@@ -105,6 +107,7 @@ mount(
       <h2 class="panel-title" id="side-list-title"><a href="/lista">${t('list.title')}</a> <span data-pips data-pips-count>${pips(true)}</span></h2>
       <p class="muted">${t('list.body')}</p>
       <div data-side-slots></div>
+      ${legalLinks()}
     </aside>
     <nav class="tabbar" aria-label="Principal">
       <a href="/" data-nav="deck">${icon(Compass, 24)}<span>${t('nav.explore')}</span></a>

@@ -1945,5 +1945,6 @@ html[data-route='profile'] .toast-region { bottom: calc(96px + env(safe-area-ins
 .legal__text h2:first-child { margin-top: 0; }
 .legal__text ul { display: grid; gap: 8px; padding-left: 22px; margin: 0; }
 .legal__other { margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--rule); }
+.legal__other--lang { margin-top: 0; padding-top: 0; border-top: 0; }
 .legal-links { font-size: 0.9rem; color: var(--ink-2); margin: 0; }
 .legal-links a { color: inherit; text-decoration: underline; }

@@ -41,7 +41,8 @@ function legal(): Plugin {
         this.addWatchFile(path);
         return readFileSync(path, 'utf8');
       };
-      return `export default ${JSON.stringify({ privacidad: read('privacidad.md'), terminos: read('terminos.md') })};`;
+      const texts = { privacidad: read('privacidad.md'), terminos: read('terminos.md'), privacy: read('privacy.en.md'), terms: read('terms.en.md') };
+      return `export default ${JSON.stringify(texts)};`;
     },
   };
 }

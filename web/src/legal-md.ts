@@ -36,7 +36,7 @@ export function parseMarkdown(md: string): Block[] {
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** The pages these texts may link to; every other link is shown as plain text. */
-const PAGES: Record<string, string> = { './privacidad.md': '/privacidad', './terminos.md': '/terminos' };
+const PAGES: Record<string, string> = { './privacidad.md': '/privacidad', './terminos.md': '/terminos', './privacy.en.md': '/en/privacy', './terms.en.md': '/en/terms' };
 
 /** One line of text as safe HTML: everything escaped first, then **bold** and links to the other page. */
 export function inline(text: string): string {
