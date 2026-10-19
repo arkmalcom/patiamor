@@ -3,6 +3,7 @@ import { api, ApiError, type GonePet } from '../api';
 import { companionKey, CONTACT_EMAIL, DEMO, frameFor, type Companion, type PetDetail, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, t, away } from '../i18n';
+import { setPage, titled } from '../seo';
 import { activeRequestFor, cachePets, petCache, placePet, state, takeChanged, update } from '../store';
 import { alertButton, beforeYouStart, bindAlerts, listerName, startRequest } from '../ui/request';
 import { age, canvas, companionLabel, photo } from '../ui/canvas';
@@ -150,6 +151,7 @@ function ready(pet: PetDetail): Raw {
 /** An old link (Mi lista, or one shared before) to an animal that found a home or was withdrawn. */
 function renderGone(root: HTMLElement, pet: GonePet | PetSummary) {
   const adopted = pet.status === 'adopted';
+  setPage({ title: titled(t(adopted ? 'profile.gone.adopted' : 'profile.gone.withdrawn', { name: pet.name })), index: false });
   mount(
     root,
     html`<section class="profile-missing profile-gone">
@@ -168,6 +170,7 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
   if (ended) return renderGone(root, ended);
 
   if (!cached) {
+    if (missing.has(id)) setPage({ title: titled(t('profile.unavailable')), index: false });
     mount(
       root,
       missing.has(id)
@@ -182,6 +185,7 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
 
   const p = placePet(cached);
   const pet = cached;
+  setPage({ title: titled(t('seo.pet', { name: pet.name })), index: true });
   const active = activeRequestFor(pet.id);
   const waiting = pet.status === 'reserved' || pet.requests === 'paused';
   // The bar follows the adoption path: "Quiero adoptar" leads to the end of the profile, where the

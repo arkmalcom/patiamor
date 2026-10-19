@@ -13,6 +13,7 @@ import { mountPips, pips } from './ui/save';
 import { closeSheet, initSheet, openSheet, sheetEl } from './ui/sheet';
 import { initToast, toast } from './ui/toast';
 import { api, ApiError } from './api';
+import { frontTitle, setPage, titled, type Page } from './seo';
 import { here, isAppPath, navigate, startNavigation, upgradeHashLink } from './nav';
 import { errorText } from './ui/auth';
 import { renderAccount } from './views/account';
@@ -23,6 +24,7 @@ import { bindSlots, renderList, slots } from './views/list';
 import { renderPortal, type PortalView } from './views/portal';
 import { renderProfile } from './views/profile';
 import { renderSearch } from './views/search';
+import { BRAND } from './brand';
 import { DEMO } from './data';
 
 upgradeHashLink();
@@ -181,8 +183,30 @@ function chrome(route: Route) {
   bindSlots(side, { openProfile, explore });
 }
 
+/** What search engines and the tab are told about a route. Only the front page (and only at "/", since every
+ *  unknown path draws it too), the animals and the legal texts are for search; the rest is private or empty. */
+function describe(route: Route): Page {
+  switch (route.name) {
+    case 'deck':
+      return { title: frontTitle, description: BRAND.description, index: location.pathname === '/' };
+    case 'profile':
+      return {}; // the Worker wrote its title and description; profile.ts adjusts them once the animal is known
+    case 'legal':
+      return { index: true }; // legal.ts: its title and description are in the language of the text
+    case 'search':
+      return { title: titled(t('nav.search')), description: BRAND.description, index: false };
+    case 'list':
+      return { title: titled(t('list.title')), description: BRAND.description, index: false };
+    case 'account':
+      return { title: titled(t('nav.account')), description: BRAND.description, index: false };
+    case 'portal':
+      return { title: titled(t('portal.title')), description: BRAND.description, index: false };
+  }
+}
+
 function render(route = parse(here())) {
   chrome(route);
+  setPage(describe(route));
   switch (route.name) {
     case 'deck':
       return renderDeck(view, { openProfile });

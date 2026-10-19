@@ -44,6 +44,9 @@ jobs:
 
       - name: Build web
         run: npm run build --prefix web
+        env:
+          # The address search engines list pages under (canonical links, structured data; web/src/seo.ts).
+          VITE_SITE_URL: ${{ env.PROD_URL }}
 
       - name: Type-check API
         run: npm run typecheck --prefix api

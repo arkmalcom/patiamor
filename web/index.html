@@ -12,7 +12,10 @@
     <meta property="og:locale" content="es_DO" />
     <meta property="og:title" content="%APP_NAME% · %APP_TAGLINE%" />
     <meta property="og:description" content="%APP_DESCRIPTION%" />
+    <meta name="twitter:card" content="summary" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Google's results show a favicon in a multiple of 48 px, and not every crawler reads SVG. -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
     <!-- Installing to the home screen (no service worker: the app is live data, and a cached shell could outlive a deploy). -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
@@ -22,10 +25,13 @@
     <title>%APP_NAME% · %APP_TAGLINE%</title>
   </head>
   <body>
-    <div id="app"></div>
+    <!-- What a crawler (or a browser with scripts off) reads of the page before it draws itself; the script replaces it. -->
     <noscript>
-      <p>%APP_NAME%: <a href="/privacidad">Política de privacidad</a> · <a href="/terminos">Términos de uso</a> · <a href="/en/privacy">Privacy Policy</a> · <a href="/en/terms">Terms of Use</a></p>
+      <h1>%APP_NAME% · %APP_TAGLINE%</h1>
+      <p>%APP_DESCRIPTION% Para ver a los animales necesitas activar JavaScript.</p>
+      <p><a href="/privacidad">Política de privacidad</a> · <a href="/terminos">Términos de uso</a> · <a href="/en/privacy">Privacy Policy</a> · <a href="/en/terms">Terms of Use</a></p>
     </noscript>
+    <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

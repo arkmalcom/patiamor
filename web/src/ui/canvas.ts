@@ -31,11 +31,12 @@ export function where(p: Placed): Raw {
   return html`<p class="where">${icon(MapPin, 16)}<span><strong>${away(p.km)}</strong> · ${p.pet.place.name}</span></p>`;
 }
 
-/** The photo, or a quiet empty canvas when the lister hasn't added one yet. Small frames take the thumbnail. */
-export function photo(pet: PetSummary, loading: 'eager' | 'lazy' = 'lazy', small = false): Raw {
+/** The photo, or a quiet empty canvas when the lister hasn't added one yet. Small frames take the thumbnail.
+ *  Where the name sits right beside it (cards, lists) the photo needs no alt; the profile's own says who and where. */
+export function photo(pet: PetSummary, loading: 'eager' | 'lazy' = 'lazy', small = false, alt = ''): Raw {
   const src = small ? (pet.photo.thumb ?? pet.photo.url) : pet.photo.url;
   return src
-    ? html`<img src="${src}" alt="" style="object-position:${pet.photo.focus}" loading="${loading}" decoding="async" draggable="false" />`
+    ? html`<img src="${src}" alt="${alt}" style="object-position:${pet.photo.focus}" loading="${loading}" decoding="async" draggable="false" />`
     : html`<span class="no-photo">${icon(PawPrint, 34)}<span>${t('photo.none')}</span></span>`;
 }
 
@@ -82,7 +83,7 @@ export function canvas(p: Placed, { heading = 'h2', loading = 'eager', photoName
       <div class="canvas__frame-shadow">
         <div class="canvas__frame">
           <div class="canvas__photo">
-            <div class="canvas__picture"${photoName ? html` style="view-transition-name:${photoName}"` : ''}>${photo(pet, loading)}</div>
+            <div class="canvas__picture"${photoName ? html` style="view-transition-name:${photoName}"` : ''}>${photo(pet, loading, false, heading === 'h1' ? t('photo.alt', { name: pet.name, place: pet.place.name }) : '')}</div>
             ${gallery ? galleryControls(pet, gallery) : ''}
             ${compat(pet)}
           </div>

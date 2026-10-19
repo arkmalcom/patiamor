@@ -5,6 +5,7 @@ import { appOrigin, auth, publicUser } from './auth/routes';
 import { currentUser } from './auth/session';
 import { pets, readPoint } from './pets';
 import { petPage } from './share';
+import { robots, sitemap } from './seo';
 import type { AppContext, Env } from './env';
 import { inDR, nearestPlace, PLACES_ATTRIBUTION, placeById, searchPlaces } from './places';
 import { admin } from './admin';
@@ -39,6 +40,8 @@ app.use('/api/*', async (c, next) => {
   await next();
   if (!c.res.headers.has('Cache-Control')) c.res.headers.set('Cache-Control', 'no-store');
   c.res.headers.set('X-Content-Type-Options', 'nosniff'); // an answer is only ever read as what it says it is
+  // Crawlers may read the API (the pages need it) but its JSON is not a page to list. Photos are, in image search.
+  if (!c.req.path.startsWith('/api/photos/')) c.res.headers.set('X-Robots-Tag', 'noindex');
 });
 
 // Public reads are the same for everyone, so they skip the session lookup (a D1 read per request).
@@ -71,6 +74,8 @@ app.get('/api/health', async (c) => {
 app.route('/api/auth', auth);
 // The app with link-preview tags for a pet (the only page path the Worker sees: run_worker_first).
 app.get('/mascota/:id', petPage);
+app.get('/robots.txt', robots);
+app.get('/sitemap.xml', sitemap);
 app.route('/api/pets', pets);
 app.route('/api/pets', reports);
 app.route('/api/requests', requests);

@@ -1,12 +1,14 @@
 import type { Context } from 'hono';
 import type { AppContext } from './env';
 import { cachedProfile } from './pets';
+import { indexable } from './seo';
 import { BRAND } from '../../web/src/brand';
 
 // Link previews (PAT-32). WhatsApp, Facebook, Instagram and the like read a page's meta tags without
 // running its script, so for /mascota/<id> the Worker writes the animal's name, a line about it and its
 // main photo into the app's HTML. People get the same app as on any other path. An animal that went
-// home or was withdrawn previews as such; an unknown id gets the app's default tags.
+// home or was withdrawn previews as such (and is kept out of search results); an unknown id gets the app's
+// default tags and a 404, so search engines don't list it as a copy of the front page.
 
 type C = Context<AppContext>;
 type Photo = { url: string | null; thumb: string | null };
@@ -31,12 +33,12 @@ function age(birthDate: string, estimated: boolean) {
 const escape = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
 /** What the preview says, or null to leave the app's default tags. */
-function card(body: { pet?: Pet; error?: string }): { title: string; description: string; photo: Photo } | null {
+function card(body: { pet?: Pet; error?: string }): { title: string; description: string; photo: Photo; ended?: true } | null {
   const pet = body.pet;
   if (!pet) return null;
   const more = `Hay más perros y gatos esperando familia cerca de ti en ${BRAND.name}.`;
-  if (pet.status === 'adopted') return { title: `¡${pet.name} ya encontró hogar!`, description: more, photo: pet.photo };
-  if (pet.status === 'withdrawn') return { title: `${pet.name} ya no está disponible`, description: more, photo: pet.photo };
+  if (pet.status === 'adopted') return { title: `¡${pet.name} ya encontró hogar!`, description: more, photo: pet.photo, ended: true };
+  if (pet.status === 'withdrawn') return { title: `${pet.name} ya no está disponible`, description: more, photo: pet.photo, ended: true };
   const kind = (SPECIES[pet.species] ?? SPECIES.perro)[pet.sex === 'hembra' ? 1 : 0];
   const bits = [kind, pet.birthDate ? age(pet.birthDate, !!pet.birthDateEstimated) : null, pet.place ? `${pet.place.name}, ${pet.place.municipality}` : null,
     pet.lister?.type === 'shelter' ? pet.lister.name : 'Particular'];
@@ -47,15 +49,20 @@ export async function petPage(c: C) {
   const origin = new URL(c.req.url).origin;
   const page = await c.env.ASSETS.fetch(new Request(`${origin}/`));
   const id = c.req.param('id') ?? '';
-  const about = card(await cachedProfile(c, id).catch(() => ({})));
-  if (!about) return page;
+  const profile = await cachedProfile(c, id).catch(() => ({}) as { error?: string });
+  const about = card(profile);
+  if (!about) return profile.error === 'not_found' ? new Response(page.body, { status: 404, headers: page.headers }) : page;
 
   // The thumbnail (about 480 px, tens of KB) suits previews best: WhatsApp skips large images. Sample
   // photos have none, so they use the full one.
   const photo = about.photo.thumb ?? about.photo.url;
   const url = `${c.env.APP_ORIGIN || origin}/mascota/${encodeURIComponent(id)}`;
   const meta = (key: 'property' | 'name', name: string, content: string) => `<meta ${key}="${name}" content="${escape(content)}" />`;
+  // Only open animals on the real site are for search: staging and animals that went home are not.
+  const listed = indexable(c.env, origin) && !about.ended;
   const tags = [
+    `<link rel="canonical" href="${escape(url)}" />`,
+    ...(listed ? [] : ['<meta name="robots" content="noindex" />']),
     meta('property', 'og:type', 'website'),
     meta('property', 'og:site_name', BRAND.name),
     meta('property', 'og:locale', 'es_DO'),

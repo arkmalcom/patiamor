@@ -58,9 +58,9 @@ describe('a pet’s link preview', () => {
     expect(meta(html, 'og:title')).toBe('¡Rocky ya encontró hogar!');
   });
 
-  it('keeps the app’s defaults for an unknown pet', async () => {
+  it('keeps the app’s defaults for an unknown pet, as a 404 so search engines skip it', async () => {
     const { status, html } = await page('/mascota/no-existe');
-    expect(status).toBe(200);
+    expect(status).toBe(404);
     expect(html).toContain('<title>Patiamor · Adopta cerca de ti</title>');
     expect(meta(html, 'og:title')).toBe('Patiamor · Adopta cerca de ti');
   });

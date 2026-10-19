@@ -55,3 +55,15 @@ export async function cachedJson(c: Context<AppContext>, path: string, build: ()
   c.executionCtx.waitUntil(cache.put(key, res.clone()));
   return forBrowser(res, 'MISS');
 }
+
+/** Like cachedJson, for a text answer built from the catalogue (the sitemap): one copy per catalogue version. */
+export async function cachedText(c: Context<AppContext>, path: string, type: string, build: () => Promise<string>) {
+  const v = await catalogVersion(c.env.DB);
+  const key = new Request(`${new URL(c.req.url).origin}/__catalog/v${v}${path}`);
+  const cache = (caches as unknown as { default: Cache }).default;
+  const hit = await cache.match(key);
+  if (hit) return forBrowser(hit, 'HIT');
+  const res = new Response(await build(), { headers: { 'Content-Type': type, 'Cache-Control': `public, max-age=${EDGE_TTL}` } });
+  c.executionCtx.waitUntil(cache.put(key, res.clone()));
+  return forBrowser(res, 'MISS');
+}
