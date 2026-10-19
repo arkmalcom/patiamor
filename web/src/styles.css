@@ -162,6 +162,7 @@ html[data-route='deck'] #app { height: 100dvh; overflow: hidden; }
   color: var(--ink);
   display: inline-flex; align-items: flex-start; gap: 6px;
 }
+.wordmark__paw { flex: none; align-self: center; width: 0.95em; height: 1em; fill: var(--hibiscus); }
 .wordmark__demo {
   font-family: var(--font-ui);
   font-size: 0.58rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
@@ -177,7 +178,13 @@ html[data-route='deck'] #app { height: 100dvh; overflow: hidden; }
   .topbar__tools { gap: 6px; }
   .radius-chip { gap: 5px; padding: 0 12px 0 10px; }
 }
-@media (max-width: 389px) { .wordmark__demo { display: none; } }
+@media (max-width: 389px) {
+  .wordmark__demo { display: none; }
+  .wordmark { gap: 4px; }
+  .wordmark__paw { width: 0.8em; height: 0.85em; }
+}
+/* The smallest phones (320 px) have no room for the paw beside "Todo RD" and the filter button. */
+@media (max-width: 359px) { .wordmark__paw { display: none; } }
 
 .topnav { display: none; }
 

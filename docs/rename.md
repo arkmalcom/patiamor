@@ -11,7 +11,7 @@ Patiamor's name and public contact address live in one file, so a rename is most
 | Staging email sender | `api/wrangler.jsonc`, `env.staging.vars.EMAIL_FROM`. |
 | Production URL for the deploy and its smoke test | `.github/workflows/deploy-prod.yml`: `environment.url` and `PROD_URL`. |
 | Legal texts | Nothing to edit: the pages at `/privacidad` and `/terminos` show `docs/legal/*.md` with the name, contact email and the address the site runs on filled in from `brand.ts` (`fill()` in `web/src/legal-md.ts`). A test fails if a text names anything a rename wouldn't change. |
-| Logo, if it changes | `web/public/favicon.svg`. The PNG icons in `web/public/icons/` are made from it on the app's pale blue (`rsvg-convert` plus `magick`; the commands are in the commit that added them, e74b5b3). The wordmark in the top bar is text, so it follows the name. |
+| Logo, if it changes | `web/public/favicon.svg` (the paw on its pink tile). The PNG icons in `web/public/icons/` and `web/public/favicon.ico` are made from it with `rsvg-convert` plus `magick`; the commands are in the latest commit of `git log -- web/public/favicon.svg`. The top bar draws the same paw (`PAW` in `web/src/main.ts`) beside the wordmark, which is text, so it follows the name. |
 
 `api/test/brand.test.ts` fails if any app text spells the name or email out instead of using `{app}` and `{contact}`. After the edits, run `npm test` in `api/` and `npm run build` in `web/`, and search the visible text for the old name.
 

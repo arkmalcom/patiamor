@@ -4,7 +4,7 @@ import './styles.css';
 
 import { Compass, MapPin, Search, SlidersHorizontal, User } from 'lucide';
 import { backdrop, landscape } from './art';
-import { $, $$, html, icon, mount, transition } from './dom';
+import { $, $$, html, icon, mount, raw, transition } from './dom';
 import { kmLabel, t } from './i18n';
 import { activeFilterCount, loadPets, loadRequests, radius, setLocation, setUser, state, subscribe, takePendingRequest, update } from './store';
 import { applyFooter, bindRadiusPanel, radiusPanel } from './ui/radius';
@@ -28,6 +28,15 @@ import { BRAND } from './brand';
 import { DEMO } from './data';
 
 upgradeHashLink();
+
+// The logo: a paw whose main pad is a heart. The same drawing as public/favicon.svg, without its tile.
+const PAW = raw(`<svg class="wordmark__paw" viewBox="84 80 344 362" aria-hidden="true" focusable="false">
+  <path d="M256 438C234 422 150 370 142 308C136 262 168 232 204 232C228 232 246 246 256 264C266 246 284 232 308 232C344 232 376 262 370 308C362 370 278 422 256 438Z"/>
+  <ellipse cx="128" cy="208" rx="34" ry="44" transform="rotate(-30 128 208)"/>
+  <ellipse cx="204" cy="132" rx="36" ry="47" transform="rotate(-10 204 132)"/>
+  <ellipse cx="308" cy="132" rx="36" ry="47" transform="rotate(10 308 132)"/>
+  <ellipse cx="384" cy="208" rx="34" ry="44" transform="rotate(30 384 208)"/>
+</svg>`);
 
 type Route = { name: 'deck' } | { name: 'profile'; id: string } | { name: 'search'; q: string } | { name: 'list' } | { name: 'account' } | { name: 'legal'; doc: LegalDoc } | ({ name: 'portal' } & PortalView);
 
@@ -91,7 +100,7 @@ mount(
     ${landscape}
     <a class="skip-link" href="#view">Saltar al contenido</a>
     <header class="topbar">
-      <a class="wordmark" href="/" aria-label="${t('app.name')}, ${t('nav.explore')}">${t('app.name')}${DEMO ? html`<span class="wordmark__demo">${t('app.demo')}</span>` : ''}</a>
+      <a class="wordmark" href="/" aria-label="${t('app.name')}, ${t('nav.explore')}">${PAW}${t('app.name')}${DEMO ? html`<span class="wordmark__demo">${t('app.demo')}</span>` : ''}</a>
       <nav class="topnav" aria-label="Principal">
         <a href="/" data-nav="deck">${t('nav.explore')}</a>
         <a href="/buscar" data-nav="search">${t('nav.search')}</a>
