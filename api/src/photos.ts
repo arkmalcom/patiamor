@@ -256,7 +256,7 @@ export async function servePhoto(c: C) {
   if (!KEY.test(key)) return c.json({ error: 'not_found' }, 404);
   const cache = (caches as unknown as { default: Cache }).default; // a no-op on workers.dev (staging)
   const hit = await cache.match(c.req.url);
-  if (hit) return hit;
+  if (hit) return new Response(hit.body, hit); // a cached response's headers are read-only; the /api middleware adds its own
   const object = await c.env.PHOTOS.get(key);
   if (!object) {
     c.header('Cache-Control', 'public, max-age=300');

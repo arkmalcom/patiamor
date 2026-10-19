@@ -61,6 +61,15 @@ describe('what is accepted', () => {
     expect((await api(res.json.photo.thumb)).headers.get('content-type')).toBe('image/webp');
   });
 
+  it('serves the same photo again from the edge cache with the API headers', async () => {
+    const { petId, owner } = await draftPet();
+    const url = (await addPhoto(petId, owner.cookie)).json.photo.url as string;
+    await api(url); // fills the cache (waitUntil)
+    const again = await api(url);
+    expect(again.status).toBe(200);
+    expect(again.headers.get('x-content-type-options')).toBe('nosniff');
+  });
+
   it('rejects anything that isn’t a JPEG or WebP, whatever it claims', async () => {
     const { petId, owner } = await draftPet();
     const svg = b64text('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>');
