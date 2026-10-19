@@ -14,11 +14,15 @@
     "run_worker_first": ["/api/*", "/mascota/*", "/robots.txt", "/sitemap.xml"]
   },
   "d1_databases": [
-    // database_id is filled in once the production database is created (with the owner's approval).
-    { "binding": "DB", "database_name": "patiamor-db", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }
+    { "binding": "DB", "database_name": "patiamor-db", "database_id": "0b6d481c-1d8d-45cd-aa54-6cf14a856c28", "migrations_dir": "migrations" }
   ],
-  // Pet photos (PAT-9). The production bucket is created with the owner's approval when production is set up.
+  // Pet photos (PAT-9).
   "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "patiamor-photos" }],
+  // Custom domains: Cloudflare creates their DNS records. Staging stays on workers.dev.
+  "routes": [
+    { "pattern": "patiamor.com", "custom_domain": true },
+    { "pattern": "www.patiamor.com", "custom_domain": true }
+  ],
   // The morning job (digest.ts): shelters' new requests and "Avísame" alerts. 12:00 UTC = 8:00 in the DR.
   "triggers": { "crons": ["0 12 * * *"] },
   // Writes per account (or per IP when signed out), per minute: the first guard against floods that would
