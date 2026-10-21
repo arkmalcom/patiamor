@@ -6,6 +6,7 @@ const flow: Flow = {
   title: 'Cómo publicar como particular',
   subtitle: 'Si no eres un refugio',
   end: 'Cuando te aprobemos, publicas igual que un refugio, pero **sin cuota**.',
+  music: 'Island Meet and Greet',
   signedInAs: 'marta',
   start: '/refugio',
   async run(t) {

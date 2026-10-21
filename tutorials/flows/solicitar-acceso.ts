@@ -6,6 +6,7 @@ const flow: Flow = {
   title: 'Cómo pedir acceso para tu refugio',
   subtitle: 'El primer paso para publicar como refugio',
   end: 'Cuando te aprobemos, verás **Registrar un refugio** en el portal.',
+  music: 'Teddy Bear Waltz',
   signedInAs: 'marta',
   start: '/refugio',
   async run(t) {

@@ -6,6 +6,7 @@ const flow: Flow = {
   title: 'Cómo registrar tu refugio',
   subtitle: 'Después de que aprobemos tu acceso',
   end: 'Cuando lo verifiquemos, tus animales aparecerán a las familias que viven cerca.',
+  music: 'Daily Beetle',
   signedInAs: 'luis',
   start: '/refugio',
   async run(t) {

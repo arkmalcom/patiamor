@@ -8,6 +8,7 @@ const flow: Flow = {
   title: 'Cómo entrar al portal',
   subtitle: 'Para refugios y particulares',
   end: 'La próxima vez, entra con el **mismo correo**.',
+  music: 'Glitter Blast',
   start: '/',
   async run(t) {
     const page = t.page;

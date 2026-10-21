@@ -6,6 +6,7 @@ const flow: Flow = {
   title: 'Cómo responder las solicitudes',
   subtitle: 'Para refugios y particulares',
   end: 'Si llegan solicitudes nuevas, te avisamos **cada mañana** por correo.',
+  music: 'Doobly Doo',
   signedInAs: 'carla',
   start: '/refugio',
   async run(t) {

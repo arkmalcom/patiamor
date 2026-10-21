@@ -5,11 +5,11 @@
 //
 // Frames are screenshots taken back to back (about 30 a second, at 2x, so text stays sharp; the
 // browser's own video recorder only captures at 1x). Captions, the title and the end card are HTML
-// pages in the app's fonts, rendered to PNG and laid over the frames with ffmpeg.
+// pages in the app's fonts, rendered to PNG and laid over the frames with ffmpeg, over one music track per flow.
 
 import { chromium, type Browser, type Locator, type Page } from 'playwright';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -40,6 +40,8 @@ export interface Flow {
   subtitle: string;
   /** The end card's line, above the contact address. */
   end: string;
+  /** A Kevin MacLeod track from incompetech.com (CC BY 4.0, credited on the end card), longer than the video. */
+  music: string;
   signedInAs?: keyof typeof SESSIONS;
   start: string;
   run(t: Tutor): Promise<void>;
@@ -270,7 +272,20 @@ const captionPage = (text: string) => PAGE(`<div id="c" style="position:absolute
   display:flex;align-items:center;justify-content:center;text-align:center;font-size:50px;line-height:1.25;font-weight:600;text-wrap:balance"><p style="margin:0">${marked(text)}</p></div>`);
 
 const titlePage = (f: Flow) => PAGE(`<div class="card"><img src="${logo()}" alt=""><p class="kicker">Patiamor · Guía</p><h1>${esc(f.title)}</h1><p class="sub">${esc(f.subtitle)}</p></div>`);
-const endPage = (f: Flow) => PAGE(`<div class="card"><img src="${logo()}" alt=""><h1>¡Listo!</h1><p class="sub">${marked(f.end)}</p><p class="contact">¿Dudas? hola@patiamor.com</p></div>`);
+const endPage = (f: Flow) =>
+  PAGE(`<div class="card"><img src="${logo()}" alt=""><h1>¡Listo!</h1><p class="sub">${marked(f.end)}</p><p class="contact">¿Dudas? hola@patiamor.com</p>
+    <p style="position:absolute;bottom:70px;left:0;right:0;font-size:28px;color:#4a5275">Música: «${esc(f.music)}», Kevin MacLeod (incompetech.com) · CC BY 4.0</p></div>`);
+
+/** The flow's track, downloaded once into .state/music. */
+function music(title: string) {
+  const dir = join(STATE, 'music');
+  const file = join(dir, `${title}.mp3`);
+  if (!existsSync(file)) {
+    mkdirSync(dir, { recursive: true });
+    execFileSync('curl', ['-sfL', '-o', file, `https://incompetech.com/music/royalty-free/mp3-royaltyfree/${encodeURIComponent(`${title}.mp3`)}`]);
+  }
+  return file;
+}
 
 async function png(browser: Browser, html: string, file: string) {
   const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
@@ -330,9 +345,13 @@ async function compose(browser: Browser, name: string, flow: Flow, frames: numbe
 
   mkdirSync(OUT, { recursive: true });
   const file = join(OUT, `${name}.mp4`);
-  // A silent audio track: some apps won't post a video without one.
-  args.push('-f', 'lavfi', '-t', total.toFixed(3), '-i', 'anullsrc=r=44100:cl=stereo');
-  args.push('-filter_complex', graph.join(';'), '-map', `[${last}]`, '-map', `${n}:a`, '-t', total.toFixed(3));
+  // The music plays once, start to end, never looped: a track shorter than the video is refused.
+  const track = music(flow.music);
+  const trackS = Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', track], { encoding: 'utf8' }));
+  if (trackS < total) throw new Error(`«${flow.music}» (${trackS.toFixed(0)} s) is shorter than the video (${total.toFixed(0)} s)`);
+  args.push('-i', track);
+  graph.push(`[${n}:a]atrim=0:${total.toFixed(3)},loudnorm=I=-20:TP=-2:LRA=11,afade=t=in:d=1.5,afade=t=out:st=${(total - 3).toFixed(3)}:d=3[music]`);
+  args.push('-filter_complex', graph.join(';'), '-map', `[${last}]`, '-map', '[music]', '-t', total.toFixed(3));
   args.push('-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k', '-movflags', '+faststart', file);
   execFileSync('ffmpeg', args, { stdio: 'inherit' });
   return { file, total };

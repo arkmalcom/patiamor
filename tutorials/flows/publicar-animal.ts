@@ -12,6 +12,7 @@ const flow: Flow = {
   title: 'Cómo publicar un animal',
   subtitle: 'Para refugios verificados',
   end: 'Para cambiar algo después, tócalo en **Tus animales**.',
+  music: 'Enchanted Valley',
   signedInAs: 'carla',
   start: '/refugio',
   async run(t) {

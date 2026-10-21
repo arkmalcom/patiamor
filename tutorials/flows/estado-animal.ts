@@ -6,6 +6,7 @@ const flow: Flow = {
   title: 'Cómo marcar en proceso o adoptado',
   subtitle: 'Para refugios y particulares',
   end: '¿Te equivocaste? Abre la pestaña y toca **Volver a publicar**.',
+  music: 'Chee Zee Beach',
   signedInAs: 'carla',
   start: '/refugio',
   async run(t) {
