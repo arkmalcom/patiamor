@@ -1316,6 +1316,22 @@ html.sheet-open { overflow: hidden; }
 .profile-gone__frame img, .profile-gone__frame .no-photo { width: 200px; height: 244px; border-radius: 102px 102px 3px 3px; }
 .shelter__meta { font-size: 0.95rem; margin-top: 4px; }
 
+/* "Apoyar a …": the shelter's bank account, folded under its card. */
+.donation { display: grid; gap: 12px; }
+.donation > summary .icon { flex: none; color: var(--hibiscus-press); }
+.donation__lede { font-size: 0.95rem; color: var(--ink-2); max-width: 62ch; }
+.donation__list { margin: 0; }
+.donation__list > div {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--rule);
+}
+.donation__list dt { color: var(--ink-2); font-weight: 600; }
+.donation__list dd { margin: 0; display: flex; align-items: center; gap: 10px; font-weight: 800; overflow-wrap: anywhere; }
+.donation__account { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.donation__copy { padding: 6px 0; font-size: 0.9rem; min-height: 44px; }
+.donation__note { font-size: 0.95rem; }
+.outcome__form > .button--danger { justify-self: start; }
+
 .profile__bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
   display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center;

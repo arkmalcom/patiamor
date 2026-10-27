@@ -1,6 +1,6 @@
-import { BadgeCheck, CircleAlert, CirclePause, Clock, Eye, EyeOff, Flag, House, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, UserCheck, Users, UsersRound } from 'lucide';
+import { BadgeCheck, CircleAlert, CirclePause, Clock, Eye, EyeOff, Flag, HandHeart, House, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, UserCheck, Users, UsersRound } from 'lucide';
 import { api, ApiError, type AdminAdopter, type AdminReviewPet, type AdminBulk, type AdminOwnerRequest, type AdminPaused, type AdminShelter, type BulkStatus, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
-import { frameFor, type PetSummary, type Place } from '../data';
+import { frameFor, type Donation, type PetSummary, type Place } from '../data';
 import { photo } from '../ui/canvas';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, failText, pesos, t, type Key } from '../i18n';
@@ -132,6 +132,79 @@ async function home(root: HTMLElement) {
   $$<HTMLButtonElement>('[data-review]', root).forEach((b) =>
     b.addEventListener('click', () => openReview(shelters.find((x) => x.id === b.dataset.review)!, () => void home(root))),
   );
+  $$<HTMLButtonElement>('[data-donation]', root).forEach((b) => b.addEventListener('click', () => void openDonation(shelters.find((x) => x.id === b.dataset.donation)!, b)));
+}
+
+const DONATION_ERRORS = ['invalid_bank', 'invalid_account_type', 'invalid_account', 'invalid_holder', 'invalid_holder_id', 'not_for_private'];
+
+/** The bank account adopters can donate to. Optional, and separate from registration; shown only while verified. */
+async function openDonation(shelter: PortalShelter, opener: HTMLButtonElement) {
+  opener.disabled = true;
+  let d: Donation | null;
+  try {
+    d = (await api.shelter(shelter.id)).shelter.donation ?? null;
+  } catch (err) {
+    return toast(failText(err));
+  } finally {
+    opener.disabled = false;
+  }
+  const input = (name: string, label: Key, value: string | null | undefined, opts: { max: number; optional?: boolean; hint?: Key; inputmode?: string; placeholder?: string }) => html`
+    <label class="field">
+      <span class="field__label">${t(label)}${opts.optional ? html` <span class="muted">(${t('request.optional')})</span>` : ''}</span>
+      <input class="field__input" name="${name}" maxlength="${opts.max}" value="${value ?? ''}" autocomplete="off" ${opts.inputmode ? html`inputmode="${opts.inputmode}"` : ''} ${opts.placeholder ? html`placeholder="${opts.placeholder}"` : ''} />
+      ${opts.hint ? html`<span class="field__hint">${t(opts.hint)}</span>` : ''}
+    </label>`;
+  const dialog = openSheet(
+    t('donation.portal.title', { name: shelter.name }),
+    html`<form class="outcome__form" id="donation-form" novalidate>
+      <p>${t('donation.portal.lede')}</p>
+      ${input('bank', 'donation.bank', d?.bank, { max: 60, placeholder: t('donation.portal.bankPlaceholder') })}
+      <fieldset class="question">
+        <legend>${t('donation.accountType')}</legend>
+        <div class="segmented">
+          ${(['ahorros', 'corriente'] as const).map((k) => html`<label><input type="radio" name="accountType" value="${k}" ${d?.accountType === k ? 'checked' : ''} /><span>${t(`donation.type.${k}`)}</span></label>`)}
+        </div>
+      </fieldset>
+      ${input('account', 'donation.account', d?.account, { max: 40, inputmode: 'numeric' })}
+      ${input('holder', 'donation.holder', d?.holder, { max: 100, hint: 'donation.portal.holderHint' })}
+      ${input('holderId', 'donation.holderId', d?.holderId, { max: 20, optional: true, inputmode: 'numeric', hint: 'donation.portal.holderIdHint' })}
+      <label class="field">
+        <span class="field__label">${t('donation.portal.note')} <span class="muted">(${t('request.optional')})</span></span>
+        <textarea class="field__input field__input--area" name="note" rows="2" maxlength="300" placeholder="${t('donation.portal.notePlaceholder')}">${d?.note ?? ''}</textarea>
+      </label>
+      ${d ? html`<button class="text-button button--danger" type="button" data-remove>${t('donation.portal.remove')}</button>` : ''}
+      <p class="form-error" role="alert" hidden data-error></p>
+    </form>`,
+    {
+      footer: html`<button class="button button--ghost" type="button" data-cancel>${t('request.cancel')}</button>
+        <button class="button button--primary" type="submit" form="donation-form" data-send>${t('donation.portal.save')}</button>`,
+    },
+  );
+  const formEl = $<HTMLFormElement>('#donation-form', dialog);
+  const error = $('[data-error]', dialog);
+  const send = $<HTMLButtonElement>('[data-send]', dialog);
+  const submit = async (remove: boolean) => {
+    const f = new FormData(formEl);
+    const v = (k: string) => (remove ? '' : String(f.get(k) ?? '').trim());
+    send.disabled = true;
+    error.hidden = true;
+    try {
+      const saved = await api.saveDonation(shelter.id, { bank: v('bank'), accountType: v('accountType'), account: v('account'), holder: v('holder'), holderId: v('holderId'), note: v('note') });
+      closeSheet();
+      toast(t(saved ? 'donation.portal.saved' : 'donation.portal.removed'));
+    } catch (err) {
+      const code = err instanceof ApiError ? err.code : '';
+      error.textContent = DONATION_ERRORS.includes(code) ? t(`donation.err.${code as 'invalid_bank'}`) : failText(err);
+      error.hidden = false;
+      send.disabled = false;
+    }
+  };
+  $('[data-cancel]', dialog).addEventListener('click', () => closeSheet());
+  dialog.querySelector('[data-remove]')?.addEventListener('click', () => void submit(true));
+  formEl.addEventListener('submit', (e) => {
+    e.preventDefault();
+    void submit(false);
+  });
 }
 
 /** For a person with animals to rehome and no shelter: ask to list as a "Particular", or where the request stands. */
@@ -258,6 +331,9 @@ function shelterCard(s: PortalShelter): Raw {
         ${statusChip(s.status)}
       </div>
       ${next[s.status]}
+      ${!mine && s.role === 'owner' && s.status !== 'suspended'
+        ? html`<button class="text-button portal-card__donation" type="button" data-donation="${s.id}">${icon(HandHeart, 18)}${t('donation.portal.open')}</button>`
+        : ''}
       ${mine ? '' : html`<p class="portal-card__role">${icon(Users, 15)}${t(`portal.role.${s.role}`)}${s.submittedAt ? html` · ${t('portal.sentOn', { date: formatDate(s.submittedAt.slice(0, 10)) })}` : ''}</p>`}
     </li>`;
 }

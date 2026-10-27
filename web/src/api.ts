@@ -1,5 +1,5 @@
 // Thin client for the Patiamor Worker API (same origin in every environment).
-import type { Energy, PetDetail, PetSummary, LatLng, Place, Sex, Size, Species } from './data';
+import type { Donation, Energy, PetDetail, PetSummary, LatLng, Place, Sex, Size, Species } from './data';
 import type { AdoptionRequest, ContactPref, MyRequest, RequestForm, RequestStatus } from './store';
 
 export interface Me {
@@ -117,6 +117,8 @@ export interface PortalShelter {
   email?: string | null;
   website?: string | null;
   visitHours?: string | null;
+  /** Only in the one-shelter answer (api.shelter). */
+  donation?: Donation | null;
 }
 
 /** What Patiamor needs to verify a shelter. Private: never shown to adopters. */
@@ -372,6 +374,8 @@ export const api = {
   registerShelter: (form: ShelterForm) => call<{ shelter: { id: string; slug: string; status: ShelterStatus } }>('/api/portal/shelters', 'POST', form).then((r) => r.shelter),
   shelter: (id: string) => call<{ shelter: PortalShelter; application: ShelterApplication | null }>(`/api/portal/shelters/${encodeURIComponent(id)}`),
   resubmitShelter: (id: string, form: ShelterForm) => call<{ shelter: { id: string; status: ShelterStatus } }>(`/api/portal/shelters/${encodeURIComponent(id)}/application`, 'PUT', form),
+  /** All blank removes it. */
+  saveDonation: (id: string, form: Record<keyof Donation, string>) => call<{ donation: Donation | null }>(`/api/portal/shelters/${encodeURIComponent(id)}/donation`, 'PUT', form).then((r) => r.donation),
   shelterPets: (id: string) => call<{ shelter: ListingShelter; pets: ListingSummary[] }>(`/api/portal/shelters/${encodeURIComponent(id)}/pets`),
   createPet: (shelterId: string, form: PetForm, publish: boolean) =>
     call<{ pet: { id: string; status: PetStatus } }>(`/api/portal/shelters/${encodeURIComponent(shelterId)}/pets`, 'POST', { ...form, publish }).then((r) => r.pet),
