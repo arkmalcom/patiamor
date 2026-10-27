@@ -51,6 +51,21 @@ export interface PetSummary {
   km?: number;
 }
 
+export interface DonationAccount {
+  bank: string;
+  accountType: 'ahorros' | 'corriente';
+  account: string;
+  holder: string;
+  /** Cédula or RNC, which transfers between banks ask for. */
+  holderId: string | null;
+}
+
+/** A shelter's bank accounts for donations (up to four): the money goes straight to the shelter, never through Patiamor. */
+export interface Donation {
+  accounts: DonationAccount[];
+  note: string | null;
+}
+
 export interface PetDetail extends PetSummary {
   story: string;
   needs: string[];
@@ -58,7 +73,7 @@ export interface PetDetail extends PetSummary {
   adoptionFeeDop: number | null;
   photos: { url: string | null; focus: string }[];
   lister:
-    | { type: 'shelter'; id: string; name: string; description: string | null; place: string | null; municipality: string | null; visitHours: string | null }
+    | { type: 'shelter'; id: string; name: string; description: string | null; place: string | null; municipality: string | null; visitHours: string | null; donation?: Donation | null }
     | { type: 'private' };
   siblings: PetSummary[];
 }

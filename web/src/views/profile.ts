@@ -1,6 +1,6 @@
-import { ArrowLeft, Check, CircleHelp, Clock, Heart, HeartHandshake, House, Mail, Send, Share2, User, X } from 'lucide';
+import { ArrowLeft, Check, CircleHelp, Clock, Copy, HandHeart, Heart, HeartHandshake, House, Mail, Send, Share2, User, X } from 'lucide';
 import { api, ApiError, type GonePet } from '../api';
-import { companionKey, CONTACT_EMAIL, DEMO, frameFor, type Companion, type PetDetail, type PetSummary } from '../data';
+import { companionKey, CONTACT_EMAIL, DEMO, frameFor, type Companion, type Donation, type PetDetail, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, t, away } from '../i18n';
 import { setPage, titled } from '../seo';
@@ -72,7 +72,35 @@ function lister(pet: PetDetail, km: number): Raw {
         ${s.visitHours ? html`<p class="shelter__meta"><strong>${t('profile.visits')}:</strong> ${s.visitHours}</p>` : ''}
         ${pet.inCareSince ? html`<p class="shelter__meta">${t('profile.inShelter', { date: formatDate(pet.inCareSince, { day: 'numeric', month: 'long', year: 'numeric' }) })}</p>` : ''}
       </div>
-    </div>`;
+    </div>
+    ${s.donation ? donation(s.name, s.donation) : ''}`;
+}
+
+/** How to give to the shelter: folded away, so the profile stays about the animal. The money goes straight to them. */
+function donation(shelter: string, d: Donation): Raw {
+  const row = (label: string, value: Raw | string) => html`<div><dt>${label}</dt><dd>${value}</dd></div>`;
+  return html`
+    <details class="more donation">
+      <summary>${icon(HandHeart, 20)}<span>${t('donation.title', { shelter })}</span></summary>
+      <p class="donation__lede">${t('donation.lede', { shelter })}</p>
+      <ul class="donation__accounts">
+        ${d.accounts.map(
+          (a) => html`<li class="donation__item">
+            <p class="donation__bank">${a.bank} <span class="muted">· ${t(`donation.typeOf.${a.accountType}`)}</span></p>
+            <dl class="donation__list">
+              ${row(
+                t('donation.account'),
+                html`<span class="donation__account">${a.account}</span>
+                  <button class="text-button donation__copy" type="button" data-copy-account="${a.account}" aria-label="${t('donation.copyLabel', { bank: a.bank })}">${icon(Copy, 16)}${t('donation.copy')}</button>`,
+              )}
+              ${row(t('donation.holder'), a.holder)}
+              ${a.holderId ? row(t('donation.holderId'), a.holderId) : ''}
+            </dl>
+          </li>`,
+        )}
+      </ul>
+      ${d.note ? html`<p class="donation__note">${d.note}</p>` : ''}
+    </details>`;
 }
 
 function siblings(pet: PetDetail): Raw {
@@ -226,4 +254,15 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
     deps.back();
   });
   $$<HTMLButtonElement>('[data-sibling]', root).forEach((b) => b.addEventListener('click', () => deps.openProfile(b.dataset.sibling!)));
+  $$<HTMLButtonElement>('[data-copy-account]', root).forEach((b) =>
+    b.addEventListener('click', async () => {
+      const account = b.dataset.copyAccount!;
+      try {
+        await navigator.clipboard.writeText(account);
+        toast(t('donation.copied'));
+      } catch {
+        toast(t('donation.copyFailed', { account }));
+      }
+    }),
+  );
 }

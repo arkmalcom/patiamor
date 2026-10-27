@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { cachedJson } from './cache';
+import { donationFor } from './donations';
 import type { AppContext } from './env';
 
 // Who may see a pet publicly. One definition, used by search, profiles, siblings and adoption requests:
@@ -184,21 +185,23 @@ async function profile(db: D1Database, id: string): Promise<{ body: unknown; sta
     .prepare(
       `SELECT ${SUMMARY_COLUMNS},
               d.story, d.needs, d.adoption_fee_dop, d.in_care_since, s.visit_hours, s.description AS shelter_description,
-              sp.name AS shelter_place, sp.municipality AS shelter_municipality
+              sp.name AS shelter_place, sp.municipality AS shelter_municipality,
+              s.donation_note
          ${FROM} LEFT JOIN places sp ON sp.id = s.place_id
         WHERE d.id = ? AND ${VIEWABLE}`,
     )
     .bind(id)
-    .first<SummaryRow & { story: string; needs: string; adoption_fee_dop: number | null; in_care_since: string | null; visit_hours: string | null; shelter_description: string | null; shelter_place: string | null; shelter_municipality: string | null }>();
+    .first<SummaryRow & { donation_note: string | null; story: string; needs: string; adoption_fee_dop: number | null; in_care_since: string | null; visit_hours: string | null; shelter_description: string | null; shelter_place: string | null; shelter_municipality: string | null }>();
   if (!row) return gone(db, id);
 
-  const [{ results: photos }, { results: siblings }] = await Promise.all([
+  const base = summary(row);
+  const [{ results: photos }, { results: siblings }, donation] = await Promise.all([
     db.prepare('SELECT r2_key, focus FROM pet_photos WHERE pet_id = ? ORDER BY position').bind(id).all<{ r2_key: string; focus: string }>(),
     row.litter_id
       ? db.prepare(`SELECT ${SUMMARY_COLUMNS} ${FROM} WHERE d.litter_id = ? AND d.id != ? AND ${VIEWABLE} ORDER BY d.name`).bind(row.litter_id, id).all<SummaryRow>()
       : Promise.resolve({ results: [] as SummaryRow[] }),
+    base.lister.type === 'shelter' ? donationFor(db, row.shelter_id!, row.donation_note) : Promise.resolve(null),
   ]);
-  const base = summary(row);
   return {
     body: {
       pet: {
@@ -210,7 +213,7 @@ async function profile(db: D1Database, id: string): Promise<{ body: unknown; sta
         photos: photos.map((p) => ({ url: photoUrl(p.r2_key), focus: p.focus })),
         lister:
           base.lister.type === 'shelter'
-            ? { ...base.lister, description: row.shelter_description, place: row.shelter_place, municipality: row.shelter_municipality, visitHours: row.visit_hours }
+            ? { ...base.lister, description: row.shelter_description, place: row.shelter_place, municipality: row.shelter_municipality, visitHours: row.visit_hours, donation }
             : base.lister,
         siblings: siblings.map(summary),
       },
