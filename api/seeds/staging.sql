@@ -149,11 +149,16 @@ UPDATE shelters SET status = 'verified' WHERE verified_at IS NOT NULL AND status
 -- Shelter owners are approved to register shelters (migration 0017 did this for owners that existed then).
 UPDATE users SET shelter_owner_at = coalesce(shelter_owner_at, '2026-10-01T00:00:00Z') WHERE id IN (SELECT user_id FROM shelter_members WHERE role = 'owner');
 
--- Donation details (migration 0023): one sample shelter has a (fictional) account, the others none, so both
--- profiles can be seen. Only filled in while empty, so an edit made on staging stays until it's removed.
-UPDATE shelters SET donation_bank = 'Banco de Ejemplo', donation_account_type = 'ahorros', donation_account = '000-123456-7',
-       donation_holder = 'Fundación Patitas de Gazcue', donation_holder_id = '1-01-00000-1', donation_note = 'También recibimos alimento y medicinas.'
- WHERE id = 'seed-patitas-gazcue' AND donation_bank IS NULL;
+-- Donation accounts (migrations 0023/0024): one sample shelter has two (fictional) accounts, the others none,
+-- so both kinds of profile can be seen. Only filled in while it has none, so an edit made on staging stays
+-- until the accounts are removed.
+UPDATE shelters SET donation_note = 'También recibimos alimento y medicinas.'
+ WHERE id = 'seed-patitas-gazcue' AND NOT EXISTS (SELECT 1 FROM shelter_donation_accounts WHERE shelter_id = 'seed-patitas-gazcue');
+INSERT INTO shelter_donation_accounts (id, shelter_id, position, bank, account_type, account, holder, holder_id)
+SELECT * FROM (VALUES
+  ('seed-donation-gazcue-1', 'seed-patitas-gazcue', 0, 'Banco de Ejemplo',      'ahorros',   '000-123456-7', 'Fundación Patitas de Gazcue', '1-01-00000-1'),
+  ('seed-donation-gazcue-2', 'seed-patitas-gazcue', 1, 'Banco Ficticio Unido',  'corriente', '000-765432-1', 'Carla Méndez',                NULL))
+ WHERE NOT EXISTS (SELECT 1 FROM shelter_donation_accounts WHERE shelter_id = 'seed-patitas-gazcue');
 
 -- Private listers (migration 0021): a person outside any shelter is a one-person row in shelters of kind
 -- 'private', approved by an admin. The sample private animals belong to two of them, so adoption requests

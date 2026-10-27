@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono';
 import { isoIn, nowIso } from './auth/crypto';
 import { hasEmailBudget, sendReviewAdminEmail } from './auth/email';
 import { appOrigin } from './auth/routes';
-import { DONATION_COLUMNS, donationView, type DonationRow } from './donations';
+import { donationFor, MAX_DONATION_ACCOUNTS } from './donations';
 import type { AppContext } from './env';
 import { placeById } from './places';
 import { drPhone } from './requests';
@@ -107,26 +107,32 @@ export function readApplication(b: Record<string, unknown>) {
   return { app, error };
 }
 
-/** The donation form, validated. All blank means "remove it"; otherwise bank, type, number and holder are needed. */
+/** The donation form, validated: { accounts, note }. Accounts left completely blank are dropped, and none at
+ *  all means "remove them" (the note goes too: it's about the accounts). `index` names the account at fault. */
 export function readDonation(b: Record<string, unknown>) {
-  const d = {
-    bank: text(b.bank, 60),
-    accountType: text(b.accountType, 20),
-    account: text(b.account, 40),
-    holder: text(b.holder, 100),
-    holderId: text(b.holderId, 20) || null,
-    note: longText(b.note, 300) || null,
+  const note = longText(b.note, 300) || null;
+  const accounts = (Array.isArray(b.accounts) ? b.accounts : [])
+    .map((a) => {
+      const o = (a ?? {}) as Record<string, unknown>;
+      return { bank: text(o.bank, 60), accountType: text(o.accountType, 20), account: text(o.account, 40), holder: text(o.holder, 100), holderId: text(o.holderId, 20) || null };
+    })
+    .filter((a) => a.bank || a.accountType || a.account || a.holder || a.holderId);
+  const digits = (s: string) => s.replace(/\D/g, '');
+  const accountError = (a: (typeof accounts)[number]) => {
+    if (a.bank.length < 2) return 'invalid_bank';
+    if (!['ahorros', 'corriente'].includes(a.accountType)) return 'invalid_account_type';
+    if (!/^[\d\s-]+$/.test(a.account) || digits(a.account).length < 6) return 'invalid_account';
+    if (a.holder.length < 3) return 'invalid_holder';
+    // A cédula has 11 digits and an RNC 9.
+    if (a.holderId && (!/^[\d\s-]+$/.test(a.holderId) || ![9, 11].includes(digits(a.holderId).length))) return 'invalid_holder_id';
+    return null;
   };
-  if (!d.bank && !d.accountType && !d.account && !d.holder && !d.holderId && !d.note) return { donation: null, error: null };
-  const digits = (s: string) => s.replace(/\D/g, '').length;
-  let error: string | null = null;
-  if (d.bank.length < 2) error = 'invalid_bank';
-  else if (!['ahorros', 'corriente'].includes(d.accountType)) error = 'invalid_account_type';
-  else if (!/^[\d\s-]+$/.test(d.account) || digits(d.account) < 6) error = 'invalid_account';
-  else if (d.holder.length < 3) error = 'invalid_holder';
-  // A cédula has 11 digits and an RNC 9.
-  else if (d.holderId && (!/^[\d\s-]+$/.test(d.holderId) || ![9, 11].includes(digits(d.holderId)))) error = 'invalid_holder_id';
-  return { donation: d, error };
+  if (accounts.length > MAX_DONATION_ACCOUNTS) return { donation: null, error: 'too_many_accounts', index: null };
+  for (const [i, a] of accounts.entries()) {
+    const error = accountError(a) ?? (accounts.slice(0, i).some((x) => digits(x.account) === digits(a.account)) ? 'duplicate_account' : null);
+    if (error) return { donation: null, error, index: i };
+  }
+  return { donation: accounts.length ? { accounts: accounts as { bank: string; accountType: 'ahorros' | 'corriente'; account: string; holder: string; holderId: string | null }[], note } : null, error: null, index: null };
 }
 
 export const portal = new Hono<AppContext>();
@@ -289,9 +295,9 @@ portal.get('/shelters/:id', async (c) => {
   if (!role) return c.json({ error: 'not_found' }, 404);
   const db = c.env.DB;
   const s = await db
-    .prepare(`SELECT id, slug, name, description, place_id, phone, email, website, visit_hours, status, status_reason, verified_at, kind, ${DONATION_COLUMNS} FROM shelters WHERE id = ?`)
+    .prepare(`SELECT id, slug, name, description, place_id, phone, email, website, visit_hours, status, status_reason, verified_at, kind, donation_note FROM shelters WHERE id = ?`)
     .bind(id)
-    .first<{ id: string; slug: string; name: string; description: string | null; place_id: string; phone: string | null; email: string | null; website: string | null; visit_hours: string | null; status: string; status_reason: string | null; verified_at: string | null; kind: string } & DonationRow>();
+    .first<{ id: string; slug: string; name: string; description: string | null; place_id: string; phone: string | null; email: string | null; website: string | null; visit_hours: string | null; status: string; status_reason: string | null; verified_at: string | null; kind: string; donation_note: string | null }>();
   if (!s) return c.json({ error: 'not_found' }, 404);
   const a =
     role === 'owner'
@@ -313,7 +319,7 @@ portal.get('/shelters/:id', async (c) => {
       verifiedAt: s.verified_at,
       kind: s.kind as 'shelter' | 'private',
       role,
-      donation: donationView(s),
+      donation: await donationFor(db, id, s.donation_note),
     },
     application: a
       ? {
@@ -330,9 +336,9 @@ portal.get('/shelters/:id', async (c) => {
   });
 });
 
-// Owners add, change or remove the bank account for donations, in any status: adopters only see it while the
-// shelter is verified (its pets are only public then). Never part of registration. Private listers can't ask
-// for money, so they have none.
+// Owners set the bank accounts for donations, in any status: adopters only see them while the shelter is
+// verified (its pets are only public then). Never part of registration. Private listers can't ask for money,
+// so they have none. The form sends the whole list each time, and it replaces what was there.
 portal.put('/shelters/:id/donation', async (c) => {
   const id = c.req.param('id');
   if ((await roleIn(c, id)) !== 'owner') return c.json({ error: 'not_found' }, 404);
@@ -340,17 +346,18 @@ portal.put('/shelters/:id/donation', async (c) => {
   const current = await db.prepare('SELECT kind FROM shelters WHERE id = ?').bind(id).first<{ kind: string }>();
   if (!current) return c.json({ error: 'not_found' }, 404);
   if (current.kind === 'private') return c.json({ error: 'not_for_private' }, 409);
-  const { donation: d, error } = readDonation(await c.req.json<Record<string, unknown>>().catch(() => ({})));
-  if (error) return c.json({ error }, 400);
-  await db
-    .prepare(
-      `UPDATE shelters SET donation_bank = ?, donation_account_type = ?, donation_account = ?, donation_holder = ?, donation_holder_id = ?, donation_note = ?, updated_at = ?
-        WHERE id = ?`,
-    )
-    .bind(d?.bank ?? null, d?.accountType ?? null, d?.account ?? null, d?.holder ?? null, d?.holderId ?? null, d?.note ?? null, nowIso(), id)
-    .run();
-  const row = await db.prepare(`SELECT ${DONATION_COLUMNS} FROM shelters WHERE id = ?`).bind(id).first<DonationRow>();
-  return c.json({ donation: donationView(row!) });
+  const { donation: d, error, index } = readDonation(await c.req.json<Record<string, unknown>>().catch(() => ({})));
+  if (error) return c.json({ error, index, max: MAX_DONATION_ACCOUNTS }, 400);
+  await db.batch([
+    db.prepare('DELETE FROM shelter_donation_accounts WHERE shelter_id = ?').bind(id),
+    ...(d?.accounts ?? []).map((a, i) =>
+      db
+        .prepare('INSERT INTO shelter_donation_accounts (id, shelter_id, position, bank, account_type, account, holder, holder_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(crypto.randomUUID(), id, i, a.bank, a.accountType, a.account, a.holder, a.holderId),
+    ),
+    db.prepare('UPDATE shelters SET donation_note = ?, updated_at = ? WHERE id = ?').bind(d?.note ?? null, nowIso(), id),
+  ]);
+  return c.json({ donation: await donationFor(db, id, d?.note ?? null) });
 });
 
 // Owners correct and resend a rejected application, or update a pending one. Once verified, the name and

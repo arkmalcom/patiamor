@@ -1,6 +1,6 @@
 import { BadgeCheck, CircleAlert, CirclePause, Clock, Eye, EyeOff, Flag, HandHeart, House, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, UserCheck, Users, UsersRound } from 'lucide';
 import { api, ApiError, type AdminAdopter, type AdminReviewPet, type AdminBulk, type AdminOwnerRequest, type AdminPaused, type AdminShelter, type BulkStatus, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
-import { frameFor, type Donation, type PetSummary, type Place } from '../data';
+import { frameFor, type Donation, type DonationAccount, type PetSummary, type Place } from '../data';
 import { photo } from '../ui/canvas';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, failText, pesos, t, type Key } from '../i18n';
@@ -135,9 +135,10 @@ async function home(root: HTMLElement) {
   $$<HTMLButtonElement>('[data-donation]', root).forEach((b) => b.addEventListener('click', () => void openDonation(shelters.find((x) => x.id === b.dataset.donation)!, b)));
 }
 
-const DONATION_ERRORS = ['invalid_bank', 'invalid_account_type', 'invalid_account', 'invalid_holder', 'invalid_holder_id', 'not_for_private'];
+const DONATION_ERRORS = ['invalid_bank', 'invalid_account_type', 'invalid_account', 'invalid_holder', 'invalid_holder_id', 'duplicate_account', 'too_many_accounts', 'not_for_private'];
+const MAX_ACCOUNTS = 4;
 
-/** The bank account adopters can donate to. Optional, and separate from registration; shown only while verified. */
+/** The bank accounts adopters can donate to (up to four). Optional, and separate from registration; shown only while verified. */
 async function openDonation(shelter: PortalShelter, opener: HTMLButtonElement) {
   opener.disabled = true;
   let d: Donation | null;
@@ -148,26 +149,15 @@ async function openDonation(shelter: PortalShelter, opener: HTMLButtonElement) {
   } finally {
     opener.disabled = false;
   }
-  const input = (name: string, label: Key, value: string | null | undefined, opts: { max: number; optional?: boolean; hint?: Key; inputmode?: string; placeholder?: string }) => html`
-    <label class="field">
-      <span class="field__label">${t(label)}${opts.optional ? html` <span class="muted">(${t('request.optional')})</span>` : ''}</span>
-      <input class="field__input" name="${name}" maxlength="${opts.max}" value="${value ?? ''}" autocomplete="off" ${opts.inputmode ? html`inputmode="${opts.inputmode}"` : ''} ${opts.placeholder ? html`placeholder="${opts.placeholder}"` : ''} />
-      ${opts.hint ? html`<span class="field__hint">${t(opts.hint)}</span>` : ''}
-    </label>`;
+  type Account = Record<keyof DonationAccount, string>;
+  const blank = (): Account => ({ bank: '', accountType: '', account: '', holder: '', holderId: '' });
+  let accounts: Account[] = d?.accounts.length ? d.accounts.map((a) => ({ ...a, holderId: a.holderId ?? '' })) : [blank()];
   const dialog = openSheet(
     t('donation.portal.title', { name: shelter.name }),
     html`<form class="outcome__form" id="donation-form" novalidate>
       <p>${t('donation.portal.lede')}</p>
-      ${input('bank', 'donation.bank', d?.bank, { max: 60, placeholder: t('donation.portal.bankPlaceholder') })}
-      <fieldset class="question">
-        <legend>${t('donation.accountType')}</legend>
-        <div class="segmented">
-          ${(['ahorros', 'corriente'] as const).map((k) => html`<label><input type="radio" name="accountType" value="${k}" ${d?.accountType === k ? 'checked' : ''} /><span>${t(`donation.type.${k}`)}</span></label>`)}
-        </div>
-      </fieldset>
-      ${input('account', 'donation.account', d?.account, { max: 40, inputmode: 'numeric' })}
-      ${input('holder', 'donation.holder', d?.holder, { max: 100, hint: 'donation.portal.holderHint' })}
-      ${input('holderId', 'donation.holderId', d?.holderId, { max: 20, optional: true, inputmode: 'numeric', hint: 'donation.portal.holderIdHint' })}
+      <div class="donation-accounts" data-accounts></div>
+      <button class="text-button" type="button" data-add-account>${icon(Plus, 18)}${t('donation.portal.add')}</button>
       <label class="field">
         <span class="field__label">${t('donation.portal.note')} <span class="muted">(${t('request.optional')})</span></span>
         <textarea class="field__input field__input--area" name="note" rows="2" maxlength="300" placeholder="${t('donation.portal.notePlaceholder')}">${d?.note ?? ''}</textarea>
@@ -180,21 +170,80 @@ async function openDonation(shelter: PortalShelter, opener: HTMLButtonElement) {
         <button class="button button--primary" type="submit" form="donation-form" data-send>${t('donation.portal.save')}</button>`,
     },
   );
+
+  // Like the references in registration: the list is kept here and redrawn on add or remove, keeping what's typed.
+  const list = $('[data-accounts]', dialog);
+  const add = $<HTMLButtonElement>('[data-add-account]', dialog);
+  const read = () =>
+    (accounts = $$<HTMLElement>('[data-account]', list).map((el, i) => {
+      const v = (k: string) => $<HTMLInputElement>(`[name=${k}-${i}]`, el).value.trim();
+      return { bank: v('bank'), accountType: el.querySelector<HTMLInputElement>(`input[name=accountType-${i}]:checked`)?.value ?? '', account: v('account'), holder: v('holder'), holderId: v('holderId') };
+    }));
+  const input = (name: string, label: Key, value: string, opts: { max: number; optional?: boolean; hint?: Key; inputmode?: string; placeholder?: string }) => html`
+    <label class="field">
+      <span class="field__label">${t(label)}${opts.optional ? html` <span class="muted">(${t('request.optional')})</span>` : ''}</span>
+      <input class="field__input" name="${name}" maxlength="${opts.max}" value="${value}" autocomplete="off" ${opts.inputmode ? html`inputmode="${opts.inputmode}"` : ''} ${opts.placeholder ? html`placeholder="${opts.placeholder}"` : ''} />
+      ${opts.hint ? html`<span class="field__hint">${t(opts.hint)}</span>` : ''}
+    </label>`;
+  const draw = () => {
+    mount(
+      list,
+      html`${accounts.map(
+        (a, i) => html`
+          <div class="reference" role="group" aria-labelledby="donation-account-${i}" data-account>
+            <div class="reference__head">
+              <span class="reference__title" id="donation-account-${i}">${t('donation.portal.accountN', { n: i + 1 })}</span>
+              ${accounts.length > 1 ? html`<button class="text-button" type="button" data-remove-account="${i}">${t('donation.portal.removeAccount')}</button>` : ''}
+            </div>
+            ${input(`bank-${i}`, 'donation.bank', a.bank, { max: 60, placeholder: t('donation.portal.bankPlaceholder') })}
+            <fieldset class="question">
+              <legend>${t('donation.accountType')}</legend>
+              <div class="segmented">
+                ${(['ahorros', 'corriente'] as const).map((k) => html`<label><input type="radio" name="accountType-${i}" value="${k}" ${a.accountType === k ? 'checked' : ''} /><span>${t(`donation.type.${k}`)}</span></label>`)}
+              </div>
+            </fieldset>
+            ${input(`account-${i}`, 'donation.account', a.account, { max: 40, inputmode: 'numeric' })}
+            ${input(`holder-${i}`, 'donation.holder', a.holder, { max: 100, hint: 'donation.portal.holderHint' })}
+            ${input(`holderId-${i}`, 'donation.holderId', a.holderId, { max: 20, optional: true, inputmode: 'numeric', hint: 'donation.portal.holderIdHint' })}
+          </div>`,
+      )}`,
+    );
+    add.hidden = accounts.length >= MAX_ACCOUNTS;
+    $$<HTMLButtonElement>('[data-remove-account]', list).forEach((b) =>
+      b.addEventListener('click', () => {
+        read();
+        accounts.splice(Number(b.dataset.removeAccount), 1);
+        draw();
+        add.hidden ? $<HTMLInputElement>('[name=bank-0]', list).focus() : add.focus();
+      }),
+    );
+  };
+  draw();
+  add.addEventListener('click', () => {
+    read();
+    accounts.push(blank());
+    draw();
+    $<HTMLInputElement>(`[name=bank-${accounts.length - 1}]`, list).focus();
+  });
+
   const formEl = $<HTMLFormElement>('#donation-form', dialog);
   const error = $('[data-error]', dialog);
   const send = $<HTMLButtonElement>('[data-send]', dialog);
   const submit = async (remove: boolean) => {
-    const f = new FormData(formEl);
-    const v = (k: string) => (remove ? '' : String(f.get(k) ?? '').trim());
+    // Accounts left completely blank are dropped, not sent as errors.
+    const filled = remove ? [] : read().filter((a) => Object.values(a).some(Boolean));
     send.disabled = true;
     error.hidden = true;
     try {
-      const saved = await api.saveDonation(shelter.id, { bank: v('bank'), accountType: v('accountType'), account: v('account'), holder: v('holder'), holderId: v('holderId'), note: v('note') });
+      const saved = await api.saveDonation(shelter.id, { accounts: filled, note: remove ? '' : String(new FormData(formEl).get('note') ?? '').trim() });
       closeSheet();
       toast(t(saved ? 'donation.portal.saved' : 'donation.portal.removed'));
     } catch (err) {
       const code = err instanceof ApiError ? err.code : '';
-      error.textContent = DONATION_ERRORS.includes(code) ? t(`donation.err.${code as 'invalid_bank'}`) : failText(err);
+      const index = err instanceof ApiError && typeof err.data.index === 'number' ? err.data.index : null;
+      const text = DONATION_ERRORS.includes(code) ? t(`donation.err.${code as 'invalid_bank'}`) : failText(err);
+      // With several accounts, say which one; the index counts only the filled ones, as sent.
+      error.textContent = index !== null && filled.length > 1 ? `${t('donation.portal.accountN', { n: accounts.indexOf(filled[index]) + 1 })}: ${text}` : text;
       error.hidden = false;
       send.disabled = false;
     }

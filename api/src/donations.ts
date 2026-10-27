@@ -1,11 +1,17 @@
-// A shelter's bank account for donations (migration 0023): owners edit it in the portal (portal.ts),
-// adopters read it on pet profiles (pets.ts). Patiamor never touches the money.
+// A shelter's bank accounts for donations (migrations 0023, 0024): owners edit them in the portal (portal.ts),
+// adopters read them on pet profiles (pets.ts). Patiamor never touches the money.
 
-export type DonationRow = { donation_bank: string | null; donation_account_type: string | null; donation_account: string | null; donation_holder: string | null; donation_holder_id: string | null; donation_note: string | null };
-export const DONATION_COLUMNS = 'donation_bank, donation_account_type, donation_account, donation_holder, donation_holder_id, donation_note';
+/** Shelters often bank in more than one place; four covers that without turning the profile into a list. */
+export const MAX_DONATION_ACCOUNTS = 4;
 
-/** The account as the app shows it, or null when the shelter hasn't given one. */
-export const donationView = (r: DonationRow) =>
-  r.donation_bank
-    ? { bank: r.donation_bank, accountType: r.donation_account_type as 'ahorros' | 'corriente', account: r.donation_account!, holder: r.donation_holder!, holderId: r.donation_holder_id, note: r.donation_note }
-    : null;
+type AccountRow = { bank: string; account_type: 'ahorros' | 'corriente'; account: string; holder: string; holder_id: string | null };
+
+/** The accounts as the app shows them, with the shelter's note, or null when it has given none. */
+export async function donationFor(db: D1Database, shelterId: string, note: string | null) {
+  const { results } = await db
+    .prepare('SELECT bank, account_type, account, holder, holder_id FROM shelter_donation_accounts WHERE shelter_id = ? ORDER BY position')
+    .bind(shelterId)
+    .all<AccountRow>();
+  if (!results.length) return null;
+  return { accounts: results.map((r) => ({ bank: r.bank, accountType: r.account_type, account: r.account, holder: r.holder, holderId: r.holder_id })), note };
+}

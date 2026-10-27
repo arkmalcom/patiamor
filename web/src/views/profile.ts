@@ -83,17 +83,22 @@ function donation(shelter: string, d: Donation): Raw {
     <details class="more donation">
       <summary>${icon(HandHeart, 20)}<span>${t('donation.title', { shelter })}</span></summary>
       <p class="donation__lede">${t('donation.lede', { shelter })}</p>
-      <dl class="donation__list">
-        ${row(t('donation.bank'), d.bank)}
-        ${row(t('donation.accountType'), t(`donation.type.${d.accountType}`))}
-        ${row(
-          t('donation.account'),
-          html`<span class="donation__account">${d.account}</span>
-            <button class="text-button donation__copy" type="button" data-copy-account="${d.account}">${icon(Copy, 16)}${t('donation.copy')}</button>`,
+      <ul class="donation__accounts">
+        ${d.accounts.map(
+          (a) => html`<li class="donation__item">
+            <p class="donation__bank">${a.bank} <span class="muted">· ${t(`donation.typeOf.${a.accountType}`)}</span></p>
+            <dl class="donation__list">
+              ${row(
+                t('donation.account'),
+                html`<span class="donation__account">${a.account}</span>
+                  <button class="text-button donation__copy" type="button" data-copy-account="${a.account}" aria-label="${t('donation.copyLabel', { bank: a.bank })}">${icon(Copy, 16)}${t('donation.copy')}</button>`,
+              )}
+              ${row(t('donation.holder'), a.holder)}
+              ${a.holderId ? row(t('donation.holderId'), a.holderId) : ''}
+            </dl>
+          </li>`,
         )}
-        ${row(t('donation.holder'), d.holder)}
-        ${d.holderId ? row(t('donation.holderId'), d.holderId) : ''}
-      </dl>
+      </ul>
       ${d.note ? html`<p class="donation__note">${d.note}</p>` : ''}
     </details>`;
 }
@@ -249,13 +254,15 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
     deps.back();
   });
   $$<HTMLButtonElement>('[data-sibling]', root).forEach((b) => b.addEventListener('click', () => deps.openProfile(b.dataset.sibling!)));
-  root.querySelector<HTMLButtonElement>('[data-copy-account]')?.addEventListener('click', async (e) => {
-    const account = (e.currentTarget as HTMLButtonElement).dataset.copyAccount!;
-    try {
-      await navigator.clipboard.writeText(account);
-      toast(t('donation.copied'));
-    } catch {
-      toast(t('donation.copyFailed', { account }));
-    }
-  });
+  $$<HTMLButtonElement>('[data-copy-account]', root).forEach((b) =>
+    b.addEventListener('click', async () => {
+      const account = b.dataset.copyAccount!;
+      try {
+        await navigator.clipboard.writeText(account);
+        toast(t('donation.copied'));
+      } catch {
+        toast(t('donation.copyFailed', { account }));
+      }
+    }),
+  );
 }

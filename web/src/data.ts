@@ -51,14 +51,18 @@ export interface PetSummary {
   km?: number;
 }
 
-/** A shelter's bank account for donations: the money goes straight to the shelter, never through Patiamor. */
-export interface Donation {
+export interface DonationAccount {
   bank: string;
   accountType: 'ahorros' | 'corriente';
   account: string;
   holder: string;
   /** Cédula or RNC, which transfers between banks ask for. */
   holderId: string | null;
+}
+
+/** A shelter's bank accounts for donations (up to four): the money goes straight to the shelter, never through Patiamor. */
+export interface Donation {
+  accounts: DonationAccount[];
   note: string | null;
 }
 
