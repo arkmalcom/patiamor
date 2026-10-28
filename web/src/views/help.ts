@@ -5,6 +5,7 @@ import { $, html, icon, mount, type Raw } from '../dom';
 import { formatDate, pesos, t } from '../i18n';
 import { setPage, titled } from '../seo';
 import { photo } from '../ui/canvas';
+import { rescueTabs } from '../ui/rescue-tabs';
 import { shareCase } from '../ui/share';
 import { toast } from '../ui/toast';
 import { bindCopyAccounts, donation } from './profile';
@@ -63,6 +64,7 @@ export function renderHelp(root: HTMLElement) {
     root,
     html`
       <section class="help" aria-labelledby="help-title">
+        ${rescueTabs('help')}
         <h1 class="page-title" id="help-title" tabindex="-1" data-focus>${t('help.title')}</h1>
         <p class="help__lede">${t('help.lede')}</p>
         ${body}

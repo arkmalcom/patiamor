@@ -198,3 +198,18 @@ INSERT OR IGNORE INTO case_photos (id, case_id, r2_key, position, focus) VALUES
 INSERT OR IGNORE INTO case_updates (id, case_id, body, created_by, created_at) VALUES
   ('seed-case-update-morena', 'seed-case-morena', 'Ya tenemos la fecha de la cirugía: la semana que viene. ¡Gracias a quienes ya ayudaron!', 'seed-vol-gazcue',
    strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-2 days'));
+
+-- Lost and found (migration 0026): one animal lost and one found, posted by the same sample shelter (its
+-- public phone is the number people call). Fictional.
+INSERT OR IGNORE INTO lost_found (id, shelter_id, kind, species, name, sex, description, place_id, seen_on, status, created_by, published_at, active_at) VALUES
+  ('seed-lost-chispa', 'seed-patitas-gazcue', 'perdido', 'perro', 'Chispa', 'hembra',
+   'Pequeña, blanca con manchas marrones, collar azul con cascabel. Se asustó con los fuegos artificiales y salió corriendo. Es mansa pero tímida: mejor no perseguirla.',
+   'gazcue-distrito-nacional', date('now', '-2 days'), 'open', 'seed-vol-gazcue',
+   strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-2 days'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-2 days')),
+  ('seed-found-guayaba', 'seed-patitas-gazcue', 'encontrado', 'gato', NULL, NULL,
+   'Gato atigrado naranja, adulto, muy cariñoso; parece acostumbrado a vivir en casa. Lo encontraron debajo de un carro sin collar. Está en el refugio.',
+   'ensanche-naco-distrito-nacional', date('now', '-1 days'), 'open', 'seed-vol-gazcue',
+   strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-1 days'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-1 days'));
+INSERT OR IGNORE INTO lost_found_photos (id, post_id, r2_key, position, focus) VALUES
+  ('seed-lost-photo-chispa', 'seed-lost-chispa', 'static:/perros/chispa.jpg', 0, '50% 40%'),
+  ('seed-found-photo-guayaba', 'seed-found-guayaba', 'static:/gatos/guayaba.jpg', 0, '50% 40%');

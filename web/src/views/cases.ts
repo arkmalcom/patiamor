@@ -440,7 +440,8 @@ function endedView(root: HTMLElement, shelter: CaseShelter, k: Full) {
   );
 }
 
-/** Admins: pick the verified shelter a case is for. The case is that shelter's, with its accounts. */
+/** Admins: pick the verified shelter to publish for (a help case or a lost and found post). What they publish
+ *  is that shelter's, with its accounts and its phone. */
 export async function renderAdminCases(root: HTMLElement) {
   mount(root, html`<p class="loading-note" role="status">${t('portal.loading')}</p>`);
   let shelters: Awaited<ReturnType<typeof api.adminShelters>>['shelters'];
@@ -457,16 +458,20 @@ export async function renderAdminCases(root: HTMLElement) {
         <h1 class="page-title" id="portal-title" tabindex="-1" data-focus>${t('cases.admin.title')}</h1>
         <p class="portal__lede">${t('cases.admin.lede')}</p>
         ${shelters.length
-          ? html`<ul class="listings">
+          ? html`<ul class="portal-list">
               ${shelters.map(
-                (s) => html`<li class="listing-item">
-                  <a class="listing-row" href="/refugio/${encodeURIComponent(s.id)}/casos">
+                (s) => html`<li class="portal-card">
+                  <div class="portal-card__head">
                     <span class="shelter__mark" aria-hidden="true">${icon(HandHeart, 22)}</span>
-                    <span class="listing-row__text">
-                      <strong class="listing-row__name">${s.name}</strong>
-                      ${s.place ? html`<span class="listing-row__meta">${s.place.name}, ${s.place.municipality}</span>` : ''}
-                    </span>
-                  </a>
+                    <div>
+                      <h2 class="portal-card__name">${s.name}</h2>
+                      ${s.place ? html`<span class="muted">${s.place.name}, ${s.place.municipality}</span>` : ''}
+                    </div>
+                  </div>
+                  <div class="portal-card__actions">
+                    <a class="button button--outline button--small" href="/refugio/${encodeURIComponent(s.id)}/casos">${t('cases.open')}</a>
+                    <a class="button button--outline button--small" href="/refugio/${encodeURIComponent(s.id)}/perdidos">${t('lostp.open')}</a>
+                  </div>
                 </li>`,
               )}
             </ul>`

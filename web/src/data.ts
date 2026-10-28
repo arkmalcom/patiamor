@@ -109,6 +109,34 @@ export interface HelpCaseDetail extends Omit<HelpCase, 'shelter'> {
   pet: { id: string; name: string } | null;
 }
 
+/** A lost and found post (lostfound.ts in the API): an animal someone lost, or one found in the street. */
+export type LostKind = 'perdido' | 'encontrado';
+export interface LostPost {
+  id: string;
+  kind: LostKind;
+  species: Species;
+  name: string | null;
+  sex: Sex | null;
+  /** When it was lost or seen (YYYY-MM-DD). */
+  seenOn: string;
+  /** Where it was lost or seen. */
+  place: Place;
+  shelter: { id: string; name: string };
+  photo: { url: string | null; thumb: string | null; focus: string };
+  publishedAt: string | null;
+  activeAt: string | null;
+}
+export interface LostPostDetail extends Omit<LostPost, 'shelter'> {
+  description: string;
+  photos: { url: string | null; focus: string }[];
+  /** People who respond call the shelter, never the owner or the finder. */
+  shelter: { id: string; name: string; phone: string };
+}
+/** What an old link to a post that ended (or lapsed: 30 days without renewal) still shows. */
+export interface GonePost extends Omit<LostPost, 'seenOn' | 'publishedAt' | 'activeAt'> {
+  status: 'home' | 'closed' | 'expired';
+}
+
 /** What an old link to a case that ended (or is paused: no news in 60 days) still shows. */
 export interface GoneCase {
   id: string;

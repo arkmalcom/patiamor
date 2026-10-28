@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import type { AppContext } from './env';
 import { cachedCase } from './cases';
+import { cachedPost } from './lostfound';
 import { cachedProfile } from './pets';
 import { indexable } from './seo';
 import { BRAND } from '../../web/src/brand';
@@ -72,6 +73,27 @@ function caseCard(body: { case?: Case; error?: string }): About | null {
 
 type About = { title: string; description: string; photo: Photo; ended?: true };
 
+type Post = { kind: string; species: string; name: string | null; sex: string | null; seenOn?: string; status?: string; photo: Photo; shelter: { name: string }; place: { name: string; municipality: string } };
+
+/** A lost and found post's preview: what, where and when, and who to tell. One that ended says so. */
+function postCard(body: { post?: Post; error?: string }): About | null {
+  const l = body.post;
+  if (!l) return null;
+  const she = l.sex === 'hembra';
+  const kind = (SPECIES[l.species] ?? SPECIES.perro)[she ? 1 : 0];
+  if (body.error === 'gone') {
+    const title = l.status === 'home' ? `${l.name ?? kind} volvió a casa` : 'Este aviso ya no está activo';
+    return { title, description: `Un aviso de ${l.shelter.name} en ${BRAND.name}.`, photo: l.photo, ended: true };
+  }
+  const where = `${l.place.name}, ${l.place.municipality}`;
+  const when = l.seenOn ? new Date(`${l.seenOn}T12:00:00Z`).toLocaleDateString('es-DO', { day: 'numeric', month: 'long', timeZone: 'UTC' }) : null;
+  if (l.kind === 'perdido') {
+    const title = l.name ? `Se busca a ${l.name}` : `${kind} ${she ? 'perdida' : 'perdido'}`;
+    return { title, description: [`${she ? 'Perdida' : 'Perdido'} en ${where}`, when, `Si lo ves, avisa a ${l.shelter.name}`].filter(Boolean).join(' · '), photo: l.photo };
+  }
+  return { title: `${kind} ${she ? 'encontrada' : 'encontrado'} en ${l.place.name}`, description: [where, when, `¿Es tuyo? Pregunta a ${l.shelter.name}`].filter(Boolean).join(' · '), photo: l.photo };
+}
+
 export async function petPage(c: C) {
   const id = c.req.param('id') ?? '';
   const profile = await cachedProfile(c, id).catch(() => ({}) as { error?: string });
@@ -82,6 +104,12 @@ export async function casePage(c: C) {
   const id = c.req.param('id') ?? '';
   const found = await cachedCase(c, id).catch(() => ({}) as { error?: string });
   return preview(c, `/caso/${encodeURIComponent(id)}`, caseCard(found), found.error === 'not_found');
+}
+
+export async function postPage(c: C) {
+  const id = c.req.param('id') ?? '';
+  const found = await cachedPost(c, id).catch(() => ({}) as { error?: string });
+  return preview(c, `/perdidos/${encodeURIComponent(id)}`, postCard(found), found.error === 'not_found');
 }
 
 /** The app's page with these tags; with nothing to say, its default tags (and a 404 for an unknown id). */

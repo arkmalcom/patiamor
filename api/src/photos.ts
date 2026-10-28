@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { forgetCatalogVersion } from './cache';
 import { editableCase } from './cases';
+import { editablePost } from './lostfound';
 import type { AppContext } from './env';
 import { roleIn } from './portal';
 
@@ -17,7 +18,7 @@ import { roleIn } from './portal';
 //  - photos are served with a fixed image type, nosniff and a sandboxing CSP, so nothing stored can run
 //    as a page on our origin.
 // Resizing happens on the phone (web/src/ui/photos.ts): about 1600 px plus a 480 px thumbnail.
-// Help cases (cases.ts) have photos too, under the same rules and the same budgets.
+// Help cases (cases.ts) and lost and found posts (lostfound.ts) have photos too, under the same rules and budgets.
 
 type C = Context<AppContext>;
 
@@ -28,7 +29,7 @@ const THUMB = { maxBytes: 80_000, maxEdge: 640, minEdge: 120 };
 const USER_DAILY = 100; // a shelter listing 20 animals with 5 photos each, in one day
 const GLOBAL_DAILY = 1000;
 const STORAGE_MAX = 8 * 1024 ** 3; // stop well short of the free 10 GB
-const KEY = /^(pets|cases)\/[a-z0-9-]{1,64}\/[0-9a-f]{32}(-t)?\.(webp|jpg)$/;
+const KEY = /^(pets|cases|lost)\/[a-z0-9-]{1,64}\/[0-9a-f]{32}(-t)?\.(webp|jpg)$/;
 const FOCUS = /^(\d{1,3})% (\d{1,3})%$/;
 
 type ImageInfo = { type: 'image/jpeg' | 'image/webp'; width: number; height: number };
@@ -114,10 +115,16 @@ export const validFocus = (v: unknown): v is string => {
   return !!m && Number(m[1]) <= 100 && Number(m[2]) <= 100;
 };
 
-/** What photos belong to: a pet or a help case. `keepOne`: adopters can see it, so it keeps a photo. The
+/** What photos belong to: a pet, a help case or a lost and found post. `keepOne`: adopters can see it, so it keeps a photo. The
  *  table and column are these constants, never input. */
-export type PhotoOwner = { id: string; table: 'pet_photos' | 'case_photos'; column: 'pet_id' | 'case_id'; prefix: 'pets' | 'cases'; keepOne: boolean };
-type Found = { owner: PhotoOwner } | { error: 'not_found' | 'shelter_suspended' | 'case_ended'; status: 404 | 409 };
+export type PhotoOwner = {
+  id: string;
+  table: 'pet_photos' | 'case_photos' | 'lost_found_photos';
+  column: 'pet_id' | 'case_id' | 'post_id';
+  prefix: 'pets' | 'cases' | 'lost';
+  keepOne: boolean;
+};
+type Found = { owner: PhotoOwner } | { error: 'not_found' | 'shelter_suspended' | 'case_ended' | 'post_ended'; status: 404 | 409 };
 
 /** The pet, if this person can change its photos. */
 async function editablePet(c: C, petId: string): Promise<Found> {
@@ -144,6 +151,9 @@ photoRoutes.delete('/pets/:id/photos/:photoId', async (c) => deletePhoto(c, awai
 photoRoutes.post('/cases/:id/photos', async (c) => addPhoto(c, await editableCase(c, c.req.param('id'))));
 photoRoutes.put('/cases/:id/photos', async (c) => arrangePhotos(c, await editableCase(c, c.req.param('id'))));
 photoRoutes.delete('/cases/:id/photos/:photoId', async (c) => deletePhoto(c, await editableCase(c, c.req.param('id'))));
+photoRoutes.post('/lost/:id/photos', async (c) => addPhoto(c, await editablePost(c, c.req.param('id'))));
+photoRoutes.put('/lost/:id/photos', async (c) => arrangePhotos(c, await editablePost(c, c.req.param('id'))));
+photoRoutes.delete('/lost/:id/photos/:photoId', async (c) => deletePhoto(c, await editablePost(c, c.req.param('id'))));
 
 // Add a photo: { image, thumb } as base64 (already resized on the phone), optional focus.
 async function addPhoto(c: C, found: Found) {

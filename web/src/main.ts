@@ -26,6 +26,7 @@ import { renderPortal, type PortalView } from './views/portal';
 import { renderProfile } from './views/profile';
 import { renderSearch } from './views/search';
 import { renderCase, renderHelp } from './views/help';
+import { renderLost, renderPost } from './views/lost';
 import { BRAND } from './brand';
 import { DEMO } from './data';
 
@@ -42,7 +43,7 @@ const PAW = raw(`<svg class="wordmark__paw" viewBox="84 80 344 362" aria-hidden=
 
 type Route =
   | { name: 'deck' } | { name: 'profile'; id: string } | { name: 'search'; q: string } | { name: 'list' } | { name: 'account' } | { name: 'legal'; doc: LegalDoc }
-  | { name: 'help' } | { name: 'case'; id: string } | ({ name: 'portal' } & PortalView);
+  | { name: 'help' } | { name: 'case'; id: string } | { name: 'lost' } | { name: 'post'; id: string } | ({ name: 'portal' } & PortalView);
 
 /** The route for an in-app path (here()): "/mascota/luna", "/refugio/x/animales?ver=adoptados"… */
 function parse(where: string): Route {
@@ -51,6 +52,7 @@ function parse(where: string): Route {
   if (a === 'mascota' && b) return { name: 'profile', id: decodeURIComponent(b) };
   if (a === 'caso' && b) return { name: 'case', id: decodeURIComponent(b) };
   if (a === 'ayudar') return { name: 'help' };
+  if (a === 'perdidos') return b ? { name: 'post', id: decodeURIComponent(b) } : { name: 'lost' };
   // The shelter portal: /refugio, /refugio/registro, /refugio/<id>/editar, and the admin console under /refugio/admin
   if (a === 'refugio') {
     if (b === 'registro') return { name: 'portal', view: 'registro' };
@@ -83,6 +85,8 @@ function parse(where: string): Route {
     const ver = new URLSearchParams(query).get('ver');
     if (b && c === 'solicitudes') return { name: 'portal', view: 'solicitudes', id: decodeURIComponent(b), tab: ver };
     // Help cases: /refugio/<id>/casos, …/casos/nuevo, …/casos/<caseId>.
+    if (b && c === 'perdidos')
+      return d ? { name: 'portal', view: 'aviso', id: decodeURIComponent(b), postId: d === 'nuevo' ? null : decodeURIComponent(d) } : { name: 'portal', view: 'avisos', id: decodeURIComponent(b) };
     if (b && c === 'casos')
       return d ? { name: 'portal', view: 'caso', id: decodeURIComponent(b), caseId: d === 'nuevo' ? null : decodeURIComponent(d) } : { name: 'portal', view: 'casos', id: decodeURIComponent(b) };
     if (b && c === 'animales')
@@ -199,7 +203,7 @@ function chrome(route: Route) {
     const active =
       a.dataset.nav === route.name ||
       (route.name === 'profile' && a.dataset.nav === 'deck') ||
-      (route.name === 'case' && a.dataset.nav === 'help') ||
+      (['case', 'lost', 'post'].includes(route.name) && a.dataset.nav === 'help') ||
       (route.name === 'portal' && a.dataset.nav === 'account');
     if (active) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -225,6 +229,10 @@ function describe(route: Route): Page {
       return { title: titled(t('help.title')), description: t('help.lede'), index: true };
     case 'case':
       return {}; // the Worker wrote its title and description; help.ts adjusts them once the case is known
+    case 'lost':
+      return { title: titled(t('lost.title')), description: t('lost.lede'), index: true };
+    case 'post':
+      return {}; // likewise, lost.ts
     case 'list':
       return { title: titled(t('list.title')), description: BRAND.description, index: false };
     case 'account':
@@ -248,6 +256,10 @@ function render(route = parse(here())) {
       return renderHelp(view);
     case 'case':
       return renderCase(view, route.id, { back: () => (history.length > 1 ? history.back() : navigate('/ayudar')) });
+    case 'lost':
+      return renderLost(view);
+    case 'post':
+      return renderPost(view, route.id, { back: () => (history.length > 1 ? history.back() : navigate('/perdidos')) });
     case 'list':
       return renderList(view, { openProfile, explore });
     case 'account':

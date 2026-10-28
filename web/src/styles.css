@@ -2045,3 +2045,24 @@ html[data-route='profile'] .toast-region { bottom: calc(96px + env(safe-area-ins
   .case__photos { grid-column: 1; grid-row: 2; position: sticky; top: 0; padding: 10px 0 6px; }
   .case__body { grid-column: 2; grid-row: 1 / 3; margin: 6px 0 0; }
 }
+
+/* Lost and found (owner decision 2026-10-28), the Rescate tab's second section. The kind is a word on a tint,
+   never colour alone: mango for "perdido", sky for "encontrado". WhatsApp is the one hibiscus action. */
+/* Two sections share the width; on a narrow phone "Perdidos y encontrados" wraps instead of pushing the page wider. */
+.rescue-tabs { width: 100%; max-width: 440px; }
+.rescue-tabs .list-tabs__tab { flex: 1; justify-content: center; text-align: center; line-height: 1.15; padding: 6px 12px; }
+.lost-chip {
+  display: inline-flex; align-items: center; justify-self: start;
+  padding: 3px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 800; color: var(--ink);
+}
+.lost-chip--perdido { background: var(--mango-tint); }
+.lost-chip--encontrado { background: var(--sky-tint); box-shadow: inset 0 0 0 1.5px var(--rule-strong); }
+.lost-facts { margin: 0; display: grid; gap: 0; }
+.lost-facts > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.lost-facts > div:last-child { border-bottom: 0; }
+.lost-facts dt { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); font-weight: 600; }
+.lost-facts dd { margin: 0; font-weight: 800; text-align: right; }
+.lost-contact { padding: 16px; border-radius: 16px; background: var(--sky-tint); }
+.lost-contact p { margin: 0; }
+.lost-contact__actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.listing-row__meta .lost-chip { padding: 1px 8px; font-size: 0.78rem; margin-right: 4px; }

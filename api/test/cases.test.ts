@@ -15,6 +15,7 @@ const application = {
   placeId: 'gazcue-distrito-nacional',
   contactName: 'Ana Pérez',
   contactPhone: '809-555-0101',
+  publicPhone: '809-555-0100',
   address: 'Calle Las Flores 12, Gazcue',
   history: 'Llevamos cinco años rescatando, con unos 40 animales al año y hogares temporales.',
   reference: { name: 'Clínica Vet Centro', contact: '809-555-0202', kind: 'veterinaria' },

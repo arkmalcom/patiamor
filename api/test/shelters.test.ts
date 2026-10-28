@@ -12,6 +12,7 @@ const application = (over: Record<string, unknown> = {}) => ({
   visitHours: 'Sábados 9-12',
   contactName: 'María Rodríguez',
   contactPhone: '809-555-0101',
+  publicPhone: '809-555-0100',
   address: 'Calle Las Flores 12, Gazcue',
   social: ['https://instagram.com/huellitas'],
   history: 'Llevamos cinco años rescatando, con unos 40 animales al año y hogares temporales.',
@@ -156,5 +157,27 @@ describe('verifying a shelter', () => {
     const id = (await register(owner.cookie)).json.shelter.id;
     // A pending shelter can't be suspended; it hasn't been verified yet.
     expect((await api(`/api/admin/shelters/${id}/decision`, { method: 'POST', body: { action: 'suspend', reason: 'x' }, cookie: adminUser.cookie })).json.error).toBe('invalid_transition');
+  });
+});
+
+// Since 2026-10-28 every shelter gives a phone people can call: lost and found posts send them to it.
+describe('a shelter\'s public phone', () => {
+  it('is required at registration', async () => {
+    const u = await signIn({ owner: true });
+    expect((await register(u.cookie, { publicPhone: '' })).json.error).toBe('invalid_public_phone');
+    expect((await register(u.cookie, { publicPhone: '555' })).json.error).toBe('invalid_public_phone');
+  });
+
+  it('can be changed by its owner only, any time', async () => {
+    const owner = await signIn({ owner: true });
+    const id = (await register(owner.cookie)).json.shelter.id as string;
+    const maintainer = await signIn();
+    await env.DB.prepare("INSERT INTO shelter_members (shelter_id, user_id, role) VALUES (?, ?, 'maintainer')").bind(id, maintainer.id).run();
+    const put = (cookie: string, phone: string) => api(`/api/portal/shelters/${id}/phone`, { method: 'PUT', cookie, body: { phone } });
+    expect((await put(maintainer.cookie, '809-555-4444')).status).toBe(404);
+    expect((await put(owner.cookie, '12')).json.error).toBe('invalid_public_phone');
+    expect((await put(owner.cookie, '809-555-4444')).json.publicPhone).toBe('+18095554444');
+    const mine = (await api('/api/portal/shelters', { cookie: owner.cookie })).json.shelters.find((s: { id: string }) => s.id === id);
+    expect(mine.publicPhone).toBe('+18095554444');
   });
 });

@@ -17,7 +17,7 @@
     "directory": "../web/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/mascota/*", "/caso/*", "/robots.txt", "/sitemap.xml"]
+    "run_worker_first": ["/api/*", "/mascota/*", "/caso/*", "/perdidos/*", "/robots.txt", "/sitemap.xml"]
   },
   "d1_databases": [
     { "binding": "DB", "database_name": "patiamor-db", "database_id": "0b6d481c-1d8d-45cd-aa54-6cf14a856c28", "migrations_dir": "migrations" }

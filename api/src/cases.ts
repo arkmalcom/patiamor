@@ -138,14 +138,15 @@ async function ended(db: D1Database, id: string): Promise<{ body: unknown; statu
 
 // ---------- The shelter's side (portal) ----------
 
-type Access = { role: Role | 'admin'; shelter: { id: string; name: string; status: string; kind: string; accounts: number } };
+export type Access = { role: Role | 'admin'; shelter: { id: string; name: string; status: string; kind: string; accounts: number; phone: string | null } };
 
-/** Members of the shelter, or an admin publishing for it. Private listers have no cases (they can't ask for money). */
-async function access(c: C, shelterId: string): Promise<Access | { error: string; status: 403 | 404 }> {
+/** Members of the shelter, or an admin publishing for it. Private listers have no cases (they can't ask for money)
+ *  nor lost and found posts (lostfound.ts, which shares this). */
+export async function access(c: C, shelterId: string): Promise<Access | { error: string; status: 403 | 404 }> {
   const role = (await roleIn(c, shelterId)) ?? (c.get('user')?.is_admin ? ('admin' as const) : null);
   if (!role) return { error: 'not_found', status: 404 };
   const shelter = await c.env.DB.prepare(
-    'SELECT id, name, status, kind, (SELECT count(*) FROM shelter_donation_accounts a WHERE a.shelter_id = shelters.id) AS accounts FROM shelters WHERE id = ?',
+    'SELECT id, name, status, kind, phone, (SELECT count(*) FROM shelter_donation_accounts a WHERE a.shelter_id = shelters.id) AS accounts FROM shelters WHERE id = ?',
   )
     .bind(shelterId)
     .first<Access['shelter']>();
@@ -155,7 +156,7 @@ async function access(c: C, shelterId: string): Promise<Access | { error: string
 }
 
 /** Changes need a verified shelter: cases are never drafted by one still in review, or a suspended one. */
-const writeProblem = (a: Access) => (a.shelter.status === 'verified' ? null : a.shelter.status === 'suspended' ? 'shelter_suspended' : 'shelter_not_verified');
+export const writeProblem = (a: Access) => (a.shelter.status === 'verified' ? null : a.shelter.status === 'suspended' ? 'shelter_suspended' : 'shelter_not_verified');
 
 type CaseRow = {
   id: string; shelter_id: string; pet_id: string | null; species: string; name: string; need: string; story: string; cost_dop: number | null;

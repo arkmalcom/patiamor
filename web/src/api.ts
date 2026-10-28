@@ -1,5 +1,5 @@
 // Thin client for the Patiamor Worker API (same origin in every environment).
-import type { Donation, DonationAccount, Energy, HelpCase, HelpCaseDetail, HelpNeed, PetDetail, PetSummary, LatLng, Place, Sex, Size, Species } from './data';
+import type { Donation, DonationAccount, Energy, HelpCase, HelpCaseDetail, HelpNeed, LostKind, LostPost, LostPostDetail, PetDetail, PetSummary, LatLng, Place, Sex, Size, Species } from './data';
 import type { AdoptionRequest, ContactPref, MyRequest, RequestForm, RequestStatus } from './store';
 
 export interface Me {
@@ -352,6 +352,32 @@ export interface CaseShelter {
 /** The shelter's animals a case can be linked to. */
 export type CasePet = { id: string; name: string; species: Species };
 
+/** A lost and found post as its form edits it. */
+export interface LostForm {
+  kind: LostKind;
+  species: Species;
+  name: string | null;
+  sex: Sex | null;
+  description: string;
+  placeId: string;
+  seenOn: string;
+}
+export type LostStatus = 'draft' | 'open' | 'home' | 'closed';
+/** A post in the portal. `expired`: open, but hidden after 30 days without a renewal. */
+export interface PortalLost extends Omit<LostForm, 'placeId'> {
+  id: string;
+  place: Place | null;
+  status: LostStatus;
+  publishedAt: string | null;
+  activeAt: string | null;
+  endedAt: string | null;
+  updatedAt: string;
+  expired: boolean;
+}
+export interface LostShelter extends Omit<CaseShelter, 'hasDonation'> {
+  hasPhone: boolean;
+}
+
 export class ApiError extends Error {
   readonly code: string;
   readonly data: Record<string, unknown>;
@@ -455,6 +481,23 @@ export const api = {
     call<{ photo: ListingPhoto }>(`/api/portal/cases/${encodeURIComponent(caseId)}/photos`, 'POST', body).then((r) => r.photo),
   arrangeCasePhotos: (caseId: string, photos: { id: string; focus: string }[]) => call<{ ok: true }>(`/api/portal/cases/${encodeURIComponent(caseId)}/photos`, 'PUT', { photos }),
   deleteCasePhoto: (caseId: string, photoId: string) => call<{ ok: true }>(`/api/portal/cases/${encodeURIComponent(caseId)}/photos/${encodeURIComponent(photoId)}`, 'DELETE', {}),
+  // Lost and found: the public list and pages, then the shelter's side.
+  lostPosts: () => call<{ posts: LostPost[] }>('/api/lost').then((r) => r.posts),
+  lostPost: (id: string) => call<{ post: LostPostDetail }>(`/api/lost/${encodeURIComponent(id)}`).then((r) => r.post),
+  shelterLost: (shelterId: string) =>
+    call<{ shelter: LostShelter; posts: (PortalLost & { photo: { url: string; thumb: string | null; focus: string } | null })[] }>(`/api/portal/shelters/${encodeURIComponent(shelterId)}/lost`),
+  createLost: (shelterId: string, form: LostForm) => call<{ post: { id: string; status: LostStatus } }>(`/api/portal/shelters/${encodeURIComponent(shelterId)}/lost`, 'POST', form).then((r) => r.post),
+  portalLost: (postId: string) => call<{ shelter: LostShelter; post: PortalLost & { photos: ListingPhoto[] } }>(`/api/portal/lost/${encodeURIComponent(postId)}`),
+  saveLost: (postId: string, form: LostForm, publish: boolean) => call<{ post: { id: string; status: LostStatus } }>(`/api/portal/lost/${encodeURIComponent(postId)}`, 'PUT', { ...form, publish }).then((r) => r.post),
+  renewLost: (postId: string) => call<{ post: { id: string; activeAt: string } }>(`/api/portal/lost/${encodeURIComponent(postId)}/renew`, 'POST', {}),
+  endLost: (postId: string, status: 'home' | 'closed') => call<{ post: { id: string; status: LostStatus } }>(`/api/portal/lost/${encodeURIComponent(postId)}/end`, 'POST', { status }),
+  deleteLost: (postId: string) => call<{ ok: true }>(`/api/portal/lost/${encodeURIComponent(postId)}`, 'DELETE', {}),
+  uploadLostPhoto: (postId: string, body: { image: string; thumb: string; focus: string }) =>
+    call<{ photo: ListingPhoto }>(`/api/portal/lost/${encodeURIComponent(postId)}/photos`, 'POST', body).then((r) => r.photo),
+  arrangeLostPhotos: (postId: string, photos: { id: string; focus: string }[]) => call<{ ok: true }>(`/api/portal/lost/${encodeURIComponent(postId)}/photos`, 'PUT', { photos }),
+  deleteLostPhoto: (postId: string, photoId: string) => call<{ ok: true }>(`/api/portal/lost/${encodeURIComponent(postId)}/photos/${encodeURIComponent(photoId)}`, 'DELETE', {}),
+  /** The phone people see on lost and found posts; owners change it any time. */
+  savePublicPhone: (shelterId: string, phone: string) => call<{ publicPhone: string }>(`/api/portal/shelters/${encodeURIComponent(shelterId)}/phone`, 'PUT', { phone }).then((r) => r.publicPhone),
   runDigest: () => call<{ shelters: number; digestEmails: number; alertEmails: number; closedEmails: number; deferred: boolean }>('/api/admin/digest', 'POST', {}),
   /** How many of each kind of request are waiting for an admin. */
   adminSummary: () => call<{ shelters: number; owners: number; bulk: number; paused: number; reports: number }>('/api/admin/summary'),
