@@ -1,5 +1,5 @@
-import { Camera, Copy, Eye, EyeOff, Handshake, HeartHandshake, ListChecks, PencilLine, Plus, Star, Syringe, X, type IconNode } from 'lucide';
-import { api, ApiError, type Listing, type ListingPhoto, type ListingReview, type ListingShelter, type ListingSummary, type ManyChange, type PetForm, type PetStatus, type WithdrawReason } from '../api';
+import { Copy, Eye, EyeOff, Handshake, HeartHandshake, ListChecks, PencilLine, Plus, Syringe, type IconNode } from 'lucide';
+import { api, ApiError, type Listing, type ListingReview, type ListingShelter, type ListingSummary, type ManyChange, type PetForm, type PetStatus, type WithdrawReason } from '../api';
 import { ageMonths, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { failText, pesos, t, type Key } from '../i18n';
@@ -7,7 +7,7 @@ import { moneyWords } from '../money';
 import { petChanged, placePet, state } from '../store';
 import { age, canvas, miniFrame } from '../ui/canvas';
 import { openOutcome, outcomeButton } from '../ui/outcome';
-import { PhotoError, preparePhoto, toBase64, type PreparedPhoto } from '../ui/photos';
+import { bindPhotoEditor, photoEditor } from '../ui/photo-editor';
 import { closeSheet, openSheet } from '../ui/sheet';
 import { toast } from '../ui/toast';
 import { here, navigate } from '../nav';
@@ -359,11 +359,6 @@ const ERRORS = [
   'invalid_in_care_since', 'shelter_not_verified', 'too_young', 'story_required', 'shelter_suspended',
   'photo_required', 'photos_full', 'upload_limit', 'storage_full', 'image_too_large', 'invalid_image', 'duplicate_photo', 'last_photo', 'too_many_pets',
 ] as const;
-const MAX_PHOTOS = 5;
-
-/** A photo in the form: already on the server (`id`), or prepared on this phone and sent on save. */
-type Item = { id?: string; url: string; thumb: string | null; focus: string; prepared?: PreparedPhoto };
-
 function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | null, copyOf: Listing | null = null) {
   const v: PetForm = existing ? { ...BLANK, ...existing } : copyOf ? { ...BLANK, ...copyOf, name: '' } : { ...BLANK };
   const months = ageMonths(v.birthDate || null);
@@ -400,17 +395,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
             <fieldset class="form-section">
               <legend class="section-title">${t('listing.photos')}</legend>
               <p class="muted">${t('listing.photosNote')}</p>
-              <ul class="photo-grid" data-photos></ul>
-              <label class="button button--outline photo-add" data-photo-add>
-                ${icon(Camera, 20)}<span>${t('listing.addPhotos')}</span>
-                <input class="sr-only" type="file" accept="image/*" multiple data-photo-input />
-              </label>
-              <p class="field__hint" role="status" data-photo-status></p>
-              <div class="photo-focus" data-focus-panel hidden>
-                <p class="field__label">${t('listing.focus')}</p>
-                <p class="field__hint" id="focus-hint">${t('listing.focusHint')}</p>
-                <button class="photo-focus__frame" type="button" aria-describedby="focus-hint" data-focus-frame></button>
-              </div>
+              ${photoEditor()}
             </fieldset>
 
             <fieldset class="form-section">
@@ -567,108 +552,8 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
   };
 
   // ---------- Photos ----------
-  let items: Item[] = (existing?.photos ?? []).map((p: ListingPhoto) => ({ id: p.id, url: p.url, thumb: p.thumb, focus: p.focus }));
-  const removed: string[] = [];
-  let arranged = false; // order or framing changed for photos already on the server
-  let selected = 0;
-  const grid = $('[data-photos]', root);
-  const addLabel = $<HTMLLabelElement>('[data-photo-add]', root);
-  const fileInput = $<HTMLInputElement>('[data-photo-input]', root);
-  const photoStatus = $('[data-photo-status]', root);
-  const focusPanel = $('[data-focus-panel]', root);
-  const focusFrame = $<HTMLButtonElement>('[data-focus-frame]', root);
-
-  const drawPhotos = () => {
-    selected = Math.min(selected, Math.max(0, items.length - 1));
-    mount(
-      grid,
-      html`${items.map(
-        (it, i) => html`
-          <li class="photo-tile${i === selected ? ' is-selected' : ''}">
-            <button class="photo-tile__pick" type="button" data-pick="${i}" aria-pressed="${String(i === selected)}" aria-label="${t('listing.photoN', { n: i + 1 })}">
-              <img src="${it.thumb ?? it.url}" alt="" style="object-position:${it.focus}" draggable="false" />
-            </button>
-            ${i === 0
-              ? html`<span class="photo-tile__badge">${icon(Star, 14)}${t('listing.cover')}</span>`
-              : html`<button class="photo-tile__action" type="button" data-cover="${i}">${icon(Star, 14)}${t('listing.makeCover')}</button>`}
-            <button class="photo-tile__remove" type="button" data-remove="${i}" aria-label="${t('listing.removePhoto', { n: i + 1 })}">${icon(X, 16)}</button>
-          </li>`,
-      )}`,
-    );
-    addLabel.hidden = items.length >= MAX_PHOTOS;
-    focusPanel.hidden = !items.length;
-    const it = items[selected];
-    if (it) {
-      const [x, y] = it.focus.split(' ');
-      mount(focusFrame, html`<img src="${it.url}" alt="" draggable="false" /><span class="photo-focus__dot" style="left:${x};top:${y}"></span>`);
-      focusFrame.setAttribute('aria-label', t('listing.focusLabel', { x: parseInt(x), y: parseInt(y) }));
-    }
-    draw();
-  };
-
-  grid.addEventListener('click', (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
-    if (!b) return;
-    if (b.dataset.pick) selected = Number(b.dataset.pick);
-    if (b.dataset.cover) {
-      const [it] = items.splice(Number(b.dataset.cover), 1);
-      items.unshift(it);
-      selected = 0;
-      arranged = true;
-    }
-    if (b.dataset.remove) {
-      const [it] = items.splice(Number(b.dataset.remove), 1);
-      if (it.id) removed.push(it.id);
-      else (URL.revokeObjectURL(it.url), it.thumb && URL.revokeObjectURL(it.thumb));
-      arranged = true;
-    }
-    drawPhotos();
-  });
-
-  fileInput.addEventListener('change', async () => {
-    const files = [...(fileInput.files ?? [])];
-    fileInput.value = '';
-    const room = MAX_PHOTOS - items.length;
-    if (files.length > room) photoStatus.textContent = t('listing.photosRoom', { n: room });
-    for (const file of files.slice(0, room)) {
-      photoStatus.textContent = t('listing.preparing');
-      try {
-        const prepared = await preparePhoto(file);
-        items.push({ url: URL.createObjectURL(prepared.full), thumb: URL.createObjectURL(prepared.thumb), focus: '50% 40%', prepared });
-        error.hidden = true; // "add a photo" no longer applies
-        selected = items.length - 1;
-        photoStatus.textContent = '';
-      } catch (err) {
-        photoStatus.textContent = t(err instanceof PhotoError && err.message === 'too_small' ? 'listing.photoTooSmall' : 'listing.photoUnreadable');
-      }
-      drawPhotos();
-    }
-    if (files.length > room) photoStatus.textContent = t('listing.photosRoom', { n: room });
-  });
-
-  // Framing: tap where the face is. Arrow keys nudge it, for keyboards.
-  const setFocus = (x: number, y: number) => {
-    const it = items[selected];
-    if (!it) return;
-    const clamp = (v: number) => Math.round(Math.min(100, Math.max(0, v)));
-    it.focus = `${clamp(x)}% ${clamp(y)}%`;
-    if (it.id) arranged = true;
-    drawPhotos();
-  };
-  focusFrame.addEventListener('click', (e) => {
-    const img = focusFrame.querySelector('img');
-    if (!img || e.detail === 0) return; // a keyboard "click" (Enter/Space) carries no position
-    const r = img.getBoundingClientRect();
-    setFocus(((e.clientX - r.left) / r.width) * 100, ((e.clientY - r.top) / r.height) * 100);
-  });
-  focusFrame.addEventListener('keydown', (e) => {
-    const step = { ArrowLeft: [-5, 0], ArrowRight: [5, 0], ArrowUp: [0, -5], ArrowDown: [0, 5] }[e.key];
-    if (!step) return;
-    e.preventDefault();
-    const [x, y] = (items[selected]?.focus ?? '50% 40%').split(' ').map((v) => parseInt(v));
-    setFocus(x + step[0], y + step[1]);
-    focusFrame.focus();
-  });
+  const photos = bindPhotoEditor(root, existing?.photos ?? [], { onChange: () => draw(), onAdd: () => (error.hidden = true) });
+  const items = photos.items;
 
   let species = v.species;
   formEl.addEventListener('change', (e) => {
@@ -694,7 +579,7 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
   };
   formEl.addEventListener('input', checkMoney);
   checkMoney();
-  drawPhotos();
+  draw();
 
   // Saving: the listing (a new one starts as a draft), then new photos, removals, order and framing, and
   // only then publishing, so the server sees the photos it requires. If something fails halfway, the
@@ -725,21 +610,11 @@ function form(root: HTMLElement, shelter: ListingShelter, existing: Listing | nu
     try {
       const fresh = !petId;
       if (!petId) petId = (await api.createPet(shelter.id, body, false)).id;
-      const pending = items.filter((it) => !it.id);
-      for (const [n, it] of pending.entries()) {
-        progress.textContent = t('listing.uploading', { n: n + 1, total: pending.length });
-        const saved = await api.uploadPhoto(petId, { image: await toBase64(it.prepared!.full), thumb: await toBase64(it.prepared!.thumb), focus: it.focus });
-        URL.revokeObjectURL(it.url);
-        if (it.thumb) URL.revokeObjectURL(it.thumb);
-        Object.assign(it, { id: saved.id, url: saved.url, thumb: saved.thumb, prepared: undefined });
-        arranged = true;
-      }
-      while (removed.length) {
-        await api.deletePhoto(petId, removed[0]);
-        removed.shift();
-      }
-      if (arranged && items.length) await api.arrangePhotos(petId, items.map((it) => ({ id: it.id!, focus: it.focus })));
-      arranged = false;
+      const id = petId;
+      await photos.sync(
+        { upload: (b) => api.uploadPhoto(id, b), arrange: (list) => api.arrangePhotos(id, list), remove: (photoId) => api.deletePhoto(id, photoId) },
+        (n, total) => (progress.textContent = t('listing.uploading', { n, total })),
+      );
       progress.textContent = '';
       const saved = !fresh || publish ? await api.savePet(petId, body, publish) : { status: 'draft' as PetStatus, review: null };
       const status = saved.status;

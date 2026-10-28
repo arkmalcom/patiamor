@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { cachedText } from './cache';
 import type { AppContext, Env } from './env';
+import { CASE_VISIBLE } from './cases';
 import { VISIBLE } from './pets';
 
 // Search engines. The app is one page that draws itself, so what a crawler can be told lives here: which
@@ -37,16 +38,20 @@ export function robots(c: C) {
 const SITEMAP_LIMIT = 50_000;
 const xml = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
-/** The front page, the legal texts (Spanish and English, each pointing to the other) and every animal open to
- *  adoption requests (not "en proceso", adopted or withdrawn). */
+/** The front page, the legal texts (Spanish and English, each pointing to the other), every animal open to
+ *  adoption requests (not "en proceso", adopted or withdrawn), and the help cases with their list. */
 export function sitemap(c: C) {
   return cachedText(c, '/sitemap.xml', 'application/xml; charset=UTF-8', async () => {
     const origin = siteOrigin(c);
     const { results } = await c.env.DB.prepare(
       `SELECT d.id, d.updated_at FROM pets d LEFT JOIN shelters s ON s.id = d.shelter_id WHERE ${VISIBLE} ORDER BY d.updated_at DESC LIMIT ?`,
     )
-      .bind(SITEMAP_LIMIT - 5)
+      .bind(SITEMAP_LIMIT - 300)
       .all<{ id: string; updated_at: string }>();
+    // At most 200 open (cases.ts), so they fit in the room left above.
+    const { results: open } = await c.env.DB.prepare(
+      `SELECT k.id, k.active_at FROM cases k JOIN shelters s ON s.id = k.shelter_id WHERE ${CASE_VISIBLE} ORDER BY k.active_at DESC LIMIT 250`,
+    ).all<{ id: string; active_at: string }>();
     const url = (path: string, lastmod?: string, languages?: Record<string, string>) =>
       `<url><loc>${xml(origin + path)}</loc>${lastmod ? `<lastmod>${xml(lastmod)}</lastmod>` : ''}` +
       Object.entries(languages ?? {}).map(([lang, alt]) => `<xhtml:link rel="alternate" hreflang="${lang}" href="${xml(origin + alt)}"/>`).join('') +
@@ -59,6 +64,8 @@ export function sitemap(c: C) {
       ...legal('/privacidad', '/en/privacy'),
       ...legal('/terminos', '/en/terms'),
       ...results.map((p) => url(`/mascota/${encodeURIComponent(p.id)}`, p.updated_at)),
+      url('/ayudar'),
+      ...open.map((k) => url(`/caso/${encodeURIComponent(k.id)}`, k.active_at)),
       '</urlset>',
       '',
     ].join('\n');

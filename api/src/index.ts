@@ -4,11 +4,12 @@ import { HTTPException } from 'hono/http-exception';
 import { appOrigin, auth, publicUser } from './auth/routes';
 import { currentUser } from './auth/session';
 import { pets, readPoint } from './pets';
-import { petPage } from './share';
+import { casePage, petPage } from './share';
 import { robots, sitemap } from './seo';
 import type { AppContext, Env } from './env';
 import { inDR, nearestPlace, PLACES_ATTRIBUTION, placeById, searchPlaces } from './places';
 import { admin } from './admin';
+import { casePortal, cases, trimEndedCasePhotos } from './cases';
 import { runDigest } from './digest';
 import { inbox } from './inbox';
 import { lifecycle, trimAdoptedPhotos } from './lifecycle';
@@ -45,7 +46,7 @@ app.use('/api/*', async (c, next) => {
 });
 
 // Public reads are the same for everyone, so they skip the session lookup (a D1 read per request).
-const PUBLIC_READ = /^\/api\/(pets|photos|places|whereami|health)(\/|$)/;
+const PUBLIC_READ = /^\/api\/(pets|cases|photos|places|whereami|health)(\/|$)/;
 app.use('/api/*', async (c, next) => {
   c.set('user', c.req.method === 'GET' && PUBLIC_READ.test(c.req.path) ? null : await currentUser(c));
   await next();
@@ -72,12 +73,14 @@ app.get('/api/health', async (c) => {
 });
 
 app.route('/api/auth', auth);
-// The app with link-preview tags for a pet (the only page path the Worker sees: run_worker_first).
+// The app with link-preview tags for a pet or a help case (the only page paths the Worker sees: run_worker_first).
 app.get('/mascota/:id', petPage);
+app.get('/caso/:id', casePage);
 app.get('/robots.txt', robots);
 app.get('/sitemap.xml', sitemap);
 app.route('/api/pets', pets);
 app.route('/api/pets', reports);
+app.route('/api/cases', cases);
 app.route('/api/requests', requests);
 app.route('/api/alerts', alerts);
 app.route('/api/portal', portal);
@@ -86,6 +89,7 @@ app.route('/api/portal', listings);
 app.route('/api/portal', photoRoutes);
 app.route('/api/portal', inbox);
 app.route('/api/portal', lifecycle);
+app.route('/api/portal', casePortal);
 app.get('/api/photos/:key', servePhoto);
 app.route('/api/admin', admin);
 
@@ -194,10 +198,11 @@ export default Sentry.withSentry<Env>(
   {
     fetch: app.fetch,
     // The morning job (cron in wrangler.jsonc): shelters' daily summaries, "Avísame" alerts, and
-    // trimming the photos of animals adopted 90 days ago.
+    // trimming the photos of animals adopted, and of help cases ended, 90 days ago.
     scheduled: (_event, env, ctx) => {
       ctx.waitUntil(runDigest(env).then((r) => console.log('morning job', r)));
       ctx.waitUntil(trimAdoptedPhotos(env).then((r) => console.log('photo trim', r)));
+      ctx.waitUntil(trimEndedCasePhotos(env).then((r) => console.log('case photo trim', r)));
     },
   },
 );

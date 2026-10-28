@@ -34,3 +34,18 @@ export function moneyWords(...texts: (string | null | undefined)[]): string[] {
   }
   return [...found].filter(Boolean);
 }
+
+// A help case (cases.ts) talks about money by nature, so it skips the words above. What it can't hold is a
+// number to send money or messages to: donations only go to the shelter's own accounts, shown by the app.
+/** Seven or more digits, maybe split by spaces or dashes: a phone or an account number. */
+const NUMBER = /\d(?:[\s-]?\d){6,}/g;
+/** Dates written with dashes (2026-10-28, 28-10-2026) aren't numbers to send anything to. */
+const DATE = /^(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}-\d{1,2}-\d{2,4})$/;
+
+/** Phone or account numbers in a case's texts, as written, or an empty list. Amounts with commas or points
+ *  (RD$35,000) never match. */
+export function contactNumbers(...texts: (string | null | undefined)[]): string[] {
+  const found = new Set<string>();
+  for (const text of texts) for (const m of (text ?? '').matchAll(NUMBER)) if (!DATE.test(m[0])) found.add(m[0]);
+  return [...found];
+}

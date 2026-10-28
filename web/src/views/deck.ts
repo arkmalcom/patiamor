@@ -4,6 +4,7 @@ import { animals, away, formatKm, t } from '../i18n';
 import { RADIUS_ANY, activeFilterCount, emptyFilters, inReach, loadPets, nearestBeyond, nextRadius, placed, queue, radius, state, update, widenedFrom } from '../store';
 import { canvas } from '../ui/canvas';
 import { bindGallery } from '../ui/gallery';
+import { helpInvite } from '../ui/help-invite';
 import { bindSpeciesSwitch, speciesSwitch } from '../ui/species';
 import { shareSite } from '../ui/share';
 import { toast } from '../ui/toast';
@@ -79,6 +80,7 @@ function emptyState(): Raw {
             </div>
           </aside>`
         : ''}
+      ${helpInvite()}
     </div>`;
 }
 

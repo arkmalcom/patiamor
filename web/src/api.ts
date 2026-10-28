@@ -1,5 +1,5 @@
 // Thin client for the Patiamor Worker API (same origin in every environment).
-import type { Donation, DonationAccount, Energy, PetDetail, PetSummary, LatLng, Place, Sex, Size, Species } from './data';
+import type { Donation, DonationAccount, Energy, HelpCase, HelpCaseDetail, HelpNeed, PetDetail, PetSummary, LatLng, Place, Sex, Size, Species } from './data';
 import type { AdoptionRequest, ContactPref, MyRequest, RequestForm, RequestStatus } from './store';
 
 export interface Me {
@@ -318,6 +318,40 @@ export interface InboxRequest {
   pet: { id: string; name: string; species: string; status: PetStatus; requestsPaused: boolean; openRequests: number; photo: { url: string | null; thumb: string | null; focus: string } };
 }
 
+export type CaseStatus = 'draft' | 'open' | 'resolved' | 'closed';
+/** A help case as its form edits it (and sends it back). */
+export interface CaseForm {
+  species: Species;
+  name: string;
+  need: HelpNeed;
+  story: string;
+  costDop: number | null;
+  alsoNeeded: string | null;
+  /** The same animal's listing, if it has one. */
+  petId: string | null;
+}
+/** A case in the portal, every status. `stale`: open, but hidden for want of news in 60 days. */
+export interface PortalCase extends CaseForm {
+  id: string;
+  status: CaseStatus;
+  outcome: string | null;
+  publishedAt: string | null;
+  activeAt: string | null;
+  endedAt: string | null;
+  updatedAt: string;
+  stale: boolean;
+}
+/** The shelter as the case screens need it; an admin may publish for any shelter. */
+export interface CaseShelter {
+  id: string;
+  name: string;
+  status: ShelterStatus;
+  role: 'owner' | 'maintainer' | 'admin';
+  hasDonation: boolean;
+}
+/** The shelter's animals a case can be linked to. */
+export type CasePet = { id: string; name: string; species: Species };
+
 export class ApiError extends Error {
   readonly code: string;
   readonly data: Record<string, unknown>;
@@ -404,6 +438,23 @@ export const api = {
   markAdopted: (petId: string, requestId?: string) => call<PetChange>(`/api/portal/pets/${encodeURIComponent(petId)}/adopted`, 'POST', { requestId }),
   withdrawPet: (petId: string, reason: WithdrawReason) => call<PetChange>(`/api/portal/pets/${encodeURIComponent(petId)}/withdraw`, 'POST', { reason }),
   relistPet: (petId: string) => call<PetChange>(`/api/portal/pets/${encodeURIComponent(petId)}/relist`, 'POST', {}),
+  // Help cases: the public list and pages, then the shelter's side.
+  helpCases: () => call<{ cases: HelpCase[] }>('/api/cases').then((r) => r.cases),
+  helpCase: (id: string) => call<{ case: HelpCaseDetail }>(`/api/cases/${encodeURIComponent(id)}`).then((r) => r.case),
+  shelterCases: (shelterId: string) =>
+    call<{ shelter: CaseShelter; cases: (PortalCase & { photo: { url: string; thumb: string | null; focus: string } | null })[]; pets: CasePet[] }>(`/api/portal/shelters/${encodeURIComponent(shelterId)}/cases`),
+  createCase: (shelterId: string, form: CaseForm) => call<{ case: { id: string; status: CaseStatus } }>(`/api/portal/shelters/${encodeURIComponent(shelterId)}/cases`, 'POST', form).then((r) => r.case),
+  portalCase: (caseId: string) =>
+    call<{ shelter: CaseShelter; case: PortalCase & { photos: ListingPhoto[]; updates: { id: string; body: string; at: string }[] }; pets: CasePet[] }>(`/api/portal/cases/${encodeURIComponent(caseId)}`),
+  saveCase: (caseId: string, form: CaseForm, publish: boolean) => call<{ case: { id: string; status: CaseStatus } }>(`/api/portal/cases/${encodeURIComponent(caseId)}`, 'PUT', { ...form, publish }).then((r) => r.case),
+  deleteCase: (caseId: string) => call<{ ok: true }>(`/api/portal/cases/${encodeURIComponent(caseId)}`, 'DELETE', {}),
+  postCaseUpdate: (caseId: string, body: string) => call<{ update: { id: string; body: string; at: string } }>(`/api/portal/cases/${encodeURIComponent(caseId)}/updates`, 'POST', { body }).then((r) => r.update),
+  deleteCaseUpdate: (caseId: string, updateId: string) => call<{ ok: true }>(`/api/portal/cases/${encodeURIComponent(caseId)}/updates/${encodeURIComponent(updateId)}`, 'DELETE', {}),
+  endCase: (caseId: string, status: 'resolved' | 'closed', outcome: string) => call<{ case: { id: string; status: CaseStatus } }>(`/api/portal/cases/${encodeURIComponent(caseId)}/end`, 'POST', { status, outcome }),
+  uploadCasePhoto: (caseId: string, body: { image: string; thumb: string; focus: string }) =>
+    call<{ photo: ListingPhoto }>(`/api/portal/cases/${encodeURIComponent(caseId)}/photos`, 'POST', body).then((r) => r.photo),
+  arrangeCasePhotos: (caseId: string, photos: { id: string; focus: string }[]) => call<{ ok: true }>(`/api/portal/cases/${encodeURIComponent(caseId)}/photos`, 'PUT', { photos }),
+  deleteCasePhoto: (caseId: string, photoId: string) => call<{ ok: true }>(`/api/portal/cases/${encodeURIComponent(caseId)}/photos/${encodeURIComponent(photoId)}`, 'DELETE', {}),
   runDigest: () => call<{ shelters: number; digestEmails: number; alertEmails: number; closedEmails: number; deferred: boolean }>('/api/admin/digest', 'POST', {}),
   /** How many of each kind of request are waiting for an admin. */
   adminSummary: () => call<{ shelters: number; owners: number; bulk: number; paused: number; reports: number }>('/api/admin/summary'),

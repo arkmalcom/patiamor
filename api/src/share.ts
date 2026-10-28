@@ -1,12 +1,13 @@
 import type { Context } from 'hono';
 import type { AppContext } from './env';
+import { cachedCase } from './cases';
 import { cachedProfile } from './pets';
 import { indexable } from './seo';
 import { BRAND } from '../../web/src/brand';
 
 // Link previews (PAT-32). WhatsApp, Facebook, Instagram and the like read a page's meta tags without
-// running its script, so for /mascota/<id> the Worker writes the animal's name, a line about it and its
-// main photo into the app's HTML. People get the same app as on any other path. An animal that went
+// running its script, so for /mascota/<id> (and a help case's /caso/<id>) the Worker writes the animal's
+// name, a line about it and its main photo into the app's HTML. People get the same app as on any other path. An animal that went
 // home or was withdrawn previews as such (and is kept out of search results); an unknown id gets the app's
 // default tags and a 404, so search engines don't list it as a copy of the front page.
 
@@ -33,7 +34,7 @@ function age(birthDate: string, estimated: boolean) {
 const escape = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
 /** What the preview says, or null to leave the app's default tags. */
-function card(body: { pet?: Pet; error?: string }): { title: string; description: string; photo: Photo; ended?: true } | null {
+function card(body: { pet?: Pet; error?: string }): About | null {
   const pet = body.pet;
   if (!pet) return null;
   const more = `Hay más perros y gatos esperando familia cerca de ti en ${BRAND.name}.`;
@@ -45,20 +46,56 @@ function card(body: { pet?: Pet; error?: string }): { title: string; description
   return { title: `${pet.name} busca familia`, description: bits.filter(Boolean).join(' · '), photo: pet.photo };
 }
 
+type Case = { name: string; need: string; costDop?: number | null; status?: string; photo: Photo; shelter: { name: string }; place?: { name: string; municipality: string } };
+
+const NEED: Record<string, string> = {
+  cirugia: 'Necesita una cirugía',
+  tratamiento: 'Necesita tratamiento',
+  examenes: 'Necesita exámenes',
+  medicinas: 'Necesita medicinas',
+  recuperacion: 'Está en recuperación',
+  otro: 'Necesita ayuda',
+};
+
+/** A help case's preview. One that ended or is paused says so, without the ask. */
+function caseCard(body: { case?: Case; error?: string }): About | null {
+  const k = body.case;
+  if (!k) return null;
+  if (body.error === 'gone') {
+    const title = k.status === 'resolved' ? `${k.name} recibió la ayuda que necesitaba` : k.status === 'closed' ? `El caso de ${k.name} está cerrado` : `El caso de ${k.name} no está activo ahora`;
+    return { title, description: `Un caso de ${k.shelter.name} en ${BRAND.name}.`, photo: k.photo, ended: true };
+  }
+  const cost = k.costDop ? `costo estimado RD$${k.costDop.toLocaleString('es-DO')}` : null;
+  const bits = [NEED[k.need] ?? NEED.otro, cost, k.shelter.name, k.place ? `${k.place.name}, ${k.place.municipality}` : null];
+  return { title: `${k.name} necesita tu ayuda`, description: bits.filter(Boolean).join(' · '), photo: k.photo };
+}
+
+type About = { title: string; description: string; photo: Photo; ended?: true };
+
 export async function petPage(c: C) {
-  const origin = new URL(c.req.url).origin;
-  const page = await c.env.ASSETS.fetch(new Request(`${origin}/`));
   const id = c.req.param('id') ?? '';
   const profile = await cachedProfile(c, id).catch(() => ({}) as { error?: string });
-  const about = card(profile);
-  if (!about) return profile.error === 'not_found' ? new Response(page.body, { status: 404, headers: page.headers }) : page;
+  return preview(c, `/mascota/${encodeURIComponent(id)}`, card(profile), profile.error === 'not_found');
+}
+
+export async function casePage(c: C) {
+  const id = c.req.param('id') ?? '';
+  const found = await cachedCase(c, id).catch(() => ({}) as { error?: string });
+  return preview(c, `/caso/${encodeURIComponent(id)}`, caseCard(found), found.error === 'not_found');
+}
+
+/** The app's page with these tags; with nothing to say, its default tags (and a 404 for an unknown id). */
+async function preview(c: C, path: string, about: About | null, unknown: boolean) {
+  const origin = new URL(c.req.url).origin;
+  const page = await c.env.ASSETS.fetch(new Request(`${origin}/`));
+  if (!about) return unknown ? new Response(page.body, { status: 404, headers: page.headers }) : page;
 
   // The thumbnail (about 480 px, tens of KB) suits previews best: WhatsApp skips large images. Sample
   // photos have none, so they use the full one.
   const photo = about.photo.thumb ?? about.photo.url;
-  const url = `${c.env.APP_ORIGIN || origin}/mascota/${encodeURIComponent(id)}`;
+  const url = `${c.env.APP_ORIGIN || origin}${path}`;
   const meta = (key: 'property' | 'name', name: string, content: string) => `<meta ${key}="${name}" content="${escape(content)}" />`;
-  // Only open animals on the real site are for search: staging and animals that went home are not.
+  // Only open animals and cases on the real site are for search: staging, animals that went home and ended cases are not.
   const listed = indexable(c.env, origin) && !about.ended;
   const tags = [
     `<link rel="canonical" href="${escape(url)}" />`,

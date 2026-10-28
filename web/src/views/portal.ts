@@ -9,6 +9,7 @@ import { setUser, state } from '../store';
 import { openListerRequest } from '../ui/lister';
 import { openOwnerRequest } from '../ui/owner';
 import { renderAuth } from '../ui/auth';
+import { renderAdminCases, renderCaseForm, renderCases } from './cases';
 import { renderInbox } from './inbox';
 import { renderListingForm, renderListings } from './listings';
 import { closeSheet, openSheet } from '../ui/sheet';
@@ -33,7 +34,10 @@ export type PortalView =
   | { view: 'adminRegister'; owner: string | null; shelterName: string | null; phone: string | null }
   | { view: 'animales'; id: string; tab: string | null }
   | { view: 'animal'; id: string; petId: string | null; copyOf: string | null }
-  | { view: 'solicitudes'; id: string; tab: string | null };
+  | { view: 'solicitudes'; id: string; tab: string | null }
+  | { view: 'casos'; id: string }
+  | { view: 'caso'; id: string; caseId: string | null }
+  | { view: 'adminCases' };
 
 const STATUS_ICON: Record<ShelterStatus, typeof Clock> = { pending: Clock, verified: BadgeCheck, rejected: CircleAlert, suspended: ShieldOff };
 
@@ -65,6 +69,9 @@ export function renderPortal(root: HTMLElement, route: PortalView) {
   if (route.view === 'animales') return void renderListings(root, route.id, route.tab);
   if (route.view === 'animal') return void renderListingForm(root, route.id, route.petId, route.copyOf);
   if (route.view === 'solicitudes') return void renderInbox(root, route.id, route.tab);
+  if (route.view === 'casos') return void renderCases(root, route.id);
+  if (route.view === 'caso') return void renderCaseForm(root, route.id, route.caseId);
+  if (route.view === 'adminCases') return void renderAdminCases(root);
   void home(root);
 }
 
@@ -358,6 +365,7 @@ function shelterCard(s: PortalShelter): Raw {
       <div class="portal-card__actions">
         <a class="button button--primary button--small" href="/refugio/${encodeURIComponent(s.id)}/solicitudes">${t('inbox.open')}${s.newRequests ? html` <span class="portal-card__count">${s.newRequests}</span>` : ''}</a>
         <a class="button button--outline button--small" href="${animals}">${t('listing.open')}</a>
+        ${mine ? '' : html`<a class="button button--outline button--small" href="/refugio/${encodeURIComponent(s.id)}/casos">${t('cases.open')}</a>`}
       </div>`,
     rejected: html`
       <p class="portal-card__reason"><strong>${t('portal.reason')}:</strong> ${s.statusReason ?? ''}</p>
@@ -663,6 +671,7 @@ async function adminHub(root: HTMLElement) {
         <div class="admin-tools">
           <a class="button button--outline button--small" href="/refugio/admin/registrar">${icon(Plus, 16)}${t('owners.admin.registerLink')}</a>
           <a class="button button--outline button--small" href="/refugio/admin/adoptantes">${icon(BadgeCheck, 16)}${t('admin.adoptersLink')}</a>
+          <a class="button button--outline button--small" href="/refugio/admin/casos">${icon(HandHeart, 16)}${t('cases.admin.link')}</a>
           <div class="portal-digest">
             <button class="button button--outline button--small" type="button" data-digest>${t('portal.admin.digest')}</button>
             <p class="muted">${t('portal.admin.digestNote')}</p>

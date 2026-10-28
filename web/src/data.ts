@@ -76,6 +76,49 @@ export interface PetDetail extends PetSummary {
     | { type: 'shelter'; id: string; name: string; description: string | null; place: string | null; municipality: string | null; visitHours: string | null; donation?: Donation | null }
     | { type: 'private' };
   siblings: PetSummary[];
+  /** The shelter's open help case for this same animal. */
+  helpCase?: { id: string; need: HelpNeed } | null;
+}
+
+/** What a help case is for. */
+export type HelpNeed = 'cirugia' | 'tratamiento' | 'examenes' | 'medicinas' | 'recuperacion' | 'otro';
+
+/** A shelter asking for help with an animal's medical costs, apart from adoption (cases.ts in the API). */
+export interface HelpCase {
+  id: string;
+  species: Species;
+  name: string;
+  need: HelpNeed;
+  /** The estimate, from the vet's quote, as the shelter gave it. */
+  costDop: number | null;
+  shelter: { id: string; name: string };
+  place: { name: string; municipality: string };
+  photo: { url: string | null; thumb: string | null; focus: string };
+  publishedAt: string | null;
+  /** Published, or the latest news. */
+  activeAt: string | null;
+}
+
+export interface HelpCaseDetail extends Omit<HelpCase, 'shelter'> {
+  story: string;
+  alsoNeeded: string | null;
+  photos: { url: string | null; focus: string }[];
+  updates: { id: string; body: string; at: string }[];
+  shelter: { id: string; name: string; description: string | null; donation: Donation | null };
+  /** The same animal's adoption profile, while adopters can see it. */
+  pet: { id: string; name: string } | null;
+}
+
+/** What an old link to a case that ended (or is paused: no news in 60 days) still shows. */
+export interface GoneCase {
+  id: string;
+  name: string;
+  species: Species;
+  photo: HelpCase['photo'];
+  shelter: { id: string; name: string };
+  status: 'resolved' | 'closed' | 'paused';
+  outcome: string | null;
+  endedAt: string | null;
 }
 
 /** API compatibility keys for each companion filter. */

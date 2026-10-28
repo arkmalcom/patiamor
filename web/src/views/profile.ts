@@ -76,11 +76,12 @@ function lister(pet: PetDetail, km: number): Raw {
     ${s.donation ? donation(s.name, s.donation) : ''}`;
 }
 
-/** How to give to the shelter: folded away, so the profile stays about the animal. The money goes straight to them. */
-function donation(shelter: string, d: Donation): Raw {
+/** How to give to the shelter: folded away, so the profile stays about the animal (a help case opens it). The
+ *  money goes straight to them. */
+export function donation(shelter: string, d: Donation, open = false): Raw {
   const row = (label: string, value: Raw | string) => html`<div><dt>${label}</dt><dd>${value}</dd></div>`;
   return html`
-    <details class="more donation">
+    <details class="more donation" ${open ? 'open' : ''}>
       <summary>${icon(HandHeart, 20)}<span>${t('donation.title', { shelter })}</span></summary>
       <p class="donation__lede">${t('donation.lede', { shelter })}</p>
       <ul class="donation__accounts">
@@ -130,6 +131,9 @@ function body(pet: PetDetail, km: number): Raw {
   ] as const;
   return html`
     ${pet.story ? html`<section class="profile__section"><h2 class="section-title">${t('profile.story')}</h2><p class="profile__story">${pet.story}</p></section>` : ''}
+    ${pet.helpCase
+      ? html`<p class="help-banner">${icon(HandHeart, 20)}<span>${t('help.profileBanner', { name: pet.name })} <a href="/caso/${encodeURIComponent(pet.helpCase.id)}">${t('help.profileLink')}</a></span></p>`
+      : ''}
     ${pet.needs.length ? html`<section class="profile__section"><h2 class="section-title">${t('profile.needs')}</h2><ul class="needs">${pet.needs.map((n) => html`<li>${n}</li>`)}</ul></section>` : ''}
     ${siblings(pet)}
     <div class="profile__pair">
@@ -254,6 +258,11 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
     deps.back();
   });
   $$<HTMLButtonElement>('[data-sibling]', root).forEach((b) => b.addEventListener('click', () => deps.openProfile(b.dataset.sibling!)));
+  bindCopyAccounts(root);
+}
+
+/** The "Copiar" buttons next to account numbers. */
+export function bindCopyAccounts(root: HTMLElement) {
   $$<HTMLButtonElement>('[data-copy-account]', root).forEach((b) =>
     b.addEventListener('click', async () => {
       const account = b.dataset.copyAccount!;

@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { forgetCatalogVersion } from './cache';
+import { editableCase } from './cases';
 import type { AppContext } from './env';
 import { roleIn } from './portal';
 
@@ -16,6 +17,7 @@ import { roleIn } from './portal';
 //  - photos are served with a fixed image type, nosniff and a sandboxing CSP, so nothing stored can run
 //    as a page on our origin.
 // Resizing happens on the phone (web/src/ui/photos.ts): about 1600 px plus a 480 px thumbnail.
+// Help cases (cases.ts) have photos too, under the same rules and the same budgets.
 
 type C = Context<AppContext>;
 
@@ -26,7 +28,7 @@ const THUMB = { maxBytes: 80_000, maxEdge: 640, minEdge: 120 };
 const USER_DAILY = 100; // a shelter listing 20 animals with 5 photos each, in one day
 const GLOBAL_DAILY = 1000;
 const STORAGE_MAX = 8 * 1024 ** 3; // stop well short of the free 10 GB
-const KEY = /^pets\/[a-z0-9-]{1,64}\/[0-9a-f]{32}(-t)?\.(webp|jpg)$/;
+const KEY = /^(pets|cases)\/[a-z0-9-]{1,64}\/[0-9a-f]{32}(-t)?\.(webp|jpg)$/;
 const FOCUS = /^(\d{1,3})% (\d{1,3})%$/;
 
 type ImageInfo = { type: 'image/jpeg' | 'image/webp'; width: number; height: number };
@@ -112,16 +114,21 @@ export const validFocus = (v: unknown): v is string => {
   return !!m && Number(m[1]) <= 100 && Number(m[2]) <= 100;
 };
 
+/** What photos belong to: a pet or a help case. `keepOne`: adopters can see it, so it keeps a photo. The
+ *  table and column are these constants, never input. */
+export type PhotoOwner = { id: string; table: 'pet_photos' | 'case_photos'; column: 'pet_id' | 'case_id'; prefix: 'pets' | 'cases'; keepOne: boolean };
+type Found = { owner: PhotoOwner } | { error: 'not_found' | 'shelter_suspended' | 'case_ended'; status: 404 | 409 };
+
 /** The pet, if this person can change its photos. */
-async function editablePet(c: C, petId: string) {
+async function editablePet(c: C, petId: string): Promise<Found> {
   const db = c.env.DB;
   const pet = await db
     .prepare('SELECT d.id, d.status, d.shelter_id, s.status AS shelter_status FROM pets d JOIN shelters s ON s.id = d.shelter_id WHERE d.id = ?')
     .bind(petId)
     .first<{ id: string; status: string; shelter_id: string; shelter_status: string }>();
-  if (!pet || !(await roleIn(c, pet.shelter_id))) return { error: 'not_found' as const, status: 404 as const };
-  if (pet.shelter_status === 'suspended') return { error: 'shelter_suspended' as const, status: 409 as const };
-  return { pet };
+  if (!pet || !(await roleIn(c, pet.shelter_id))) return { error: 'not_found', status: 404 };
+  if (pet.shelter_status === 'suspended') return { error: 'shelter_suspended', status: 409 };
+  return { owner: { id: pet.id, table: 'pet_photos', column: 'pet_id', prefix: 'pets', keepOne: ['available', 'reserved'].includes(pet.status) } };
 }
 
 export const photoRoutes = new Hono<AppContext>();
@@ -131,16 +138,23 @@ photoRoutes.use('*', async (c, next) => {
   await next();
 });
 
+photoRoutes.post('/pets/:id/photos', async (c) => addPhoto(c, await editablePet(c, c.req.param('id'))));
+photoRoutes.put('/pets/:id/photos', async (c) => arrangePhotos(c, await editablePet(c, c.req.param('id'))));
+photoRoutes.delete('/pets/:id/photos/:photoId', async (c) => deletePhoto(c, await editablePet(c, c.req.param('id'))));
+photoRoutes.post('/cases/:id/photos', async (c) => addPhoto(c, await editableCase(c, c.req.param('id'))));
+photoRoutes.put('/cases/:id/photos', async (c) => arrangePhotos(c, await editableCase(c, c.req.param('id'))));
+photoRoutes.delete('/cases/:id/photos/:photoId', async (c) => deletePhoto(c, await editableCase(c, c.req.param('id'))));
+
 // Add a photo: { image, thumb } as base64 (already resized on the phone), optional focus.
-photoRoutes.post('/pets/:id/photos', async (c) => {
+async function addPhoto(c: C, found: Found) {
   // Refuse oversized bodies before reading them. Browsers always send a length for a JSON fetch.
   const length = Number(c.req.header('content-length'));
   if (!Number.isFinite(length) || length <= 0) return c.json({ error: 'length_required' }, 411);
   if (length > MAX_BODY) return c.json({ error: 'image_too_large' }, 413);
 
   const user = c.get('user')!;
-  const found = await editablePet(c, c.req.param('id'));
   if ('error' in found) return c.json({ error: found.error }, found.status);
+  const { owner } = found;
   const db = c.env.DB;
 
   const text = await c.req.text();
@@ -162,7 +176,7 @@ photoRoutes.post('/pets/:id/photos', async (c) => {
 
   // Budgets, cheapest first: this animal's count, this person's day, everyone's day, total storage.
   const [count, mine, all, storage] = await db.batch<{ n: number }>([
-    db.prepare('SELECT count(*) AS n FROM pet_photos WHERE pet_id = ?').bind(found.pet.id),
+    db.prepare(`SELECT count(*) AS n FROM ${owner.table} WHERE ${owner.column} = ?`).bind(owner.id),
     db.prepare('SELECT coalesce(sum(n), 0) AS n FROM photo_quota WHERE day = ? AND user_id = ?').bind(today(), user.id),
     db.prepare('SELECT coalesce(sum(n), 0) AS n FROM photo_quota WHERE day = ?').bind(today()),
     db.prepare('SELECT bytes AS n FROM photo_storage WHERE id = 1'),
@@ -185,9 +199,9 @@ photoRoutes.post('/pets/:id/photos', async (c) => {
     .run();
 
   const hash = hex(await crypto.subtle.digest('SHA-256', fullBytes!)).slice(0, 32);
-  const key = `pets/${found.pet.id}/${hash}.${ext(full.type)}`;
-  const thumbKey = `pets/${found.pet.id}/${hash}-t.${ext(thumb.type)}`;
-  const dupe = await db.prepare('SELECT 1 FROM pet_photos WHERE r2_key = ?').bind(key).first();
+  const key = `${owner.prefix}/${owner.id}/${hash}.${ext(full.type)}`;
+  const thumbKey = `${owner.prefix}/${owner.id}/${hash}-t.${ext(thumb.type)}`;
+  const dupe = await db.prepare(`SELECT 1 FROM ${owner.table} WHERE r2_key = ?`).bind(key).first();
   if (dupe) return c.json({ error: 'duplicate_photo' }, 409);
 
   await Promise.all([
@@ -198,10 +212,10 @@ photoRoutes.post('/pets/:id/photos', async (c) => {
   try {
     await db
       .prepare(
-        `INSERT INTO pet_photos (id, pet_id, r2_key, thumb_key, content_type, bytes, uploaded_by, position, focus, width, height)
-         VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT coalesce(max(position), -1) + 1 FROM pet_photos WHERE pet_id = ?), ?, ?, ?)`,
+        `INSERT INTO ${owner.table} (id, ${owner.column}, r2_key, thumb_key, content_type, bytes, uploaded_by, position, focus, width, height)
+         VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT coalesce(max(position), -1) + 1 FROM ${owner.table} WHERE ${owner.column} = ?), ?, ?, ?)`,
       )
-      .bind(id, found.pet.id, key, thumbKey, full.type, size, user.id, found.pet.id, focus, full.width, full.height)
+      .bind(id, owner.id, key, thumbKey, full.type, size, user.id, owner.id, focus, full.width, full.height)
       .run();
   } catch (err) {
     // Lost a race to the fifth photo (the trigger) or to the same photo: don't leave the objects behind.
@@ -210,45 +224,48 @@ photoRoutes.post('/pets/:id/photos', async (c) => {
   }
   forgetCatalogVersion();
   return c.json({ photo: { id, url: `/api/photos/${encodeURIComponent(key)}`, thumb: `/api/photos/${encodeURIComponent(thumbKey)}`, focus, width: full.width, height: full.height } }, 201);
-});
+}
 
 // Order and framing in one go: { photos: [{ id, focus }] }, every current photo exactly once; the first is the cover.
-photoRoutes.put('/pets/:id/photos', async (c) => {
-  const found = await editablePet(c, c.req.param('id'));
+async function arrangePhotos(c: C, found: Found) {
   if ('error' in found) return c.json({ error: found.error }, found.status);
+  const { owner } = found;
   const body = await c.req.json<{ photos?: { id?: unknown; focus?: unknown }[] }>().catch(() => ({}) as { photos?: undefined });
   const wanted = Array.isArray(body.photos) ? body.photos : null;
   const db = c.env.DB;
-  const { results: current } = await db.prepare('SELECT id FROM pet_photos WHERE pet_id = ?').bind(found.pet.id).all<{ id: string }>();
+  const { results: current } = await db.prepare(`SELECT id FROM ${owner.table} WHERE ${owner.column} = ?`).bind(owner.id).all<{ id: string }>();
   const ids = new Set(current.map((p) => p.id));
   if (!wanted || wanted.length !== ids.size || new Set(wanted.map((p) => p.id)).size !== ids.size || !wanted.every((p) => ids.has(p.id as string) && validFocus(p.focus)))
     return c.json({ error: 'invalid_order' }, 400);
   await db.batch([
-    // Positions are unique per pet, so move them all out of the way first.
-    db.prepare('UPDATE pet_photos SET position = -1 - position WHERE pet_id = ?').bind(found.pet.id),
-    ...wanted.map((p, i) => db.prepare('UPDATE pet_photos SET position = ?, focus = ? WHERE id = ? AND pet_id = ?').bind(i, p.focus, p.id, found.pet.id)),
+    // Positions are unique per owner, so move them all out of the way first.
+    db.prepare(`UPDATE ${owner.table} SET position = -1 - position WHERE ${owner.column} = ?`).bind(owner.id),
+    ...wanted.map((p, i) => db.prepare(`UPDATE ${owner.table} SET position = ?, focus = ? WHERE id = ? AND ${owner.column} = ?`).bind(i, p.focus, p.id, owner.id)),
   ]);
   forgetCatalogVersion();
   return c.json({ ok: true });
-});
+}
 
-photoRoutes.delete('/pets/:id/photos/:photoId', async (c) => {
-  const found = await editablePet(c, c.req.param('id'));
+async function deletePhoto(c: C, found: Found) {
   if ('error' in found) return c.json({ error: found.error }, found.status);
+  const { owner } = found;
   const db = c.env.DB;
-  const photo = await db.prepare('SELECT id, r2_key, thumb_key FROM pet_photos WHERE id = ? AND pet_id = ?').bind(c.req.param('photoId'), found.pet.id).first<{ id: string; r2_key: string; thumb_key: string | null }>();
+  const photo = await db
+    .prepare(`SELECT id, r2_key, thumb_key FROM ${owner.table} WHERE id = ? AND ${owner.column} = ?`)
+    .bind(c.req.param('photoId'), owner.id)
+    .first<{ id: string; r2_key: string; thumb_key: string | null }>();
   if (!photo) return c.json({ error: 'not_found' }, 404);
-  // Adopters can see this animal: it keeps at least one photo.
-  if (['available', 'reserved'].includes(found.pet.status)) {
-    const n = await db.prepare('SELECT count(*) AS n FROM pet_photos WHERE pet_id = ?').bind(found.pet.id).first<{ n: number }>();
+  // Adopters (or donors) can see it: it keeps at least one photo.
+  if (owner.keepOne) {
+    const n = await db.prepare(`SELECT count(*) AS n FROM ${owner.table} WHERE ${owner.column} = ?`).bind(owner.id).first<{ n: number }>();
     if ((n?.n ?? 0) <= 1) return c.json({ error: 'last_photo' }, 409);
   }
-  await db.prepare('DELETE FROM pet_photos WHERE id = ?').bind(photo.id).run();
+  await db.prepare(`DELETE FROM ${owner.table} WHERE id = ?`).bind(photo.id).run();
   forgetCatalogVersion();
-  if (photo.r2_key.startsWith('pets/'))
+  if (!photo.r2_key.startsWith('static:'))
     await c.env.PHOTOS.delete([photo.r2_key, ...(photo.thumb_key ? [photo.thumb_key] : [])]).catch((err) => console.error('photo delete from R2 failed', photo.r2_key, err));
   return c.json({ ok: true });
-});
+}
 
 /** GET /api/photos/:key. Keys are content hashes, so a copy never goes stale: cached for a year. */
 export async function servePhoto(c: C) {
