@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { cachedJson } from './cache';
+import { CASE_VISIBLE } from './cases';
 import { donationFor } from './donations';
 import type { AppContext } from './env';
 
@@ -195,12 +196,16 @@ async function profile(db: D1Database, id: string): Promise<{ body: unknown; sta
   if (!row) return gone(db, id);
 
   const base = summary(row);
-  const [{ results: photos }, { results: siblings }, donation] = await Promise.all([
+  const [{ results: photos }, { results: siblings }, donation, helpCase] = await Promise.all([
     db.prepare('SELECT r2_key, focus FROM pet_photos WHERE pet_id = ? ORDER BY position').bind(id).all<{ r2_key: string; focus: string }>(),
     row.litter_id
       ? db.prepare(`SELECT ${SUMMARY_COLUMNS} ${FROM} WHERE d.litter_id = ? AND d.id != ? AND ${VIEWABLE} ORDER BY d.name`).bind(row.litter_id, id).all<SummaryRow>()
       : Promise.resolve({ results: [] as SummaryRow[] }),
     base.lister.type === 'shelter' ? donationFor(db, row.shelter_id!, row.donation_note) : Promise.resolve(null),
+    // The shelter's open help case for this same animal, if it has one (cases.ts).
+    base.lister.type === 'shelter'
+      ? db.prepare(`SELECT k.id, k.need FROM cases k JOIN shelters s ON s.id = k.shelter_id WHERE k.pet_id = ? AND ${CASE_VISIBLE} ORDER BY k.active_at DESC LIMIT 1`).bind(id).first<{ id: string; need: string }>()
+      : Promise.resolve(null),
   ]);
   return {
     body: {
@@ -216,6 +221,7 @@ async function profile(db: D1Database, id: string): Promise<{ body: unknown; sta
             ? { ...base.lister, description: row.shelter_description, place: row.shelter_place, municipality: row.shelter_municipality, visitHours: row.visit_hours, donation }
             : base.lister,
         siblings: siblings.map(summary),
+        helpCase: helpCase ? { id: helpCase.id, need: helpCase.need } : null,
       },
     },
   };

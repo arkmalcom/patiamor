@@ -6,6 +6,7 @@ import { activeRequests, isOpen, MAX_SLOTS, petCache, placePet, state, type Answ
 import { listerLabel, miniFrame, photo } from '../ui/canvas';
 import { listerName, openWithdraw, requestStatus, statusKey } from '../ui/request';
 import { bulkWhat, openBulk } from '../ui/bulk';
+import { helpInvite } from '../ui/help-invite';
 import { pips } from '../ui/save';
 
 // Mi lista: three slots, each an adoption request in progress, plus the ones that ended recently and,
@@ -168,7 +169,8 @@ export function renderList(root: HTMLElement, deps: ListDeps) {
               ${!state.signedIn && !open.length ? html`<p class="sample-note">${t('list.signedOut')}</p>` : ''}
               ${slots()}
               ${bulkSection()}
-              ${ended()}`}
+              ${ended()}
+              ${open.length ? '' : helpInvite()}`}
         <button class="button button--outline" type="button" data-explore>${icon(Compass, 20)}${t('list.explore')}</button>
       </section>`,
   );

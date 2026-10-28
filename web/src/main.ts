@@ -2,7 +2,7 @@ import '@fontsource/shrikhand/latin-400.css';
 import '@fontsource-variable/atkinson-hyperlegible-next/wght.css';
 import './styles.css';
 
-import { Compass, MapPin, Search, SlidersHorizontal, User } from 'lucide';
+import { HandHeart, MapPin, PawPrint, Search, SlidersHorizontal, User } from 'lucide';
 import { backdrop, landscape } from './art';
 import { $, $$, html, icon, mount, raw, transition } from './dom';
 import { kmLabel, t } from './i18n';
@@ -19,11 +19,14 @@ import { errorText } from './ui/auth';
 import { renderAccount } from './views/account';
 import { renderLegal, type LegalDoc } from './views/legal';
 import { legalLinks } from './ui/legal-links';
+import { helpInvite } from './ui/help-invite';
 import { renderDeck } from './views/deck';
 import { bindSlots, renderList, slots } from './views/list';
 import { renderPortal, type PortalView } from './views/portal';
 import { renderProfile } from './views/profile';
 import { renderSearch } from './views/search';
+import { renderCase, renderHelp } from './views/help';
+import { renderLost, renderPost } from './views/lost';
 import { BRAND } from './brand';
 import { DEMO } from './data';
 
@@ -38,18 +41,24 @@ const PAW = raw(`<svg class="wordmark__paw" viewBox="84 80 344 362" aria-hidden=
   <ellipse cx="384" cy="208" rx="34" ry="44" transform="rotate(30 384 208)"/>
 </svg>`);
 
-type Route = { name: 'deck' } | { name: 'profile'; id: string } | { name: 'search'; q: string } | { name: 'list' } | { name: 'account' } | { name: 'legal'; doc: LegalDoc } | ({ name: 'portal' } & PortalView);
+type Route =
+  | { name: 'deck' } | { name: 'profile'; id: string } | { name: 'search'; q: string } | { name: 'list' } | { name: 'account' } | { name: 'legal'; doc: LegalDoc }
+  | { name: 'help' } | { name: 'case'; id: string } | { name: 'lost' } | { name: 'post'; id: string } | ({ name: 'portal' } & PortalView);
 
 /** The route for an in-app path (here()): "/mascota/luna", "/refugio/x/animales?ver=adoptados"… */
 function parse(where: string): Route {
   const [path, query = ''] = where.split('?');
   const [, a, b, c, d] = path.split('/');
   if (a === 'mascota' && b) return { name: 'profile', id: decodeURIComponent(b) };
+  if (a === 'caso' && b) return { name: 'case', id: decodeURIComponent(b) };
+  if (a === 'ayudar') return { name: 'help' };
+  if (a === 'perdidos') return b ? { name: 'post', id: decodeURIComponent(b) } : { name: 'lost' };
   // The shelter portal: /refugio, /refugio/registro, /refugio/<id>/editar, and the admin console under /refugio/admin
   if (a === 'refugio') {
     if (b === 'registro') return { name: 'portal', view: 'registro' };
     if (b === 'admin' && c === 'pausa') return { name: 'portal', view: 'adminPaused' };
     if (b === 'admin' && c === 'reportes') return { name: 'portal', view: 'adminReports' };
+    if (b === 'admin' && c === 'casos') return { name: 'portal', view: 'adminCases' };
     if (b === 'reglas') return { name: 'portal', view: 'rules', next: new URLSearchParams(query).get('siguiente') };
     if (b === 'admin' && c === 'adoptantes') return { name: 'portal', view: 'adminAdopters', email: new URLSearchParams(query).get('correo') };
     if (b === 'admin' && c === 'duenos') {
@@ -75,6 +84,11 @@ function parse(where: string): Route {
     // their tab in ?ver=…, so a re-render (any store update) stays on it.
     const ver = new URLSearchParams(query).get('ver');
     if (b && c === 'solicitudes') return { name: 'portal', view: 'solicitudes', id: decodeURIComponent(b), tab: ver };
+    // Help cases: /refugio/<id>/casos, …/casos/nuevo, …/casos/<caseId>.
+    if (b && c === 'perdidos')
+      return d ? { name: 'portal', view: 'aviso', id: decodeURIComponent(b), postId: d === 'nuevo' ? null : decodeURIComponent(d) } : { name: 'portal', view: 'avisos', id: decodeURIComponent(b) };
+    if (b && c === 'casos')
+      return d ? { name: 'portal', view: 'caso', id: decodeURIComponent(b), caseId: d === 'nuevo' ? null : decodeURIComponent(d) } : { name: 'portal', view: 'casos', id: decodeURIComponent(b) };
     if (b && c === 'animales')
       return d
         ? { name: 'portal', view: 'animal', id: decodeURIComponent(b), petId: d === 'nuevo' ? null : decodeURIComponent(d), copyOf: d === 'nuevo' ? new URLSearchParams(query).get('desde') : null }
@@ -103,6 +117,7 @@ mount(
       <a class="wordmark" href="/" aria-label="${t('app.name')}, ${t('nav.explore')}">${PAW}${t('app.name')}${DEMO ? html`<span class="wordmark__demo">${t('app.demo')}</span>` : ''}</a>
       <nav class="topnav" aria-label="Principal">
         <a href="/" data-nav="deck">${t('nav.explore')}</a>
+        <a href="/ayudar" data-nav="help">${t('nav.help')}</a>
         <a href="/buscar" data-nav="search">${t('nav.search')}</a>
         <a href="/lista" data-nav="list">${t('nav.list')} <span data-pips data-pips-count>${pips(true)}</span></a>
         <a href="/cuenta" data-nav="account" data-account-top>${t('nav.account')}</a>
@@ -118,10 +133,12 @@ mount(
       <h2 class="panel-title" id="side-list-title"><a href="/lista">${t('list.title')}</a> <span data-pips data-pips-count>${pips(true)}</span></h2>
       <p class="muted">${t('list.body')}</p>
       <div data-side-slots></div>
+      ${helpInvite()}
       ${legalLinks()}
     </aside>
     <nav class="tabbar" aria-label="Principal">
-      <a href="/" data-nav="deck">${icon(Compass, 24)}<span>${t('nav.explore')}</span></a>
+      <a href="/" data-nav="deck">${icon(PawPrint, 24)}<span>${t('nav.explore')}</span></a>
+      <a href="/ayudar" data-nav="help">${icon(HandHeart, 24)}<span>${t('nav.help')}</span></a>
       <a href="/buscar" data-nav="search">${icon(Search, 24)}<span>${t('nav.search')}</span></a>
       <a href="/lista" data-nav="list"><span class="tabbar__pips" data-pips data-pips-count>${pips(true)}</span><span>${t('nav.list')}</span></a>
       <a href="/cuenta" data-nav="account" data-account-tab>${icon(User, 24)}<span>${t('nav.account')}</span></a>
@@ -183,7 +200,11 @@ function chrome(route: Route) {
   $$('[data-pips]').forEach(mountPips);
   account();
   $$<HTMLAnchorElement>('[data-nav]').forEach((a) => {
-    const active = a.dataset.nav === route.name || (route.name === 'profile' && a.dataset.nav === 'deck') || (route.name === 'portal' && a.dataset.nav === 'account');
+    const active =
+      a.dataset.nav === route.name ||
+      (route.name === 'profile' && a.dataset.nav === 'deck') ||
+      (['case', 'lost', 'post'].includes(route.name) && a.dataset.nav === 'help') ||
+      (route.name === 'portal' && a.dataset.nav === 'account');
     if (active) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   });
@@ -204,6 +225,14 @@ function describe(route: Route): Page {
       return { index: true }; // legal.ts: its title and description are in the language of the text
     case 'search':
       return { title: titled(t('nav.search')), description: BRAND.description, index: false };
+    case 'help':
+      return { title: titled(t('help.title')), description: t('help.lede'), index: true };
+    case 'case':
+      return {}; // the Worker wrote its title and description; help.ts adjusts them once the case is known
+    case 'lost':
+      return { title: titled(t('lost.title')), description: t('lost.lede'), index: true };
+    case 'post':
+      return {}; // likewise, lost.ts
     case 'list':
       return { title: titled(t('list.title')), description: BRAND.description, index: false };
     case 'account':
@@ -223,6 +252,14 @@ function render(route = parse(here())) {
       return renderProfile(view, route.id, { back: () => (history.length > 1 ? history.back() : explore()), openProfile });
     case 'search':
       return renderSearch(view, route.q, { openProfile });
+    case 'help':
+      return renderHelp(view);
+    case 'case':
+      return renderCase(view, route.id, { back: () => (history.length > 1 ? history.back() : navigate('/ayudar')) });
+    case 'lost':
+      return renderLost(view);
+    case 'post':
+      return renderPost(view, route.id, { back: () => (history.length > 1 ? history.back() : navigate('/perdidos')) });
     case 'list':
       return renderList(view, { openProfile, explore });
     case 'account':

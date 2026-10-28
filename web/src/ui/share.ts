@@ -7,10 +7,14 @@ import { toast } from './toast';
 export const sharePet = (pet: { id: string; name: string }) =>
   shareLink({ title: pet.name, text: t('share.text', { name: pet.name }), url: `${location.origin}/mascota/${encodeURIComponent(pet.id)}` });
 
+/** A help case: its own path, previewed with its photo (share.ts in the API). */
+export const shareCase = (k: { id: string; name: string }) =>
+  shareLink({ title: k.name, text: t('help.shareText', { name: k.name }), url: `${location.origin}/caso/${encodeURIComponent(k.id)}` });
+
 /** Patiamor itself, for telling a shelter or rescuer about it (the empty states ask people to). */
 export const shareSite = () => shareLink({ title: t('app.name'), text: t('share.siteText'), url: location.origin });
 
-async function shareLink(data: { title: string; text: string; url: string }) {
+export async function shareLink(data: { title: string; text: string; url: string }) {
   if (navigator.share && (!navigator.canShare || navigator.canShare(data))) {
     try {
       await navigator.share(data);

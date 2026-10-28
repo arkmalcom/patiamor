@@ -113,7 +113,7 @@ describe('approving a private lister', () => {
   it('does not use up the three shelters an owner may have', async () => {
     const { admin, user } = await approvedLister();
     await env.DB.prepare('UPDATE users SET shelter_owner_at = ? WHERE id = ?').bind('2026-01-01T00:00:00Z', user.id).run();
-    const form = { name: 'Refugio Uno', placeId: PLACE, description: '', visitHours: '', publicPhone: '', email: '', website: '', contactName: 'Ana', contactPhone: '809-555-0100', rnc: '', address: 'Calle 1, Gazcue', social: [], history: 'x'.repeat(60), references: [{ name: 'Vet', contact: '809-555-0101', kind: 'veterinaria' }], rules: true };
+    const form = { name: 'Refugio Uno', placeId: PLACE, description: '', visitHours: '', publicPhone: '809-555-0102', email: '', website: '', contactName: 'Ana', contactPhone: '809-555-0100', rnc: '', address: 'Calle 1, Gazcue', social: [], history: 'x'.repeat(60), references: [{ name: 'Vet', contact: '809-555-0101', kind: 'veterinaria' }], rules: true };
     expect((await api('/api/portal/shelters', { method: 'POST', cookie: user.cookie, body: form })).status).toBe(201);
     expect(admin).toBeTruthy();
   });

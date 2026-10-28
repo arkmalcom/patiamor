@@ -97,7 +97,8 @@ export function readApplication(b: Record<string, unknown>) {
   else if (!placeById(placeId)) error = 'invalid_place';
   else if (contactName.length < 2) error = 'invalid_contact';
   else if (!contactPhone) error = 'invalid_phone';
-  else if (b.publicPhone && !publicPhone) error = 'invalid_public_phone';
+  // Required since 2026-10-28: lost and found posts send people to it (lostfound.ts).
+  else if (!publicPhone) error = 'invalid_public_phone';
   else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) error = 'invalid_email';
   else if (app.address.length < 8) error = 'invalid_address';
   else if (app.history.length < 40) error = 'history_too_short';
@@ -145,13 +146,13 @@ portal.use('*', async (c, next) => {
 // The person's shelters and where each stands.
 portal.get('/shelters', async (c) => {
   const { results } = await c.env.DB.prepare(
-    `SELECT s.id, s.name, s.slug, s.status, s.status_reason, s.place_id, s.kind, m.role, a.submitted_at,
+    `SELECT s.id, s.name, s.slug, s.status, s.status_reason, s.place_id, s.kind, s.phone, m.role, a.submitted_at,
             (SELECT count(*) FROM adoption_requests r JOIN pets d ON d.id = r.pet_id WHERE d.shelter_id = s.id AND r.status = 'sent') AS new_requests
        FROM shelter_members m JOIN shelters s ON s.id = m.shelter_id LEFT JOIN shelter_applications a ON a.shelter_id = s.id
       WHERE m.user_id = ? ORDER BY s.created_at`,
   )
     .bind(c.get('user')!.id)
-    .all<{ id: string; name: string; slug: string; status: string; status_reason: string | null; place_id: string; kind: string; role: Role; submitted_at: string | null; new_requests: number }>();
+    .all<{ id: string; name: string; slug: string; status: string; status_reason: string | null; place_id: string; kind: string; phone: string | null; role: Role; submitted_at: string | null; new_requests: number }>();
   // For suspended ones, their latest request to lift it, so the card says where it stands.
   const suspended = JSON.stringify(results.filter((r) => r.status === 'suspended').map((r) => r.id));
   const { results: reviews } = await c.env.DB.prepare(
@@ -172,6 +173,7 @@ portal.get('/shelters', async (c) => {
       statusReason: r.status_reason,
       place: placeById(r.place_id) ?? null,
       role: r.role,
+      publicPhone: r.phone,
       submittedAt: r.submitted_at,
       newRequests: r.new_requests,
       review: latest.has(r.id) ? reviewView(latest.get(r.id)!) : null,
@@ -362,6 +364,23 @@ portal.put('/shelters/:id/donation', async (c) => {
 
 // Owners correct and resend a rejected application, or update a pending one. Once verified, the name and
 // area stay as verified (changing them means a new review); the rest of the public profile is editable later.
+// The phone people see (lost and found posts send them to it). Owners change it any time, as with the donation
+// accounts: { phone }. Registration asks for it since 2026-10-28; this is how shelters from before add one.
+portal.put('/shelters/:id/phone', async (c) => {
+  const id = c.req.param('id');
+  if ((await roleIn(c, id)) !== 'owner') return c.json({ error: 'not_found' }, 404);
+  const db = c.env.DB;
+  const shelter = await db.prepare('SELECT status, kind FROM shelters WHERE id = ?').bind(id).first<{ status: string; kind: string }>();
+  if (!shelter) return c.json({ error: 'not_found' }, 404);
+  if (shelter.kind === 'private') return c.json({ error: 'not_for_private' }, 403);
+  if (shelter.status === 'suspended') return c.json({ error: 'shelter_suspended' }, 409);
+  const b = await c.req.json<{ phone?: unknown }>().catch(() => ({}) as { phone?: unknown });
+  const phone = drPhone(text(b.phone, 30));
+  if (!phone) return c.json({ error: 'invalid_public_phone' }, 400);
+  await db.prepare('UPDATE shelters SET phone = ?, updated_at = ? WHERE id = ?').bind(phone, nowIso(), id).run();
+  return c.json({ publicPhone: phone });
+});
+
 portal.put('/shelters/:id/application', async (c) => {
   const id = c.req.param('id');
   if ((await roleIn(c, id)) !== 'owner') return c.json({ error: 'not_found' }, 404);

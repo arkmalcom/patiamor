@@ -1,4 +1,4 @@
-import { BadgeCheck, CircleAlert, CirclePause, Clock, Eye, EyeOff, Flag, HandHeart, House, MapPin, MessageCircle, Plus, ShieldCheck, ShieldOff, UserCheck, Users, UsersRound } from 'lucide';
+import { BadgeCheck, CircleAlert, CirclePause, Clock, Eye, EyeOff, Flag, HandHeart, House, MapPin, MessageCircle, Phone, Plus, ShieldCheck, ShieldOff, UserCheck, Users, UsersRound } from 'lucide';
 import { api, ApiError, type AdminAdopter, type AdminReviewPet, type AdminBulk, type AdminOwnerRequest, type AdminPaused, type AdminShelter, type BulkStatus, type PortalShelter, type ReferenceKind, type ShelterApplication, type ShelterForm, type ShelterStatus } from '../api';
 import { frameFor, type Donation, type DonationAccount, type PetSummary, type Place } from '../data';
 import { photo } from '../ui/canvas';
@@ -9,7 +9,9 @@ import { setUser, state } from '../store';
 import { openListerRequest } from '../ui/lister';
 import { openOwnerRequest } from '../ui/owner';
 import { renderAuth } from '../ui/auth';
+import { renderAdminCases, renderCaseForm, renderCases } from './cases';
 import { renderInbox } from './inbox';
+import { renderLostForm, renderLostPosts } from './lost-posts';
 import { renderListingForm, renderListings } from './listings';
 import { closeSheet, openSheet } from '../ui/sheet';
 import { toast } from '../ui/toast';
@@ -33,7 +35,12 @@ export type PortalView =
   | { view: 'adminRegister'; owner: string | null; shelterName: string | null; phone: string | null }
   | { view: 'animales'; id: string; tab: string | null }
   | { view: 'animal'; id: string; petId: string | null; copyOf: string | null }
-  | { view: 'solicitudes'; id: string; tab: string | null };
+  | { view: 'solicitudes'; id: string; tab: string | null }
+  | { view: 'casos'; id: string }
+  | { view: 'caso'; id: string; caseId: string | null }
+  | { view: 'adminCases' }
+  | { view: 'avisos'; id: string }
+  | { view: 'aviso'; id: string; postId: string | null };
 
 const STATUS_ICON: Record<ShelterStatus, typeof Clock> = { pending: Clock, verified: BadgeCheck, rejected: CircleAlert, suspended: ShieldOff };
 
@@ -65,6 +72,11 @@ export function renderPortal(root: HTMLElement, route: PortalView) {
   if (route.view === 'animales') return void renderListings(root, route.id, route.tab);
   if (route.view === 'animal') return void renderListingForm(root, route.id, route.petId, route.copyOf);
   if (route.view === 'solicitudes') return void renderInbox(root, route.id, route.tab);
+  if (route.view === 'casos') return void renderCases(root, route.id);
+  if (route.view === 'caso') return void renderCaseForm(root, route.id, route.caseId);
+  if (route.view === 'adminCases') return void renderAdminCases(root);
+  if (route.view === 'avisos') return void renderLostPosts(root, route.id);
+  if (route.view === 'aviso') return void renderLostForm(root, route.id, route.postId);
   void home(root);
 }
 
@@ -133,6 +145,7 @@ async function home(root: HTMLElement) {
     b.addEventListener('click', () => openReview(shelters.find((x) => x.id === b.dataset.review)!, () => void home(root))),
   );
   $$<HTMLButtonElement>('[data-donation]', root).forEach((b) => b.addEventListener('click', () => void openDonation(shelters.find((x) => x.id === b.dataset.donation)!, b)));
+  $$<HTMLButtonElement>('[data-phone]', root).forEach((b) => b.addEventListener('click', () => openPhone(shelters.find((x) => x.id === b.dataset.phone)!, () => void home(root))));
 }
 
 const DONATION_ERRORS = ['invalid_bank', 'invalid_account_type', 'invalid_account', 'invalid_holder', 'invalid_holder_id', 'duplicate_account', 'too_many_accounts', 'not_for_private'];
@@ -348,6 +361,40 @@ function openReview(shelter: PortalShelter, done: () => void) {
   });
 }
 
+/** The phone people see on lost and found posts: owners set or change it here (shelters from before it was
+ *  required at registration add it this way). */
+function openPhone(shelter: PortalShelter, done: () => void) {
+  const dialog = openSheet(
+    t('phone.portal.title', { name: shelter.name }),
+    html`<form class="outcome__form" novalidate>
+      <p>${t('phone.portal.lede')}</p>
+      <label class="field">
+        <span class="field__label">${t('phone.portal.label')}</span>
+        <input class="field__input" name="phone" type="tel" inputmode="tel" autocomplete="tel-national" maxlength="30" value="${showPhone(shelter.publicPhone)}" />
+      </label>
+      <p class="form-error" role="alert" hidden data-phone-error></p>
+      <button class="button button--primary button--block" type="submit">${t('phone.portal.save')}</button>
+    </form>`,
+  );
+  const formEl = $<HTMLFormElement>('form', dialog);
+  formEl.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = $<HTMLButtonElement>('button[type=submit]', formEl);
+    const error = $('[data-phone-error]', formEl);
+    btn.disabled = true;
+    try {
+      await api.savePublicPhone(shelter.id, String(new FormData(formEl).get('phone') ?? ''));
+      closeSheet();
+      toast(t('phone.portal.saved'));
+      done();
+    } catch (err) {
+      error.textContent = err instanceof ApiError && err.code === 'invalid_public_phone' ? t('portal.err.invalid_public_phone') : failText(err);
+      error.hidden = false;
+      btn.disabled = false;
+    }
+  });
+}
+
 function shelterCard(s: PortalShelter): Raw {
   const animals = `/refugio/${encodeURIComponent(s.id)}/animales`;
   const mine = s.kind === 'private';
@@ -358,6 +405,8 @@ function shelterCard(s: PortalShelter): Raw {
       <div class="portal-card__actions">
         <a class="button button--primary button--small" href="/refugio/${encodeURIComponent(s.id)}/solicitudes">${t('inbox.open')}${s.newRequests ? html` <span class="portal-card__count">${s.newRequests}</span>` : ''}</a>
         <a class="button button--outline button--small" href="${animals}">${t('listing.open')}</a>
+        ${mine ? '' : html`<a class="button button--outline button--small" href="/refugio/${encodeURIComponent(s.id)}/casos">${t('cases.open')}</a>`}
+        ${mine ? '' : html`<a class="button button--outline button--small" href="/refugio/${encodeURIComponent(s.id)}/perdidos">${t('lostp.open')}</a>`}
       </div>`,
     rejected: html`
       <p class="portal-card__reason"><strong>${t('portal.reason')}:</strong> ${s.statusReason ?? ''}</p>
@@ -381,7 +430,9 @@ function shelterCard(s: PortalShelter): Raw {
       </div>
       ${next[s.status]}
       ${!mine && s.role === 'owner' && s.status !== 'suspended'
-        ? html`<button class="text-button portal-card__donation" type="button" data-donation="${s.id}">${icon(HandHeart, 18)}${t('donation.portal.open')}</button>`
+        ? html`${s.status === 'verified' && !s.publicPhone ? html`<p class="portal-card__reason">${t('phone.portal.missing')}</p>` : ''}
+            <button class="text-button portal-card__donation" type="button" data-phone="${s.id}">${icon(Phone, 18)}${t('phone.portal.open')}</button>
+            <button class="text-button portal-card__donation" type="button" data-donation="${s.id}">${icon(HandHeart, 18)}${t('donation.portal.open')}</button>`
         : ''}
       ${mine ? '' : html`<p class="portal-card__role">${icon(Users, 15)}${t(`portal.role.${s.role}`)}${s.submittedAt ? html` · ${t('portal.sentOn', { date: formatDate(s.submittedAt.slice(0, 10)) })}` : ''}</p>`}
     </li>`;
@@ -446,7 +497,7 @@ function form(root: HTMLElement, existing: { shelter: PortalShelter; application
             </div>
             ${field('description', 'portal.form.description', { value: s?.description, area: true, max: 600 })}
             ${field('visitHours', 'portal.form.visitHours', { value: s?.visitHours, hint: 'portal.form.visitHoursHint' })}
-            ${field('publicPhone', 'portal.form.publicPhone', { value: showPhone(s?.publicPhone), type: 'tel', inputmode: 'tel', auto: 'tel-national' })}
+            ${field('publicPhone', 'portal.form.publicPhone', { value: showPhone(s?.publicPhone), required: true, type: 'tel', inputmode: 'tel', auto: 'tel-national', hint: 'portal.form.publicPhoneHint' })}
             ${field('email', 'portal.form.email', { value: s?.email, type: 'email', auto: 'email' })}
             ${field('website', 'portal.form.website', { value: s?.website, type: 'url', hint: 'portal.form.websiteHint' })}
           </fieldset>
@@ -663,6 +714,7 @@ async function adminHub(root: HTMLElement) {
         <div class="admin-tools">
           <a class="button button--outline button--small" href="/refugio/admin/registrar">${icon(Plus, 16)}${t('owners.admin.registerLink')}</a>
           <a class="button button--outline button--small" href="/refugio/admin/adoptantes">${icon(BadgeCheck, 16)}${t('admin.adoptersLink')}</a>
+          <a class="button button--outline button--small" href="/refugio/admin/casos">${icon(HandHeart, 16)}${t('cases.admin.link')}</a>
           <div class="portal-digest">
             <button class="button button--outline button--small" type="button" data-digest>${t('portal.admin.digest')}</button>
             <p class="muted">${t('portal.admin.digestNote')}</p>

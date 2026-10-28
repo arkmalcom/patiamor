@@ -180,3 +180,36 @@ UPDATE pets SET status = 'draft' WHERE status = 'in_review' AND review_reason IS
 INSERT OR IGNORE INTO shelter_owner_requests (id, user_id, shelter_name, zone, phone, about, consent_at, kind, place_id) VALUES
   ('seed-request-pedro', 'seed-private-new', 'Particular', 'Gazcue, Distrito Nacional', '+18095550112',
    'Tengo una perra con cuatro cachorros y busco familias cercanas que los cuiden bien. (Datos de ejemplo.)', '2026-10-15T12:00:00Z', 'private', 'gazcue-distrito-nacional');
+
+-- Help cases (migration 0025): two open cases from the shelter with donation accounts, one linked to its
+-- adoption profile (Morena) and one not, plus some news. Fictional, like everything here.
+INSERT OR IGNORE INTO cases (id, shelter_id, pet_id, species, name, need, story, cost_dop, also_needed, status, created_by, published_at, active_at) VALUES
+  ('seed-case-morena', 'seed-patitas-gazcue', 'morena', 'perro', 'Morena', 'cirugia',
+   'Morena tiene un tumor en una mama que hay que quitar antes de que crezca. La veterinaria dice que, operada a tiempo, puede vivir muchos años más. La cirugía incluye exámenes de sangre, la anestesia y los medicamentos de después.',
+   28500, 'Una cama ortopédica para su recuperación.', 'open', 'seed-vol-gazcue',
+   strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-6 days'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-2 days')),
+  ('seed-case-ceniza', 'seed-patitas-gazcue', NULL, 'gato', 'Ceniza', 'tratamiento',
+   'Ceniza llegó con una infección en los ojos y está bajo tratamiento diario. Necesita gotas, antibióticos y dos chequeos más en la clínica durante el próximo mes.',
+   6000, NULL, 'open', 'seed-vol-gazcue',
+   strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-3 days'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-3 days'));
+INSERT OR IGNORE INTO case_photos (id, case_id, r2_key, position, focus) VALUES
+  ('seed-case-photo-morena', 'seed-case-morena', 'static:/perros/morena.jpg', 0, '50% 30%'),
+  ('seed-case-photo-ceniza', 'seed-case-ceniza', 'static:/gatos/ceniza.jpg', 0, '50% 40%');
+INSERT OR IGNORE INTO case_updates (id, case_id, body, created_by, created_at) VALUES
+  ('seed-case-update-morena', 'seed-case-morena', 'Ya tenemos la fecha de la cirugía: la semana que viene. ¡Gracias a quienes ya ayudaron!', 'seed-vol-gazcue',
+   strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-2 days'));
+
+-- Lost and found (migration 0026): one animal lost and one found, posted by the same sample shelter (its
+-- public phone is the number people call). Fictional.
+INSERT OR IGNORE INTO lost_found (id, shelter_id, kind, species, name, sex, description, place_id, seen_on, status, created_by, published_at, active_at) VALUES
+  ('seed-lost-chispa', 'seed-patitas-gazcue', 'perdido', 'perro', 'Chispa', 'hembra',
+   'Pequeña, blanca con manchas marrones, collar azul con cascabel. Se asustó con los fuegos artificiales y salió corriendo. Es mansa pero tímida: mejor no perseguirla.',
+   'gazcue-distrito-nacional', date('now', '-2 days'), 'open', 'seed-vol-gazcue',
+   strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-2 days'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-2 days')),
+  ('seed-found-guayaba', 'seed-patitas-gazcue', 'encontrado', 'gato', NULL, NULL,
+   'Gato atigrado naranja, adulto, muy cariñoso; parece acostumbrado a vivir en casa. Lo encontraron debajo de un carro sin collar. Está en el refugio.',
+   'ensanche-naco-distrito-nacional', date('now', '-1 days'), 'open', 'seed-vol-gazcue',
+   strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-1 days'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-1 days'));
+INSERT OR IGNORE INTO lost_found_photos (id, post_id, r2_key, position, focus) VALUES
+  ('seed-lost-photo-chispa', 'seed-lost-chispa', 'static:/perros/chispa.jpg', 0, '50% 40%'),
+  ('seed-found-photo-guayaba', 'seed-found-guayaba', 'static:/gatos/guayaba.jpg', 0, '50% 40%');
