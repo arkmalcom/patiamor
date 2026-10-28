@@ -348,7 +348,7 @@ Tactile, rounded and plainly worded. Each one presses down slightly under the th
 - **Focus (global):** 3px solid añil outline, 3px offset, 6px corner.
 
 ### Navigation
-- **Mobile tab bar:** a sticky paper bar 64px tall with a top hairline. It has five tabs (Explorar, Buscar, Mi lista, Rescate, Cuenta), each with an icon and a 0.8rem label in ink-2 at 600. The active tab switches to ink at 800 and gets a 32×4px mango bar hanging from the top edge. Mi lista shows three slot pips with an "n/3" count in place of an icon.
+- **Mobile tab bar:** a sticky paper bar 64px tall with a top hairline. It has five tabs (Adoptar, Rescate, Buscar, Mi lista, Cuenta: the two ways in side by side; renamed from Explorar and reordered 2026-10-28), each with an icon and a 0.8rem label in ink-2 at 600. The active tab switches to ink at 800 and gets a 32×4px mango bar hanging from the top edge. Mi lista shows three slot pips with an "n/3" count in place of an icon.
 - **Desktop top nav (1100px and up):** pill links (10px 14px) in ink-2 at 700. Hover gives a 60% white wash. The active link is paper with the soft shadow.
 - **Wordmark:** "Patiamor" in Shrikhand, at clamp(1.55rem, 6.4vw, 1.85rem), with a small uppercase DEMO tag on mango marking sample data.
 

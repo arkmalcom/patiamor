@@ -2,7 +2,7 @@ import '@fontsource/shrikhand/latin-400.css';
 import '@fontsource-variable/atkinson-hyperlegible-next/wght.css';
 import './styles.css';
 
-import { Compass, HandHeart, MapPin, Search, SlidersHorizontal, User } from 'lucide';
+import { HandHeart, MapPin, PawPrint, Search, SlidersHorizontal, User } from 'lucide';
 import { backdrop, landscape } from './art';
 import { $, $$, html, icon, mount, raw, transition } from './dom';
 import { kmLabel, t } from './i18n';
@@ -117,9 +117,9 @@ mount(
       <a class="wordmark" href="/" aria-label="${t('app.name')}, ${t('nav.explore')}">${PAW}${t('app.name')}${DEMO ? html`<span class="wordmark__demo">${t('app.demo')}</span>` : ''}</a>
       <nav class="topnav" aria-label="Principal">
         <a href="/" data-nav="deck">${t('nav.explore')}</a>
+        <a href="/ayudar" data-nav="help">${t('nav.help')}</a>
         <a href="/buscar" data-nav="search">${t('nav.search')}</a>
         <a href="/lista" data-nav="list">${t('nav.list')} <span data-pips data-pips-count>${pips(true)}</span></a>
-        <a href="/ayudar" data-nav="help">${t('nav.help')}</a>
         <a href="/cuenta" data-nav="account" data-account-top>${t('nav.account')}</a>
       </nav>
       <div class="topbar__tools">
@@ -137,10 +137,10 @@ mount(
       ${legalLinks()}
     </aside>
     <nav class="tabbar" aria-label="Principal">
-      <a href="/" data-nav="deck">${icon(Compass, 24)}<span>${t('nav.explore')}</span></a>
+      <a href="/" data-nav="deck">${icon(PawPrint, 24)}<span>${t('nav.explore')}</span></a>
+      <a href="/ayudar" data-nav="help">${icon(HandHeart, 24)}<span>${t('nav.help')}</span></a>
       <a href="/buscar" data-nav="search">${icon(Search, 24)}<span>${t('nav.search')}</span></a>
       <a href="/lista" data-nav="list"><span class="tabbar__pips" data-pips data-pips-count>${pips(true)}</span><span>${t('nav.list')}</span></a>
-      <a href="/ayudar" data-nav="help">${icon(HandHeart, 24)}<span>${t('nav.help')}</span></a>
       <a href="/cuenta" data-nav="account" data-account-tab>${icon(User, 24)}<span>${t('nav.account')}</span></a>
     </nav>
   `,
