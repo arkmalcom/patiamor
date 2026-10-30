@@ -11,6 +11,8 @@ import { PET_JOINS, REQUEST_CAP, SUMMARY_COLUMNS, summary, VIEWABLE, type Summar
 // "Enviar solicitud" sends one deliberate request with the reflection answers, contact
 // details the adopter consents to share, and anything else they want to tell the lister. There's no
 // lower-commitment "save". Withdrawing is always possible; the lister always sees that it happened.
+// A request can also be an offer to foster ("hogar temporal") an animal from a verified shelter, for a length
+// the person picks: same form, same slot. While the animal lives with them it stays open (foster_started_at).
 // Listers read and move requests in the portal (later); this file is the adopter's side.
 
 export const OPEN_STATUSES = `('sent', 'seen', 'contacted', 'visit')`;
@@ -28,6 +30,9 @@ const TRAVEL = ['si', 'pensando'] as const;
 /** Beyond this the form asks "¿Puedes viajar?" (the same number is in web/src/ui/request.ts). */
 export const TRAVEL_FROM_KM = 50;
 const WITHDRAW_REASONS = ['situacion', 'vivienda', 'otra_mascota', 'refugio', 'otro'] as const;
+const KINDS = ['adopt', 'foster'] as const;
+/** How long someone can foster (the same list is in the 0027 migration and web/src/store.ts). */
+export const FOSTER_LENGTHS = ['dos_semanas', 'un_mes', 'dos_tres_meses', 'hasta_adopcion'] as const;
 
 /** This many withdrawals within the window pause new requests until an admin clears the account. */
 const WITHDRAW_LIMIT = 3;
@@ -83,6 +88,9 @@ type RequestBody = {
   travel?: string;
   /** The area they browse from, to work out how far they are (the distance is kept, never the place). */
   fromPlaceId?: string;
+  /** 'adopt' (the default) or 'foster', with how long they can foster. */
+  kind?: string;
+  fosterLength?: string;
 };
 
 type RequestRow = SummaryRow & {
@@ -93,7 +101,14 @@ type RequestRow = SummaryRow & {
   answer_cost: string;
   request_created: string;
   request_updated: string;
+  kind: string;
+  foster_length: string | null;
+  foster_started_at: string | null;
 };
+
+/** A foster in progress reads as its own step ('fostering'), though the stored status stays open. */
+export const shownStatus = (r: { status: string; foster_started_at: string | null }) =>
+  r.foster_started_at && ['sent', 'seen', 'contacted', 'visit'].includes(r.status) ? 'fostering' : r.status;
 
 export const requests = new Hono<AppContext>();
 
@@ -110,7 +125,7 @@ requests.get('/', async (c) => {
     db
       .prepare(
         `SELECT ${SUMMARY_COLUMNS}, r.id AS request_id, r.status AS request_status, r.answer_space, r.answer_time, r.answer_cost,
-                r.created_at AS request_created, r.updated_at AS request_updated
+                r.created_at AS request_created, r.updated_at AS request_updated, r.kind, r.foster_length, r.foster_started_at
            FROM adoption_requests r JOIN pets d ON d.id = r.pet_id ${PET_JOINS}
           WHERE r.user_id = ? AND (r.status IN ${OPEN_STATUSES} OR r.updated_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-${ENDED_VISIBLE_DAYS} days'))
           ORDER BY r.created_at`,
@@ -125,7 +140,15 @@ requests.get('/', async (c) => {
     items: results.map((r) => ({
       pet: summary(r),
       answers: { space: r.answer_space, time: r.answer_time, cost: r.answer_cost },
-      request: { id: r.request_id, status: r.request_status, createdAt: r.request_created, updatedAt: r.request_updated },
+      request: {
+        id: r.request_id,
+        status: shownStatus({ status: r.request_status, foster_started_at: r.foster_started_at }),
+        createdAt: r.request_created,
+        updatedAt: r.request_updated,
+        kind: r.kind,
+        fosterLength: r.foster_length,
+        fosterStartedAt: r.foster_started_at,
+      },
     })),
     alerts: alertRows.map((a) => a.pet_id),
   });
@@ -196,12 +219,15 @@ requests.post('/', async (c) => {
   const message = (b.message ?? '').trim().slice(0, 500) || null;
   const travel = optional(TRAVEL, b.travel);
   const fromPlace = typeof b.fromPlaceId === 'string' ? placeById(b.fromPlaceId) : null;
+  const kind = b.kind === undefined ? 'adopt' : oneOf(KINDS, b.kind) ? b.kind : null;
+  const fosterLength = kind === 'foster' && oneOf(FOSTER_LENGTHS, b.fosterLength) ? b.fosterLength : null;
 
   if (b.consent !== true) return c.json({ error: 'consent_required' }, 400);
   if (name.length < 2 || name.length > 80) return c.json({ error: 'invalid_name' }, 400);
   if (!pref) return c.json({ error: 'invalid_request' }, 400);
   // WhatsApp and calls need a number; email-only adopters may leave it out (but a typo is still an error).
   if ((pref !== 'correo' || b.phone) && !phone) return c.json({ error: 'invalid_phone' }, 400);
+  if (!kind || (kind === 'foster' && !fosterLength) || (kind === 'adopt' && b.fosterLength != null)) return c.json({ error: 'invalid_request' }, 400);
   if (!b.petId || !oneOf(REFLECTION, a.space) || !oneOf(REFLECTION, a.time) || !oneOf(REFLECTION, a.cost) || !otherPets?.every((p) => oneOf(OTHER_PETS, p)) || Object.values(about).includes(undefined) || travel === undefined) {
     return c.json({ error: 'invalid_request' }, 400);
   }
@@ -209,10 +235,12 @@ requests.post('/', async (c) => {
   const db = c.env.DB;
   if (await requestsRestricted(db, user.id)) return c.json({ error: 'restricted' }, 403);
   const pet = await db
-    .prepare(`SELECT d.name, d.status, d.open_requests, d.requests_paused, s.name AS shelter_name, s.kind AS shelter_kind, COALESCE(s.place_id, d.place_id) AS place_id FROM pets d LEFT JOIN shelters s ON s.id = d.shelter_id WHERE d.id = ? AND ${VIEWABLE}`)
+    .prepare(`SELECT d.name, d.status, d.open_requests, d.requests_paused, d.fostered, s.name AS shelter_name, s.kind AS shelter_kind, COALESCE(s.place_id, d.place_id) AS place_id FROM pets d LEFT JOIN shelters s ON s.id = d.shelter_id WHERE d.id = ? AND ${VIEWABLE}`)
     .bind(b.petId)
-    .first<{ name: string; status: string; open_requests: number; requests_paused: number; shelter_name: string | null; shelter_kind: string | null; place_id: string }>();
+    .first<{ name: string; status: string; open_requests: number; requests_paused: number; fostered: number; shelter_name: string | null; shelter_kind: string | null; place_id: string }>();
   if (!pet) return c.json({ error: 'not_found' }, 404);
+  // Only shelters take foster homes: a private lister is rehoming their own animal.
+  if (kind === 'foster' && (!pet.shelter_name || pet.shelter_kind === 'private')) return c.json({ error: 'foster_unavailable' }, 400);
   // How far, if the app said where they browse from. Far away, they must say whether they can come.
   const petPlace = placeById(pet.place_id);
   const km = fromPlace && petPlace ? distanceKm(fromPlace, petPlace) : null;
@@ -225,6 +253,7 @@ requests.post('/', async (c) => {
   if (existing) return c.json({ request: { id: existing.id, status: existing.status, createdAt: existing.created_at } });
   if (pet.status === 'reserved') return c.json({ error: 'reserved' }, 409);
   if (pet.requests_paused || pet.open_requests >= REQUEST_CAP) return c.json({ error: 'paused' }, 409);
+  if (kind === 'foster' && pet.fostered) return c.json({ error: 'fostered' }, 409);
 
   const id = crypto.randomUUID();
   const now = nowIso();
@@ -234,11 +263,12 @@ requests.post('/', async (c) => {
       db
         .prepare(
           `INSERT INTO adoption_requests (id, pet_id, user_id, answer_space, answer_time, answer_cost, home, other_pets, kids, experience, visit,
-             message, contact_name, contact_email, contact_phone, contact_pref, consent_at, created_at, updated_at, distance_km, travel)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             message, contact_name, contact_email, contact_phone, contact_pref, consent_at, created_at, updated_at, distance_km, travel, kind, foster_length)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(id, b.petId, user.id, a.space, a.time, a.cost, about.home, JSON.stringify(otherPets), about.kids, about.experience, about.visit,
-          message, name, user.email, phone, pref, now, now, now, km === null ? null : Math.round(km / 5) * 5, km !== null && km > TRAVEL_FROM_KM ? travel : null),
+          message, name, user.email, phone, pref, now, now, now, km === null ? null : Math.round(km / 5) * 5, km !== null && km > TRAVEL_FROM_KM ? travel : null,
+          kind, fosterLength),
     ]);
   } catch (err) {
     // The database refuses a 4th open request (trigger in 0007), e.g. one sent from another device.
@@ -252,20 +282,26 @@ requests.post('/', async (c) => {
       pet: pet.name,
       lister: pet.shelter_name && pet.shelter_kind !== 'private' ? pet.shelter_name : 'la persona que lo publicó',
       listUrl: `${appOrigin(c)}/lista`,
+      foster: kind === 'foster',
     }).catch((err) => console.error('request confirmation email failed', err));
   } else console.warn('daily email budget reached: request confirmation not sent');
 
-  return c.json({ request: { id, status: 'sent', createdAt: now } }, 201);
+  return c.json({ request: { id, status: 'sent', createdAt: now, kind, fosterLength } }, 201);
 });
 
 // Withdrawing is a serious step: it needs a reason, frees the slot at once, and the lister always sees
-// it (with the reason). Several in a short time pause new requests (requestsRestricted).
+// it (with the reason). Several in a short time pause new requests (requestsRestricted). A foster in
+// progress can't be withdrawn here: the animal lives with them, so its return is arranged with the shelter,
+// which ends it.
 requests.post('/:id/withdraw', async (c) => {
   const user = c.get('user')!;
   const b = await c.req.json<{ reason?: string }>().catch(() => ({}) as { reason?: string });
   if (!oneOf(WITHDRAW_REASONS, b.reason)) return c.json({ error: 'reason_required' }, 400);
   const reason = b.reason;
-  await c.env.DB.prepare(`UPDATE adoption_requests SET status = 'withdrawn', closed_reason = ?, updated_at = ? WHERE id = ? AND user_id = ? AND status IN ${OPEN_STATUSES}`)
+  const db = c.env.DB;
+  const fostering = await db.prepare(`SELECT 1 FROM adoption_requests WHERE id = ? AND user_id = ? AND foster_started_at IS NOT NULL AND status IN ${OPEN_STATUSES}`).bind(c.req.param('id'), user.id).first();
+  if (fostering) return c.json({ error: 'fostering' }, 409);
+  await db.prepare(`UPDATE adoption_requests SET status = 'withdrawn', closed_reason = ?, updated_at = ? WHERE id = ? AND user_id = ? AND status IN ${OPEN_STATUSES} AND foster_started_at IS NULL`)
     .bind(reason, nowIso(), c.req.param('id'), user.id)
     .run();
   return c.json({ ok: true });

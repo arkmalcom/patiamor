@@ -1,5 +1,5 @@
-import { BadgeCheck, House, Mail, MessageCircle, Phone } from 'lucide';
-import { api, type CloseReason, type InboxRequest } from '../api';
+import { BadgeCheck, House, HouseHeart, Mail, MessageCircle, Phone } from 'lucide';
+import { api, ApiError, type CloseReason, type InboxRequest } from '../api';
 import { frameFor, type PetSummary } from '../data';
 import { $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, failText, t, type Key } from '../i18n';
@@ -11,10 +11,14 @@ import { state } from '../store';
 // A shelter's requests (/refugio/<id>/solicitudes, PAT-5). Shelters reach adopters through their own
 // WhatsApp, phone or email from here, and mark each step; adopters see every step in their list.
 // Opening a new request marks it seen. New requests also arrive in a morning email (api/src/digest.ts).
+// A foster offer says so and for how long; "Empezó el hogar temporal" marks the animal as living with them
+// (it stays in En curso, and listed for adoption), and closing it ends the foster.
 
 type Tab = 'nuevas' | 'curso' | 'cerradas';
-const TAB_OF: Record<string, Tab> = { sent: 'nuevas', seen: 'curso', contacted: 'curso', visit: 'curso', adopted: 'cerradas', closed: 'cerradas', withdrawn: 'cerradas' };
+const TAB_OF: Record<string, Tab> = { sent: 'nuevas', seen: 'curso', contacted: 'curso', visit: 'curso', fostering: 'curso', adopted: 'cerradas', closed: 'cerradas', withdrawn: 'cerradas' };
 const CLOSE_REASONS: CloseReason[] = ['otra_familia', 'no_encaja', 'sin_respuesta', 'otro'];
+/** Ending a foster in progress (the same list is in api/src/inbox.ts). */
+const FOSTER_CLOSE_REASONS: CloseReason[] = ['acogida_terminada', 'no_encaja', 'otro'];
 /** Reasons the server records when a request ends because its animal did (api/src/lifecycle.ts). */
 const AUTO_REASONS = ['adoptado', 'retirado', 'devuelto'] as const;
 const DAY = 86_400_000;
@@ -104,7 +108,7 @@ export async function renderInbox(root: HTMLElement, shelterId: string, slug: st
     $$<HTMLButtonElement>('[data-move]', root).forEach((b) =>
       b.addEventListener('click', async () => {
         const id = b.closest<HTMLElement>('[data-request]')!.dataset.request!;
-        const to = b.dataset.move as 'contacted' | 'visit';
+        const to = b.dataset.move as 'contacted' | 'visit' | 'fostering';
         b.disabled = true;
         try {
           const updated = await api.moveRequest(id, to);
@@ -115,7 +119,8 @@ export async function renderInbox(root: HTMLElement, shelterId: string, slug: st
           root.querySelector<HTMLDetailsElement>(`details[data-request="${id}"]`)?.setAttribute('open', '');
         } catch (err) {
           b.disabled = false;
-          toast(failText(err));
+          const r = requests.find((x) => x.id === id);
+          toast(err instanceof ApiError && err.code === 'already_fostered' && r ? t('inbox.err.already_fostered', { pet: r.pet.name }) : failText(err));
         }
       }),
     );
@@ -156,13 +161,14 @@ function card(r: InboxRequest, shelter: string, shelterId: string, privateLister
   const open = TAB_OF[r.status] !== 'cerradas';
   const pet = r.pet;
   const first = r.contact.name.split(/\s+/)[0];
+  const foster = r.kind === 'foster';
   return html`
     <li>
       <details class="request-card" data-request="${r.id}">
         <summary class="request-card__head">
           <span class="mini-frame mini-frame--sm" data-frame="${frameFor(pet.id)}">${photo({ photo: pet.photo } as PetSummary, 'lazy', true)}</span>
           <span class="request-card__who">
-            <strong>${t('inbox.wants', { who: r.contact.name, pet: pet.name })}</strong>
+            <strong>${t(foster ? 'inbox.wantsFoster' : 'inbox.wants', { who: r.contact.name, pet: pet.name })}</strong>
             <span class="request-card__meta">${when(r.createdAt)}${pet.status === 'reserved' ? html` · ${t('inbox.petReserved', { pet: pet.name })}` : pet.requestsPaused ? html` · ${t('inbox.petPaused')}` : ''}</span>
             ${r.verified ? html`<span class="verified-badge">${icon(BadgeCheck, 15)}${t('verified.badge')}</span>` : ''}
           </span>
@@ -170,14 +176,16 @@ function card(r: InboxRequest, shelter: string, shelterId: string, privateLister
         </summary>
         <div class="request-card__body">
           ${r.verified ? html`<p class="muted verified-note">${t('verified.inboxNote', { who: first })}</p>` : ''}
+          ${r.status === 'fostering' && r.fosterStartedAt ? html`<p class="muted">${t('inbox.fosteringSince', { date: formatDate(r.fosterStartedAt.slice(0, 10)) })}</p>` : ''}
           ${open && r.contact.pref ? contactButtons(r, shelter, first, privateLister) : ''}
           ${r.status === 'withdrawn' ? html`<p class="portal-card__reason"><strong>${t('inbox.withdrew')}</strong> «${t(`request.withdraw.${r.closedReason as 'situacion'}`)}»</p>` : ''}
           ${r.status === 'closed' ? html`<p class="muted">${closedText(r)}</p>` : ''}
           ${r.message ? html`<blockquote class="request-card__message">${r.message}</blockquote>` : ''}
           <dl class="portal-facts">
+            ${foster && r.fosterLength ? fact('inbox.q.fosterLength', t(`request.fosterLength.${r.fosterLength}`)) : ''}
             ${answer('inbox.q.space', r.answers.space)}
             ${answer('inbox.q.time', r.answers.time)}
-            ${answer('inbox.q.cost', r.answers.cost)}
+            ${answer(foster ? 'inbox.q.cost.foster' : 'inbox.q.cost', r.answers.cost)}
             ${fact('inbox.q.home', r.about.home && t(`request.home.${r.about.home as 'casa'}`))}
             ${fact('inbox.q.otherPets', r.about.otherPets.length ? r.about.otherPets.map((p) => t(`request.otherPets.${p as 'perros'}`)).join(', ') : t('inbox.none'))}
             ${fact('inbox.q.kids', r.about.kids && t(`request.kids.${r.about.kids as 'no'}`))}
@@ -211,7 +219,7 @@ function contactButtons(r: InboxRequest, shelter: string, first: string, private
   const lister = state.user?.name?.trim();
   const text = privateLister
     ? t(lister ? 'inbox.waTextPrivate' : 'inbox.waTextPrivateAnon', { name: first, lister: lister ?? '', pet: r.pet.name })
-    : t('inbox.waText', { name: first, shelter, pet: r.pet.name });
+    : t(r.kind === 'foster' ? 'inbox.waTextFoster' : 'inbox.waText', { name: first, shelter, pet: r.pet.name });
   const options = {
     whatsapp: c.phone ? { href: `https://wa.me/${digits(c.phone)}?text=${encodeURIComponent(text)}`, label: t('inbox.contact.whatsapp'), glyph: MessageCircle, external: true } : null,
     llamada: c.phone ? { href: `tel:${c.phone}`, label: t('inbox.contact.call', { phone: showPhone(c.phone) }), glyph: Phone, external: false } : null,
@@ -232,23 +240,25 @@ function contactButtons(r: InboxRequest, shelter: string, first: string, private
 }
 
 function actions(r: InboxRequest, first: string): Raw {
-  const next: ('contacted' | 'visit')[] = r.status === 'contacted' ? ['visit'] : r.status === 'visit' ? [] : ['contacted', 'visit'];
+  const fostering = r.status === 'fostering';
+  const next: ('contacted' | 'visit')[] = fostering ? [] : r.status === 'contacted' ? ['visit'] : r.status === 'visit' ? [] : ['contacted', 'visit'];
   const live = r.pet.status === 'available' || r.pet.status === 'reserved';
   return html`
     <div class="request-card__actions">
       ${next.map((s) => html`<button class="button button--outline button--small" type="button" data-move="${s}">${t(`inbox.move.${s}`)}</button>`)}
+      ${r.kind === 'foster' && !fostering && live ? html`<button class="button button--outline button--small" type="button" data-move="fostering">${icon(HouseHeart, 16)}${t('inbox.move.fostering')}</button>` : ''}
       ${live ? html`<button class="button button--outline button--small" type="button" data-adopted="${r.id}">${icon(House, 16)}${t('inbox.adopted', { name: first })}</button>` : ''}
     </div>
     <details class="request-card__close">
-      <summary class="text-button">${t('inbox.close')}</summary>
+      <summary class="text-button">${t(fostering ? 'inbox.closeFoster' : 'inbox.close')}</summary>
       <form data-close="${r.id}">
         <fieldset class="question">
           <legend>${t('inbox.closeWhy')}</legend>
           <div class="segmented segmented--stack">
-            ${CLOSE_REASONS.map((k) => html`<label><input type="radio" name="reason" value="${k}" /><span>${t(`inbox.reason.${k}`)}</span></label>`)}
+            ${(fostering ? FOSTER_CLOSE_REASONS : CLOSE_REASONS).map((k) => html`<label><input type="radio" name="reason" value="${k}" /><span>${t(`inbox.reason.${k}`)}</span></label>`)}
           </div>
         </fieldset>
-        <p class="muted">${t('inbox.closeNote')}</p>
+        <p class="muted">${t(fostering ? 'inbox.closeNoteFoster' : 'inbox.closeNote')}</p>
         <button class="button button--ink button--small" type="submit">${t('inbox.closeConfirm')}</button>
       </form>
     </details>`;

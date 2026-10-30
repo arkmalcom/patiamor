@@ -4,7 +4,7 @@ import { $$, html, icon, mount, type Raw } from '../dom';
 import { away, formatDate, sentence, t } from '../i18n';
 import { activeRequests, isOpen, MAX_SLOTS, petCache, placePet, state, type Answer, type MyRequest } from '../store';
 import { listerLabel, miniFrame, photo } from '../ui/canvas';
-import { listerName, openWithdraw, requestStatus, statusKey } from '../ui/request';
+import { kindTag, listerName, lo, openWithdraw, requestStatus, statusKey } from '../ui/request';
 import { bulkWhat, openBulk } from '../ui/bulk';
 import { helpInvite } from '../ui/help-invite';
 import { pips } from '../ui/save';
@@ -29,8 +29,9 @@ function filled(s: MyRequest, compact: boolean): Raw {
       <div class="slot__text">
         <h2 class="slot__name">${pet.name}</h2>
         <p class="muted">${away(p.km)} · ${listerLabel(pet)}</p>
+        ${kindTag(s.request) ? html`<p class="slot__kind">${kindTag(s.request)}</p>` : ''}
         ${compact
-          ? html`<p class="slot__status">${sentence(t(`request.status.${statusKey(s) as 'sent'}`, { lister: listerName(pet), name: pet.name }))}</p>`
+          ? html`<p class="slot__status">${sentence(t(`request.status.${statusKey(s) as 'sent'}`, { lister: listerName(pet), name: pet.name, lo: lo(pet) }))}</p>`
           : html`
               ${requestStatus(s)}
               <ul class="answers" aria-label="${t('list.answers')}">
@@ -40,7 +41,7 @@ function filled(s: MyRequest, compact: boolean): Raw {
               </ul>
               <div class="slot__actions">
                 <button class="button button--outline button--small" type="button" data-open="${pet.id}">${t('deck.profile')}</button>
-                <button class="button button--ghost button--small" type="button" data-withdraw="${s.request.id}">${t('request.withdraw')}</button>
+                ${s.request.status === 'fostering' ? '' : html`<button class="button button--ghost button--small" type="button" data-withdraw="${s.request.id}">${t('request.withdraw')}</button>`}
               </div>`}
       </div>
     </li>`;

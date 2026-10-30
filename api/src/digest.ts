@@ -100,10 +100,11 @@ export async function runDigest(env: Env, origin = env.APP_ORIGIN ?? ''): Promis
       result.alertEmails++;
     }
   }
-  // Requests that ended without a home for this person. 'devuelto' (an adoption undone) isn't announced.
+  // Requests that ended without a home for this person. 'devuelto' (an adoption undone) isn't announced, nor
+  // is a foster that ended: the animal lived with them, so the shelter has told them in person.
   if (!result.deferred) {
     await db
-      .prepare("UPDATE adoption_requests SET closed_notified_at = ? WHERE status = 'closed' AND closed_notified_at IS NULL AND (updated_at < ? OR coalesce(closed_reason, '') = 'devuelto')")
+      .prepare("UPDATE adoption_requests SET closed_notified_at = ? WHERE status = 'closed' AND closed_notified_at IS NULL AND (updated_at < ? OR coalesce(closed_reason, '') = 'devuelto' OR foster_started_at IS NOT NULL)")
       .bind(started, isoIn(-NOTICE_DAYS * 24 * 60 * 60 * 1000))
       .run();
     const { results: closed } = await db

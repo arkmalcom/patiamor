@@ -37,17 +37,20 @@ function renderSignIn(code: string, link: string): Message {
   return { subject, text, html };
 }
 
-function renderRequestSent(o: { pet: string; lister: string; listUrl: string }): Message {
-  const subject = `Tu solicitud para conocer a ${o.pet} fue enviada`;
+function renderRequestSent(o: { pet: string; lister: string; listUrl: string; foster?: boolean }): Message {
+  // A foster offer says so, so it isn't read as a promise to adopt.
+  const what = o.foster ? `oferta de hogar temporal para ${o.pet}` : `solicitud para conocer a ${o.pet}`;
+  const whatHtml = o.foster ? `oferta de hogar temporal para ${escape(o.pet)}` : `solicitud para conocer a ${escape(o.pet)}`;
+  const subject = `Tu ${what} fue enviada`;
   const text = [
-    `Enviamos tu solicitud para conocer a ${o.pet} a ${o.lister}.`,
+    `Enviamos tu ${what} a ${o.lister}.`,
     '',
     `Revisarán tus respuestas y, si es buena opción, te escribirán por WhatsApp o correo para coordinar una visita. Suele tomar unos días.`,
     '',
     `Puedes ver cómo va, o retirar la solicitud, en mi lista: ${o.listUrl}`,
   ].join('\n');
   const html = shell(`
-      <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">Tu solicitud para conocer a ${escape(o.pet)} fue enviada a ${escape(o.lister)}.</td></tr>
+      <tr><td style="padding:0 28px 8px;font-size:18px;line-height:1.4;font-weight:bold">Tu ${whatHtml} fue enviada a ${escape(o.lister)}.</td></tr>
       <tr><td style="padding:8px 28px;font-size:16px;line-height:1.5">Revisarán tus respuestas y, si es buena opción, te escribirán por WhatsApp o correo para coordinar una visita. Suele tomar unos días.</td></tr>
       <tr><td style="padding:16px 28px 24px">${button(o.listUrl, 'Ver mi lista')}</td></tr>
       <tr><td style="padding:0 28px 28px;font-size:13px;line-height:1.5;color:#4a5275">Puedes retirar la solicitud cuando quieras desde mi lista.</td></tr>`);
@@ -327,7 +330,7 @@ async function send(env: Env, kind: EmailKind, to: string, { subject, text, html
 export const sendSignInEmail = (env: Env, to: string, code: string, link: string) =>
   send(env, 'signin', to, renderSignIn(code, link), `code=${code} link=${link}`);
 
-export const sendRequestSentEmail = (env: Env, to: string, o: { pet: string; lister: string; listUrl: string }) =>
+export const sendRequestSentEmail = (env: Env, to: string, o: { pet: string; lister: string; listUrl: string; foster?: boolean }) =>
   send(env, 'request_sent', to, renderRequestSent(o), `pet=${o.pet} lister=${o.lister}`);
 
 export const sendShelterDecisionEmail = (env: Env, to: string, o: { shelter: string; decision: ShelterOutcome; reason: string | null; portalUrl: string }) =>

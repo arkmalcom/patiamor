@@ -36,7 +36,7 @@ const KM_SQL = `6371 * acos(min(1, cos(radians(?1)) * cos(radians(p.lat)) * cos(
 
 export const SUMMARY_COLUMNS = `d.id, d.species, d.name, d.sex, d.birth_date, d.birth_date_estimated, d.size, d.energy,
   d.good_with_kids, d.good_with_dogs, d.good_with_cats, d.vaccinated, d.sterilized, d.dewormed, d.litter_id, d.status,
-  d.open_requests, d.requests_paused,
+  d.open_requests, d.requests_paused, d.fostered,
   p.id AS place_id, p.name AS place_name, p.municipality, p.province, p.lat, p.lng,
   s.id AS shelter_id, s.name AS shelter_name, s.kind AS shelter_kind,
   (SELECT json_object('key', ph.r2_key, 'thumb', ph.thumb_key, 'focus', ph.focus, 'count', (SELECT count(*) FROM pet_photos n WHERE n.pet_id = d.id))
@@ -52,7 +52,7 @@ type Bool = 0 | 1 | null;
 export interface SummaryRow {
   id: string; species: string; name: string; sex: string; birth_date: string | null; birth_date_estimated: number; size: string; energy: string;
   good_with_kids: Bool; good_with_dogs: Bool; good_with_cats: Bool; vaccinated: number; sterilized: number; dewormed: number;
-  litter_id: string | null; status: string; open_requests: number; requests_paused: number;
+  litter_id: string | null; status: string; open_requests: number; requests_paused: number; fostered: number;
   place_id: string; place_name: string; municipality: string; province: string; lat: number; lng: number;
   shelter_id: string | null; shelter_name: string | null; shelter_kind: string | null; cover: string | null;
 }
@@ -83,6 +83,8 @@ export function summary(r: SummaryRow) {
           : r.open_requests >= BUSY_AT
             ? ('busy' as const)
             : ('open' as const),
+    // Living with a foster home ("En hogar temporal") while it waits for a family; still up for adoption.
+    fostered: r.fostered === 1,
     place: { id: r.place_id, name: r.place_name, municipality: r.municipality, province: r.province, lat: r.lat, lng: r.lng },
     // Verified shelters show their name; a private lister (a one-person row in shelters) is "Particular",
     // never a person's name or id.
