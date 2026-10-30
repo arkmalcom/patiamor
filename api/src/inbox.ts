@@ -4,25 +4,31 @@ import { forgetCatalogVersion } from './cache';
 import type { AppContext } from './env';
 import { photoUrl } from './pets';
 import { roleIn } from './portal';
-import { OPEN_STATUSES } from './requests';
+import { OPEN_STATUSES, shownStatus } from './requests';
 
 // The shelter's request inbox (PAT-5). Members see every request for their animals, move it along
 // (seen → contacted → visit) or close it with a reason; each step shows to the adopter in Mi lista.
 // Contact details are only shown while a request is open: once it's closed or withdrawn, the shelter
 // keeps the answers and the reason but not the phone or email. Shelters reach adopters through their own
 // WhatsApp, phone or email (links built in the app); Patiamor sends no message on their behalf.
+// A foster offer moves the same way, plus "fostering" when the animal moves in; the shelter ends it by
+// closing it ("acogida_terminada"), or with "Se fue a casa" when the foster home adopts.
 
 type C = Context<AppContext>;
 
 /** Ended requests stay in the inbox this long. */
 const ENDED_DAYS = 90;
 const CLOSE_REASONS = ['otra_familia', 'no_encaja', 'sin_respuesta', 'otro'] as const;
+/** Ending a foster in progress: the animal came back, or another reason. */
+const FOSTER_CLOSE_REASONS = ['acogida_terminada', 'no_encaja', 'otro'] as const;
 /** Where a shelter may move a request, from each status. "Se fue a casa" is in lifecycle.ts: it ends the animal's other requests too. */
 const MOVES: Record<string, readonly string[]> = {
   seen: ['sent'],
   contacted: ['sent', 'seen', 'visit'],
   visit: ['sent', 'seen', 'contacted'],
   closed: ['sent', 'seen', 'contacted', 'visit'],
+  // The animal moved in with the foster home (foster offers only).
+  fostering: ['sent', 'seen', 'contacted', 'visit'],
 };
 
 type Row = {
@@ -32,6 +38,7 @@ type Row = {
   contact_name: string; contact_email: string; contact_phone: string | null; contact_pref: string;
   pet_id: string; pet_name: string; pet_species: string; pet_status: string; requests_paused: number; open_requests: number;
   cover: string | null; thumb: string | null; focus: string | null; adopter_verified_at: string | null;
+  kind: string; foster_length: string | null; foster_started_at: string | null;
 };
 
 const isOpen = (status: string) => ['sent', 'seen', 'contacted', 'visit'].includes(status);
@@ -40,7 +47,10 @@ function view(r: Row) {
   const open = isOpen(r.status);
   return {
     id: r.id,
-    status: r.status,
+    status: shownStatus(r),
+    kind: r.kind,
+    fosterLength: r.foster_length,
+    fosterStartedAt: r.foster_started_at,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     seenAt: r.seen_at,
@@ -68,7 +78,7 @@ const SELECT = `SELECT r.id, r.status, r.created_at, r.updated_at, r.seen_at, r.
     r.answer_space, r.answer_time, r.answer_cost, r.home, r.other_pets, r.kids, r.experience, r.visit, r.message, r.distance_km, r.travel,
     r.contact_name, r.contact_email, r.contact_phone, r.contact_pref,
     d.id AS pet_id, d.name AS pet_name, d.species AS pet_species, d.status AS pet_status, d.requests_paused, d.open_requests,
-    ph.r2_key AS cover, ph.thumb_key AS thumb, ph.focus, u.adopter_verified_at
+    ph.r2_key AS cover, ph.thumb_key AS thumb, ph.focus, u.adopter_verified_at, r.kind, r.foster_length, r.foster_started_at
   FROM adoption_requests r
   JOIN pets d ON d.id = r.pet_id
   JOIN users u ON u.id = r.user_id
@@ -104,7 +114,8 @@ inbox.get('/shelters/:id/requests', async (c) => {
   return c.json({ requests: results.map(view) });
 });
 
-// Move a request along: { status: 'seen' | 'contacted' | 'visit' | 'closed', reason? } (closing needs a reason).
+// Move a request along: { status: 'seen' | 'contacted' | 'visit' | 'fostering' | 'closed', reason? } (closing needs a reason).
+// While a foster is in progress the only way on is closing it (or "Se fue a casa", in lifecycle.ts).
 inbox.post('/requests/:id/status', async (c) => {
   const row = await requestForMember(c, c.req.param('id'));
   if (!row) return c.json({ error: 'not_found' }, 404);
@@ -112,19 +123,32 @@ inbox.post('/requests/:id/status', async (c) => {
   const to = b.status ?? '';
   const from = MOVES[to];
   if (!from) return c.json({ error: 'invalid_status' }, 400);
-  if (to === 'closed' && !CLOSE_REASONS.includes(b.reason as never)) return c.json({ error: 'reason_required' }, 400);
-  if (!from.includes(row.status)) {
+  const fostering = row.foster_started_at !== null;
+  const reasons: readonly string[] = fostering ? FOSTER_CLOSE_REASONS : CLOSE_REASONS;
+  if (to === 'closed' && !reasons.includes(b.reason as never)) return c.json({ error: 'reason_required' }, 400);
+  if (to === 'fostering' && row.kind !== 'foster') return c.json({ error: 'invalid_transition' }, 409);
+  if (!from.includes(row.status) || (fostering && to !== 'closed')) {
     // Opening an already-seen request again is fine; anything else from the wrong status is a conflict.
     if (to === 'seen') return c.json({ request: view(row) });
     return c.json({ error: 'invalid_transition' }, 409);
   }
   const now = nowIso();
-  await c.env.DB.prepare(
-    `UPDATE adoption_requests SET status = ?, closed_reason = CASE WHEN ? = 'closed' THEN ? ELSE closed_reason END,
-       seen_at = coalesce(seen_at, ?), updated_at = ? WHERE id = ? AND status = ?`,
-  )
-    .bind(to, to, b.reason ?? null, now, now, row.id, row.status)
-    .run();
+  try {
+    await c.env.DB.prepare(
+      to === 'fostering'
+        ? 'UPDATE adoption_requests SET foster_started_at = ?, seen_at = coalesce(seen_at, ?), updated_at = ? WHERE id = ? AND status = ? AND foster_started_at IS NULL'
+        : `UPDATE adoption_requests SET status = ?, closed_reason = CASE WHEN ? = 'closed' THEN ? ELSE closed_reason END,
+             seen_at = coalesce(seen_at, ?), updated_at = ? WHERE id = ? AND status = ?`,
+    )
+      .bind(...(to === 'fostering' ? [now, now, now, row.id, row.status] : [to, to, b.reason ?? null, now, now, row.id, row.status]))
+      .run();
+  } catch (err) {
+    // Another foster home already has this animal (one at a time: the 0027 index).
+    if (String(err).includes('UNIQUE')) return c.json({ error: 'already_fostered' }, 409);
+    throw err;
+  }
+  // Starting or ending a foster changes the animal's "En hogar temporal" tag.
+  if (to === 'fostering' || fostering) forgetCatalogVersion();
   const updated = await c.env.DB.prepare(`${SELECT} WHERE r.id = ?`).bind(row.id).first<Row>();
   return c.json({ request: view(updated!) });
 });

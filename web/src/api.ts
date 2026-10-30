@@ -1,6 +1,6 @@
 // Thin client for the Patiamor Worker API (same origin in every environment).
 import type { Donation, DonationAccount, Energy, HelpCase, HelpCaseDetail, HelpNeed, LostKind, LostPost, LostPostDetail, PetDetail, PetSummary, LatLng, Place, Sex, Size, Species } from './data';
-import type { AdoptionRequest, ContactPref, MyRequest, RequestForm, RequestStatus } from './store';
+import type { AdoptionRequest, ContactPref, FosterLength, MyRequest, RequestForm, RequestKind, RequestStatus } from './store';
 
 export interface Me {
   id: string;
@@ -254,7 +254,7 @@ export type ManyChange =
   | { ids: string[]; action: 'withdrawn'; reason: WithdrawReason }
   | { ids: string[]; action: 'health'; health: Partial<Record<'vaccinated' | 'sterilized' | 'dewormed', boolean>> };
 
-export type CloseReason = 'otra_familia' | 'no_encaja' | 'sin_respuesta' | 'otro';
+export type CloseReason = 'otra_familia' | 'no_encaja' | 'sin_respuesta' | 'otro' | 'acogida_terminada';
 /** A special request to adopt more than Mi lista's three (a farm, a large family home). */
 export type BulkStatus = 'pending' | 'approved' | 'declined';
 export type BulkSpecies = 'perros' | 'gatos' | 'ambos';
@@ -305,6 +305,9 @@ export interface GonePet {
 export interface InboxRequest {
   id: string;
   status: RequestStatus;
+  kind: RequestKind;
+  fosterLength: FosterLength | null;
+  fosterStartedAt: string | null;
   createdAt: string;
   updatedAt: string;
   seenAt: string | null;
@@ -450,7 +453,7 @@ export const api = {
   deletePhoto: (petId: string, photoId: string) =>
     call<{ ok: true }>(`/api/portal/pets/${encodeURIComponent(petId)}/photos/${encodeURIComponent(photoId)}`, 'DELETE', {}),
   shelterRequests: (shelterId: string) => call<{ requests: InboxRequest[] }>(`/api/portal/shelters/${encodeURIComponent(shelterId)}/requests`).then((r) => r.requests),
-  moveRequest: (id: string, status: 'seen' | 'contacted' | 'visit' | 'closed', reason?: CloseReason) =>
+  moveRequest: (id: string, status: 'seen' | 'contacted' | 'visit' | 'fostering' | 'closed', reason?: CloseReason) =>
     call<{ request: InboxRequest }>(`/api/portal/requests/${encodeURIComponent(id)}/status`, 'POST', { status, reason }).then((r) => r.request),
   /** Several of the shelter's animals at once (PAT-33); those that can't take the change come back in `skipped`. */
   changeMany: (shelterId: string, change: ManyChange) =>

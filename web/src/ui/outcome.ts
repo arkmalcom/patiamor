@@ -17,7 +17,7 @@ export interface OutcomePet {
 }
 
 const WITHDRAW_REASONS: WithdrawReason[] = ['familia_original', 'salud', 'fallecio', 'otro'];
-const OPEN = ['sent', 'seen', 'contacted', 'visit'];
+const OPEN = ['sent', 'seen', 'contacted', 'visit', 'fostering'];
 const OUTSIDE = 'fuera';
 /** Errors the server may give here that have their own message (the publishing rules, on relisting). */
 const KNOWN = ['photo_required', 'story_required', 'too_young', 'shelter_not_verified', 'shelter_suspended'];

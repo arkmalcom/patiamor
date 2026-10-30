@@ -1,4 +1,4 @@
-import { Bell, BellRing, CalendarCheck, Check, Eye, HeartHandshake, House, Mail, MessageCircle, Send, Undo2, X, type IconNode } from 'lucide';
+import { Bell, BellRing, CalendarCheck, Check, Eye, HeartHandshake, House, HouseHeart, Mail, MessageCircle, Send, Undo2, X, type IconNode } from 'lucide';
 import { ApiError } from '../api';
 import { CONTACT_EMAIL, type PetDetail, type PetSummary } from '../data';
 import { $, $$, html, icon, type Raw } from '../dom';
@@ -7,6 +7,7 @@ import {
   activeRequestFor,
   activeRequests,
   loadRequests,
+  FOSTER_LENGTHS,
   MAX_SLOTS,
   petCache,
   placePet,
@@ -17,8 +18,10 @@ import {
   withdrawRequest,
   type Answers,
   type ContactPref,
+  type FosterLength,
   type MyRequest,
   type RequestForm,
+  type RequestKind,
   type RequestStatus,
 } from '../store';
 import { renderAuth } from './auth';
@@ -31,10 +34,13 @@ import { legalLinks } from './legal-links';
 
 // Adoption requests. Liking a pet opens its full profile; "Quiero adoptar" in its bar opens this one form: the reflection questions, how to reach the adopter, consent, and
 // optionally more for the lister. Each request takes one of Mi lista's 3 slots until it ends or is
-// withdrawn; withdrawing is always possible and the lister always sees it.
+// withdrawn; withdrawing is always possible and the lister always sees it. For a shelter's animal the form
+// also offers a foster home ("hogar temporal") for a length the person picks, in the same slot.
 
 export const lo = (pet: PetSummary) => (pet.sex === 'hembra' ? 'la' : 'lo');
 export const listerName = (pet: PetSummary) => (pet.lister.type === 'shelter' ? pet.lister.name : t('lister.privateWho'));
+/** Only shelters take foster homes (a private lister is rehoming their own animal), one at a time. */
+export const canFoster = (pet: PetSummary) => pet.lister.type === 'shelter' && !pet.fostered;
 
 /** "+18095551234" or "8095551234" → "809-555-1234". */
 const showPhone = (p: string | null | undefined) => {
@@ -86,20 +92,22 @@ function timeQuestion(pet: PetSummary): string {
 }
 
 const yesUnsure = (v: string) => (v === 'si' ? t('reflect.yes') : t('reflect.unsure'));
-const reflection = (pet: PetSummary) => [
+const costQuestion = (kind: RequestKind) => t(kind === 'foster' ? 'reflect.q.cost.foster' : 'reflect.q.cost');
+const reflection = (pet: PetSummary, kind: RequestKind) => [
   choice('space', pet.size === 'grande' && pet.species === 'perro' ? t('reflect.q.space.big', { name: pet.name }) : t('reflect.q.space', { un: t(`animal.${pet.species}.un`) }), ['si', 'pensando'], yesUnsure),
   choice('time', timeQuestion(pet), ['si', 'pensando'], yesUnsure),
-  choice('cost', t('reflect.q.cost'), ['si', 'pensando'], yesUnsure),
+  choice('cost', costQuestion(kind), ['si', 'pensando'], yesUnsure),
 ];
 
-/** Starts the process for a pet: signs in first if needed, makes room if Mi lista is full, then the form. */
-export function startRequest(petId: string) {
+/** Starts the process for a pet: signs in first if needed, makes room if Mi lista is full, then the form.
+ *  `kind` picks what the form opens on; the person can still switch there. */
+export function startRequest(petId: string, kind: RequestKind = 'adopt') {
   const pet = petCache.get(petId);
   if (!pet || activeRequestFor(petId)) return;
   if (!state.signedIn) return showAuth(pet);
   if (state.user?.requestsRestricted) return void openRestricted();
   if (activeRequests().length >= MAX_SLOTS) return openFull(pet);
-  openForm(pet);
+  openForm(pet, kind === 'foster' && canFoster(pet) ? 'foster' : 'adopt');
 }
 
 /** Reopens a request interrupted by a sign-in redirect (Google, the email link). */
@@ -158,8 +166,9 @@ function openRestricted() {
 
 const PREFS: ContactPref[] = ['whatsapp', 'llamada', 'correo'];
 
-function openForm(pet: PetSummary) {
+function openForm(pet: PetSummary, initial: RequestKind) {
   const lister = listerName(pet);
+  const fosterable = canFoster(pet);
   const user = state.user;
   // A returning adopter sees one line with how they'll be reached, and can change it.
   const known = !!(user?.name && user.contactPref && (user.contactPref === 'correo' || user.phone));
@@ -175,8 +184,20 @@ function openForm(pet: PetSummary) {
           ${pet.requests === 'busy' ? html`<p class="request__busy">${t('request.busy', { lister })}</p>` : ''}
         </div>
       </div>
+      ${fosterable
+        ? html`<fieldset class="question">
+              <legend>${t('request.kind', { name: pet.name })}</legend>
+              <div class="segmented segmented--wrap">
+                ${(['adopt', 'foster'] as const).map((k) => html`<label><input type="radio" name="kind" value="${k}" ${k === initial ? 'checked' : ''} /><span>${t(`request.kind.${k}`, { lo: lo(pet) })}</span></label>`)}
+              </div>
+              <p class="question__hint" data-foster-only>${t('request.kindHint', { lo: lo(pet), lister })}</p>
+            </fieldset>
+            <div data-foster-only>
+              ${choice('fosterLength', t('request.fosterLength', { lo: lo(pet) }), [...FOSTER_LENGTHS], (v) => t(`request.fosterLength.${v as FosterLength}`), { hint: t('request.fosterLengthHint') })}
+            </div>`
+        : ''}
       ${beforeYouStart(pet)}
-      ${reflection(pet)}
+      ${reflection(pet, initial)}
       ${far ? choice('travel', t('request.travel', { name: pet.name }), ['si', 'pensando'], yesUnsure, { hint: t('request.travelHint', { km: formatKm(placePet(pet).km), place: pet.place.name }) }) : ''}
       <p class="unsure-note" hidden data-unsure>${t('reflect.unsureNote', { lister })}</p>
       <fieldset class="question contact">
@@ -217,7 +238,7 @@ function openForm(pet: PetSummary) {
           <textarea class="field__input field__input--area" name="message" rows="3" maxlength="500"></textarea>
         </label>
       </details>
-      <p class="request__warning">${t('request.warning', { name: pet.name, lister })}</p>
+      <p class="request__warning" data-warning>${t(initial === 'foster' ? 'request.warning.foster' : 'request.warning', { name: pet.name, lister })}</p>
       <label class="consent">
         <input type="checkbox" name="consent" />
         <span>${t('request.consent', { email: user?.email ?? '', lister })}</span>
@@ -229,7 +250,8 @@ function openForm(pet: PetSummary) {
     <button class="button button--ghost" type="button" data-cancel>${t('request.cancel')}</button>
     <button class="button button--primary" type="submit" form="request-form" disabled data-send>${icon(Send, 18)}<span>${t('request.complete')}</span></button>`;
 
-  const dialog = openSheet(t('request.title', { name: pet.name }), body, { footer });
+  const title = (kind: RequestKind) => t(kind === 'foster' ? 'request.title.foster' : 'request.title', { name: pet.name });
+  const dialog = openSheet(title(initial), body, { footer });
   const form = $<HTMLFormElement>('#request-form', dialog);
   const send = $<HTMLButtonElement>('[data-send]', dialog);
   const error = $('[data-error]', dialog);
@@ -241,8 +263,11 @@ function openForm(pet: PetSummary) {
   const read = (): RequestForm => {
     const f = new FormData(form);
     const opt = <T,>(k: string) => (f.get(k) as T | null) ?? undefined;
+    const kind: RequestKind = f.get('kind') === 'foster' ? 'foster' : 'adopt';
     return {
       petId: pet.id,
+      kind,
+      fosterLength: kind === 'foster' ? opt<FosterLength>('fosterLength') : undefined,
       answers: { space: f.get('space'), time: f.get('time'), cost: f.get('cost') } as Answers,
       name: String(f.get('name') ?? '').trim(),
       phone: String(f.get('phone') ?? '').trim(),
@@ -259,9 +284,22 @@ function openForm(pet: PetSummary) {
     };
   };
   const phoneOk = (r: RequestForm) => (r.pref === 'correo' && !r.phone) || r.phone.replace(/\D/g, '').length >= 10;
-  const complete = (r: RequestForm) => !!(r.answers.space && r.answers.time && r.answers.cost) && (!far || !!r.travel) && r.name.length >= 2 && phoneOk(r) && r.consent;
+  const complete = (r: RequestForm) =>
+    !!(r.answers.space && r.answers.time && r.answers.cost) && (r.kind !== 'foster' || !!r.fosterLength) && (!far || !!r.travel) && r.name.length >= 2 && phoneOk(r) && r.consent;
+  /** Adopting and fostering share the form; what differs follows the choice (a foster pays no adoption fee). */
+  let shownKind: RequestKind | null = null;
+  const showKind = (kind: RequestKind) => {
+    if (kind === shownKind) return;
+    shownKind = kind;
+    $$<HTMLElement>('[data-foster-only]', dialog).forEach((el) => (el.hidden = kind !== 'foster'));
+    dialog.querySelector<HTMLElement>('.ready__fee')?.toggleAttribute('hidden', kind === 'foster');
+    $('#sheet-title', dialog).textContent = title(kind);
+    $('input[name=cost]', dialog).closest('fieldset')!.querySelector('legend')!.textContent = costQuestion(kind);
+    $('[data-warning]', dialog).textContent = t(kind === 'foster' ? 'request.warning.foster' : 'request.warning', { name: pet.name, lister });
+  };
   const sync = () => {
     const r = read();
+    showKind(r.kind);
     const ok = complete(r);
     send.disabled = !ok;
     $('span', send).textContent = ok ? t('request.send') : t('request.complete');
@@ -286,14 +324,14 @@ function openForm(pet: PetSummary) {
     error.hidden = true;
     try {
       await sendRequest(r);
-      showDone(pet);
+      showDone(pet, r.kind);
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'network';
       if (code === 'requests_full') return openFull(pet);
       if (code === 'restricted') return void openRestricted();
       if (code === 'invalid_phone' || code === 'invalid_name') showFields(); // so it can be fixed
-      const known = ['invalid_phone', 'invalid_name', 'reserved', 'paused', 'travel_required'];
-      error.textContent = known.includes(code) ? sentence(t(`request.err.${code as 'invalid_phone'}`, { name: pet.name, lister })) : failText(code);
+      const known = ['invalid_phone', 'invalid_name', 'reserved', 'paused', 'travel_required', 'fostered'];
+      error.textContent = known.includes(code) ? sentence(t(`request.err.${code as 'invalid_phone'}`, { name: pet.name, lister, lo: lo(pet) })) : failText(code);
       error.hidden = false;
       error.scrollIntoView({ block: 'nearest' });
       sync();
@@ -301,12 +339,12 @@ function openForm(pet: PetSummary) {
   });
 }
 
-function showDone(pet: PetSummary) {
+function showDone(pet: PetSummary, kind: RequestKind) {
   const lister = listerName(pet);
   const body = html`
     <div class="request-done">
       <span class="request-done__mark" aria-hidden="true">${icon(Send, 26)}</span>
-      <p class="request-done__lede">${sentence(t('request.doneBody', { lister, name: pet.name }))}</p>
+      <p class="request-done__lede">${sentence(t(kind === 'foster' ? 'request.doneBody.foster' : 'request.doneBody', { lister, name: pet.name }))}</p>
       <ol class="request-done__steps">
         <li>${t('request.next1')}</li>
         <li>${t('request.next2')}</li>
@@ -362,14 +400,26 @@ const STATUS_ICON: Record<RequestStatus, IconNode> = {
   seen: Eye,
   contacted: MessageCircle,
   visit: CalendarCheck,
+  fostering: HouseHeart,
   adopted: House,
   closed: HeartHandshake,
   withdrawn: Undo2,
 };
 
-/** "closed" because the pet went home with another family, or was withdrawn, reads differently from a lister's no. */
-export const statusKey = (item: MyRequest) =>
-  item.request.status !== 'closed' ? item.request.status : item.pet.status === 'adopted' ? 'found' : item.pet.status === 'withdrawn' ? 'gone' : 'closed';
+/** "closed" because the pet went home with another family, or was withdrawn, reads differently from a lister's no;
+ *  a foster that ended, or a foster offer the shelter didn't need, has its own words. */
+export const statusKey = (item: MyRequest) => {
+  const { request, pet } = item;
+  if (request.status !== 'closed') return request.status;
+  if (pet.status === 'adopted') return 'found';
+  if (pet.status === 'withdrawn') return 'gone';
+  if (request.kind === 'foster') return request.fosterStartedAt ? 'fosterEnded' : 'fosterClosed';
+  return 'closed';
+};
+
+/** "Hogar temporal · 1 mes" for a foster offer; nothing for an adoption. */
+export const kindTag = (request: MyRequest['request']) =>
+  request.kind === 'foster' && request.fosterLength ? t('request.kindTag.foster', { length: t(`request.fosterLength.${request.fosterLength}`) }) : '';
 
 /** Where a request stands, in the adopter's words. */
 export function requestStatus(item: MyRequest): Raw {
@@ -380,7 +430,7 @@ export function requestStatus(item: MyRequest): Raw {
     <div class="req-status req-status--${request.status}" role="status">
       <span class="req-status__mark" aria-hidden="true">${icon(STATUS_ICON[request.status], 18)}</span>
       <div>
-        <p class="req-status__title">${sentence(t(`request.status.${key as 'sent'}`, { lister, name: pet.name }))}</p>
+        <p class="req-status__title">${sentence(t(`request.status.${key as 'sent'}`, { lister, name: pet.name, lo: lo(pet) }))}</p>
         <p class="req-status__body">${sentence(t(`request.status.${key as 'sent'}.body`, { lister, name: pet.name, lo: lo(pet) }))}</p>
         <p class="req-status__date">${t('request.sentOn', { date: formatDate(request.createdAt.slice(0, 10)) })}</p>
       </div>

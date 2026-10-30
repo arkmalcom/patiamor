@@ -1,11 +1,11 @@
-import { ArrowLeft, Check, CircleHelp, Clock, Copy, HandHeart, Heart, HeartHandshake, House, Mail, Send, Share2, User, X } from 'lucide';
+import { ArrowLeft, Check, CircleHelp, Clock, Copy, HandHeart, Heart, HeartHandshake, House, HouseHeart, Mail, Send, Share2, User, X } from 'lucide';
 import { api, ApiError, type GonePet } from '../api';
 import { companionKey, CONTACT_EMAIL, DEMO, frameFor, type Companion, type Donation, type PetDetail, type PetSummary } from '../data';
 import { $, $$, html, icon, mount, type Raw } from '../dom';
 import { formatDate, t, away } from '../i18n';
 import { setPage, titled } from '../seo';
 import { activeRequestFor, cachePets, petCache, placePet, state, takeChanged, update } from '../store';
-import { alertButton, beforeYouStart, bindAlerts, listerName, startRequest } from '../ui/request';
+import { alertButton, beforeYouStart, bindAlerts, canFoster, listerName, lo, startRequest } from '../ui/request';
 import { age, canvas, companionLabel, photo } from '../ui/canvas';
 import { bindGallery } from '../ui/gallery';
 import { openReport, reportButton } from '../ui/report';
@@ -130,6 +130,7 @@ function body(pet: PetDetail, km: number): Raw {
     ['desparasitacion', pet.health.dewormed],
   ] as const;
   return html`
+    ${pet.fostered ? html`<p class="help-banner">${icon(HouseHeart, 20)}<span>${t('profile.fostered', { lo: lo(pet) })}</span></p>` : ''}
     ${pet.story ? html`<section class="profile__section"><h2 class="section-title">${t('profile.story')}</h2><p class="profile__story">${pet.story}</p></section>` : ''}
     ${pet.helpCase
       ? html`<p class="help-banner">${icon(HandHeart, 20)}<span>${t('help.profileBanner', { name: pet.name })} <a href="/caso/${encodeURIComponent(pet.helpCase.id)}">${t('help.profileLink')}</a></span></p>`
@@ -176,7 +177,13 @@ function ready(pet: PetDetail): Raw {
             <p>${t('profile.ready.restricted')}</p>
             <a class="button button--ink button--small ready__write" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(t('request.restrictedSubject'))}">${icon(Mail, 18)}${t('full.manyCta')}</a>
           </div>`
-        : html`<p class="muted ready__note">${t('profile.ready.note')}</p>`}
+        : html`<p class="muted ready__note">${t('profile.ready.note')}</p>
+            ${canFoster(pet)
+              ? html`<div class="ready__foster">
+                  <p>${t('profile.ready.foster')}</p>
+                  <button class="button button--outline button--small" type="button" data-foster>${icon(HouseHeart, 18)}${t('profile.ready.fosterCta')}</button>
+                </div>`
+              : ''}`}
     </section>`;
 }
 
@@ -251,6 +258,7 @@ export function renderProfile(root: HTMLElement, id: string, deps: ProfileDeps) 
   root.querySelector('[data-report]')?.addEventListener('click', () => openReport(pet));
   bindGallery($('.profile__media', root), pet, 'profile');
   root.querySelector('[data-start]')?.addEventListener('click', () => startRequest(pet.id));
+  root.querySelector('[data-foster]')?.addEventListener('click', () => startRequest(pet.id, 'foster'));
   bindAlerts(root);
   root.querySelector('[data-skip]')?.addEventListener('click', () => {
     update((s) => s.skipped.push(pet.id));

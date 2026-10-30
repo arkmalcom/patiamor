@@ -43,6 +43,8 @@ export interface PetSummary {
   status: string;
   /** Whether an adoption request can be sent: open, busy (several already), paused, or reserved ("en proceso"). */
   requests: 'open' | 'busy' | 'paused' | 'reserved';
+  /** Living with a foster home ("En hogar temporal") meanwhile; still up for adoption. */
+  fostered?: boolean;
   place: Place;
   lister: Lister;
   /** `thumb` (about 480 px) is for small frames; sample photos have none. */

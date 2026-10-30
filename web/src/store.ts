@@ -15,20 +15,32 @@ export interface MyRequest {
   request: AdoptionRequest;
 }
 
-export type RequestStatus = 'sent' | 'seen' | 'contacted' | 'visit' | 'adopted' | 'closed' | 'withdrawn';
+/** 'fostering': a foster offer whose animal lives with them now (still open, still a slot). */
+export type RequestStatus = 'sent' | 'seen' | 'contacted' | 'visit' | 'fostering' | 'adopted' | 'closed' | 'withdrawn';
+/** Adopting, or offering a foster home ("hogar temporal") for a while. */
+export type RequestKind = 'adopt' | 'foster';
+/** How long someone can foster (the same list is in api/src/requests.ts). */
+export const FOSTER_LENGTHS = ['dos_semanas', 'un_mes', 'dos_tres_meses', 'hasta_adopcion'] as const;
+export type FosterLength = (typeof FOSTER_LENGTHS)[number];
 export interface AdoptionRequest {
   id: string;
   status: RequestStatus;
   createdAt: string;
   updatedAt?: string;
+  kind?: RequestKind;
+  fosterLength?: FosterLength | null;
+  fosterStartedAt?: string | null;
 }
-export const isOpen = (r: AdoptionRequest | null | undefined) => !!r && ['sent', 'seen', 'contacted', 'visit'].includes(r.status);
+export const isOpen = (r: AdoptionRequest | null | undefined) => !!r && ['sent', 'seen', 'contacted', 'visit', 'fostering'].includes(r.status);
 
 export type ContactPref = 'whatsapp' | 'llamada' | 'correo';
 
 /** What "Enviar solicitud" sends: reflection, contact, consent; the rest is optional. */
 export interface RequestForm {
   petId: string;
+  kind: RequestKind;
+  /** For a foster offer only. */
+  fosterLength?: FosterLength;
   answers: Answers;
   name: string;
   phone: string;

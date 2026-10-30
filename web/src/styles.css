@@ -1038,13 +1038,14 @@ html.sheet-open { overflow: hidden; }
   flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%;
   background: var(--ink); color: #fff;
 }
-.req-status--adopted .req-status__mark, .req-status--visit .req-status__mark { background: var(--hoja); }
+.req-status--adopted .req-status__mark, .req-status--visit .req-status__mark, .req-status--fostering .req-status__mark { background: var(--hoja); }
 .req-status--closed .req-status__mark { background: var(--paper); color: var(--ink-2); box-shadow: inset 0 0 0 1.5px var(--rule-strong); }
 .req-status__title { font-weight: 800; line-height: 1.3; }
 .req-status__body { font-size: 0.95rem; }
 .req-status__date { margin-top: 2px; font-size: 0.85rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 
 .slot__status { font-size: 0.85rem; font-weight: 700; color: var(--ink); line-height: 1.3; }
+.slot__kind { font-size: 0.85rem; font-weight: 700; color: var(--ink-2); }
 .request__slot { margin-top: 4px; font-weight: 700; }
 .request__warning { margin-top: 16px; font-size: 0.95rem; line-height: 1.45; }
 /* Withdrawing, and a paused account: said plainly, on the warm tint, never as an alarm. */
@@ -1102,6 +1103,8 @@ html.sheet-open { overflow: hidden; }
 .ready .mind { background: var(--paper); }
 .ready__fee { font-weight: 700; }
 .ready__note { font-size: 0.9rem; text-align: center; }
+/* A foster home, for someone who can't adopt now: secondary to "Quiero adoptar" in the bar. */
+.ready__foster { display: grid; gap: 8px; justify-items: center; text-align: center; padding-top: 12px; border-top: 1px solid var(--rule); }
 
 .alert-toggle[aria-pressed='true'] { background: var(--sky-tint); border-color: var(--rule-strong); }
 .wait-tag { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; color: var(--ink); justify-content: center; text-align: center; }
@@ -1473,7 +1476,7 @@ html[data-route='profile'] .tabbar { display: none; }
 }
 .status-chip--req-sent { background: var(--hibiscus); color: #fff; }
 .status-chip--req-seen { background: var(--sky-tint); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--rule-strong); }
-.status-chip--req-contacted, .status-chip--req-visit { background: var(--hoja); color: #fff; }
+.status-chip--req-contacted, .status-chip--req-visit, .status-chip--req-fostering { background: var(--hoja); color: #fff; }
 .status-chip--req-adopted { background: var(--ink); color: var(--paper); }
 .status-chip--req-closed, .status-chip--req-withdrawn { background: var(--paper); color: var(--ink-2); box-shadow: inset 0 0 0 1.5px var(--rule-strong); }
 .portal-card__count { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--paper); color: var(--hibiscus); font-size: 0.82rem; font-weight: 800; }
